@@ -10,6 +10,7 @@
   "patient_name_by",
   "link_customer_to_patient",
   "default_medical_code_standard",
+  "default_google_calendar",
   "column_break_9",
   "collect_registration_fee",
   "registration_fee",
@@ -330,11 +331,18 @@
    "fieldname": "validate_nursing_checklists",
    "fieldtype": "Check",
    "label": "Validate Nursing Checklists"
+  },
+  {
+   "description": "For use while scheduling tele-consultations via Google Meet",
+   "fieldname": "default_google_calendar",
+   "fieldtype": "Link",
+   "label": "Default Google Calendar",
+   "options": "Google Calendar"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2022-01-18 11:35:17.261514",
+ "modified": "2022-06-15 07:26:33.285664",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
@@ -355,5 +363,6 @@
  "restrict_to_domain": "Healthcare",
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }

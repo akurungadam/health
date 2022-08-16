@@ -12,6 +12,7 @@ from frappe.contacts.address_and_contact import (
 )
 from frappe.model.document import Document
 from frappe.model.naming import append_number_if_name_exists
+from frappe.utils import get_link_to_form
 
 from erpnext.accounts.party import validate_party_accounts
 
@@ -43,6 +44,8 @@ class HealthcarePractitioner(Document):
 				frappe.permissions.remove_user_permission(
 					'Healthcare Practitioner', self.name, existing_user_id)
 
+		self.validate_practitioner_schedules()
+
 	def on_update(self):
 		if self.user_id:
 			frappe.permissions.add_user_permission('Healthcare Practitioner', self.name, self.user_id)
@@ -52,6 +55,24 @@ class HealthcarePractitioner(Document):
 			self.practitioner_name = ' '.join(filter(None, [self.first_name, self.last_name]))
 		else:
 			self.practitioner_name = self.first_name
+
+	def validate_practitioner_schedules(self):
+		for practitioner_schedule in self.practitioner_schedules:
+			if frappe.db.get_value('Practitioner Schedule', practitioner_schedule.schedule, 'allow_video_conferencing'):
+
+				if not self.google_calendar and \
+					not frappe.db.get_single_value("Healthcare Settings", "default_google_calendar"):
+
+						frappe.throw(_(
+								'Video conferencing enabled for {}, \
+								please link {} or configure Default Google Calendar in {}'
+							).format(
+								get_link_to_form('Practitioner Schedule', practitioner_schedule.schedule),
+								frappe.bold('Google Calendar'),
+								get_link_to_form("Healthcare Settings", "Healthcare Settings", "Healthcare Settings")
+							), title=_("Google Calendar Required")
+						)
+				break
 
 	def validate_user_id(self):
 		if not frappe.db.exists('User', self.user_id):
