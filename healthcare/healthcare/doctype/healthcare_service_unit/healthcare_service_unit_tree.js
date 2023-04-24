@@ -10,21 +10,29 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 		fieldtype: 'Select',
 		options: erpnext.utils.get_tree_options('company'),
 		label: __('Company'),
-		default: erpnext.utils.get_tree_default('company')
+		default: erpnext.utils.get_tree_default('company'),
 	}],
 	fields: [
 		{
-			fieldtype: 'Data', fieldname: 'healthcare_service_unit_name', label: __('New Service Unit Name'),
-			reqd: true
+			fieldtype: 'Data',
+			fieldname: 'healthcare_service_unit_name',
+			label: __('New Service Unit Name'),
+			reqd: true,
 		},
 		{
-			fieldtype: 'Check', fieldname: 'is_group', label: __('Is Group'),
-			description: __("Child nodes can be only created under 'Group' type nodes")
+			fieldtype: 'Check',
+			fieldname: 'is_group',
+			label: __('Is Group'),
+			description: __("Child nodes can be only created under 'Group' type nodes"),
 		},
 		{
-			fieldtype: 'Link', fieldname: 'service_unit_type', label: __('Service Unit Type'),
-			options: 'Healthcare Service Unit Type', description: __('Type of the new Service Unit'),
-			depends_on: 'eval:!doc.is_group', default: '',
+			fieldtype: 'Link',
+			fieldname: 'service_unit_type',
+			label: __('Service Unit Type'),
+			options: 'Healthcare Service Unit Type',
+			description: __('Type of the new Service Unit'),
+			depends_on: 'eval:!doc.is_group',
+			default: '',
 			mandatory_depends_on: 'eval:!doc.is_group',
 			onchange: () => {
 				if (cur_dialog) {
@@ -45,24 +53,35 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 						cur_dialog.set_df_property('service_unit_capacity', 'reqd', false);
 					}
 				}
-			}
+			},
 		},
 		{
-			fieldtype: 'Int', fieldname: 'service_unit_capacity', label: __('Service Unit Capacity'),
-			description: __('Sets the number of concurrent appointments allowed'), reqd: false,
-			depends_on: "eval:!doc.is_group && doc.service_unit_type != ''", hidden: true
+			fieldtype: 'Int',
+			fieldname: 'service_unit_capacity',
+			label: __('Service Unit Capacity'),
+			description: __('Sets the number of concurrent appointments allowed'),
+			depends_on: "eval:!doc.is_group && doc.service_unit_type != ''",
+			hidden: true,
+			reqd: false,
 		},
 		{
-			fieldtype: 'Link', fieldname: 'warehouse', label: __('Warehouse'), options: 'Warehouse',
+			fieldtype: 'Link',
+			fieldname: 'warehouse',
+			label: __('Warehouse'),
+			options: 'Warehouse',
 			description: __('Optional, if you want to manage stock separately for this Service Unit'),
-			depends_on: 'eval:!doc.is_group'
+			depends_on: 'eval:!doc.is_group',
 		},
 		{
-			fieldtype: 'Link', fieldname: 'company', label: __('Company'), options: 'Company', reqd: true,
+			fieldtype: 'Link',
+			fieldname: 'company',
+			label: __('Company'),
+			options: 'Company',
+			reqd: true,
 			default: () => {
 				return cur_page.page.page.fields_dict.company.value;
-			}
-		}
+			},
+		},
 	],
 	ignore_fields: ['parent_healthcare_service_unit'],
 	onrender: function (node) {
@@ -101,17 +120,26 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 					title: __('Add Multiple Service Units'),
 					fields: [
 						{
-							fieldtype: 'Data', fieldname: 'healthcare_service_unit_name', label: __('Service Unit Name'),
-							reqd: true, description: __("Will be serially suffixed to maintain uniquness. Example: 'Ward' will be named as 'Ward-####'"),
+							fieldtype: 'Data',
+							fieldname: 'healthcare_service_unit_name',
+							label: __('Service Unit Name'),
+							description: __("Will be serially suffixed to maintain uniquness. Example: 'Ward' will be named as 'Ward-####'"),
+							reqd: true,
 						},
 						{
-							fieldtype: 'Int', fieldname: 'count', label: __('Number of Service Units'),
+							fieldtype: 'Int',
+							fieldname: 'count',
+							label: __('Number of Service Units'),
 							reqd: true
 						},
 						{
-							fieldtype: 'Link', fieldname: 'service_unit_type', label: __('Service Unit Type'),
-							options: 'Healthcare Service Unit Type', description: __('Type of the new Service Unit'),
-							depends_on: 'eval:!doc.is_group', default: '', reqd: true,
+							fieldtype: 'Link',
+							fieldname: 'service_unit_type',
+							label: __('Service Unit Type'),
+							options: 'Healthcare Service Unit Type',
+							description: __('Type of the new Service Unit'),
+							default: '',
+							reqd: true,
 							onchange: () => {
 								if (cur_dialog) {
 									if (cur_dialog.fields_dict.service_unit_type.value) {
@@ -131,23 +159,35 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 										cur_dialog.set_df_property('service_unit_capacity', 'reqd', false);
 									}
 								}
-							}
+							},
 						},
 						{
-							fieldtype: 'Int', fieldname: 'service_unit_capacity', label: __('Service Unit Capacity'),
-							description: __('Sets the number of concurrent appointments allowed'), reqd: false,
-							depends_on: "eval:!doc.is_group && doc.service_unit_type != ''", hidden: true
+							fieldtype: 'Int',
+							fieldname: 'service_unit_capacity',
+							label: __('Service Unit Capacity'),
+							description: __('Sets the number of concurrent appointments allowed'),
+							depends_on: "eval:!doc.is_group && doc.service_unit_type != ''",
+							hidden: true,
+							reqd: false,
+							mandatory_depends_on: "eval:!doc.is_group && doc.service_unit_type != ''",
 						},
 						{
-							fieldtype: 'Link', fieldname: 'warehouse', label: __('Warehouse'), options: 'Warehouse',
+							fieldtype: 'Link',
+							fieldname: 'warehouse',
+							label: __('Warehouse'),
+							options: 'Warehouse',
 							description: __('Optional, if you want to manage stock separately for this Service Unit'),
 						},
 						{
-							fieldtype: 'Link', fieldname: 'company', label: __('Company'), options: 'Company', reqd: true,
+							fieldtype: 'Link',
+							fieldname: 'company',
+							label: __('Company'),
+							options: 'Company',
+							reqd: true,
 							default: () => {
 								return cur_page.page.page.fields_dict.company.get_value();
-							}
-						}
+							},
+						},
 					],
 					primary_action: () => {
 						dialog.hide();
@@ -158,7 +198,7 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 							method: 'healthcare.healthcare.doctype.healthcare_service_unit.healthcare_service_unit.add_multiple_service_units',
 							args: {
 								parent: node.data.value,
-								data: vals
+								data: vals,
 							},
 							callback: function (r) {
 								if (!r.exc && r.message) {
@@ -166,21 +206,21 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 
 									frappe.show_alert({
 										message: __('{0} Service Units created', [vals.count - r.message.length]),
-										indicator: 'green'
+										indicator: 'green',
 									});
 								} else {
 									frappe.msgprint(__('Could not create Service Units'));
 								}
 							},
 							freeze: true,
-							freeze_message: __('Creating {0} Service Units', [vals.count])
+							freeze_message: __('Creating {0} Service Units', [vals.count]),
 						});
 					},
-					primary_action_label: __('Create')
+					primary_action_label: __('Create'),
 				});
 				dialog.show();
 			}
 		}
 	],
-	extend_toolbar: true
+	extend_toolbar: true,
 };
