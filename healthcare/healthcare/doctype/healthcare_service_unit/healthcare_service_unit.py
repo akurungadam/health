@@ -61,12 +61,17 @@ class HealthcareServiceUnit(NestedSet):
 			else:
 				self.overlap_appointments = False
 				self.service_unit_capacity = 0
+		else:
+			frappe.throw(
+				_("Service Unit Type is required to create Service Unit nodes"),
+				title=_("Missing Mandatory Field"),
+			)
 
 		if self.overlap_appointments:
 			if not self.service_unit_capacity:
 				frappe.throw(
 					_("Please set a valid Service Unit Capacity to enable Overlapping Appointments"),
-					title=_("Mandatory"),
+					title=_("Missing Mandatory Field"),
 				)
 
 

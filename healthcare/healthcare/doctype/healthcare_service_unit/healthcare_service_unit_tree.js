@@ -25,6 +25,7 @@ frappe.treeview_settings['Healthcare Service Unit'] = {
 			fieldtype: 'Link', fieldname: 'service_unit_type', label: __('Service Unit Type'),
 			options: 'Healthcare Service Unit Type', description: __('Type of the new Service Unit'),
 			depends_on: 'eval:!doc.is_group', default: '',
+			mandatory_depends_on: 'eval:!doc.is_group',
 			onchange: () => {
 				if (cur_dialog) {
 					if (cur_dialog.fields_dict.service_unit_type.value) {
