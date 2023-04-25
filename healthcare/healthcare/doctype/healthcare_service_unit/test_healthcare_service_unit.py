@@ -16,7 +16,7 @@ class TestHealthcareServiceUnit(FrappeTestCase):
 			}
 		)
 		try:
-			company = company.insert()
+			company = company.insert(ignore_if_duplicate=True)
 		except frappe.exceptions.DuplicateEntryError:
 			pass
 		filters = {"company": company.name, "parent_healthcare_service_unit": None}

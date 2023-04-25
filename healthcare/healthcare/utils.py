@@ -608,11 +608,13 @@ def get_children(doctype, parent=None, company=None, is_root=False):
 	parent_fieldname = "parent_" + doctype.lower().replace(" ", "_")
 	fields = ["name as value", "is_group as expandable", "lft", "rgt"]
 
-	filters = [["ifnull(`{0}`,'')".format(parent_fieldname), "=", "" if is_root else parent]]
+	filters = [
+		["ifnull(`{0}`,'')".format(parent_fieldname), "=", "" if is_root else parent],
+		["company", "=", company]
+	]
 
 	if is_root:
 		fields += ["service_unit_type"] if doctype == "Healthcare Service Unit" else []
-		filters.append(["company", "=", company])
 	else:
 		fields += (
 			["service_unit_type", "allow_appointments", "inpatient_occupancy", "occupancy_status"]

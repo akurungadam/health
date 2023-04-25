@@ -20,6 +20,17 @@ class HealthcareServiceUnit(NestedSet):
 		load_address_and_contact(self)
 
 	def validate(self):
+		if self.parent_healthcare_service_unit:
+			company = frappe.get_cached_value(
+				"Healthcare Service Unit", self.parent_healthcare_service_unit, "company"
+			)
+			if self.company != company:
+				frappe.throw(
+					_(
+						f"Company cannot be {frappe.bold(self.company)}. Should be same as of parent, {frappe.bold(company)}"
+					)
+				)
+
 		self.set_service_unit_properties()
 
 	def autoname(self):
@@ -79,17 +90,11 @@ class HealthcareServiceUnit(NestedSet):
 def add_multiple_service_units(parent, data):
 	"""
 	parent - parent service unit under which the service units are to be created
-	data (dict) - company, healthcare_service_unit_name, count, service_unit_type, warehouse, service_unit_capacity
+	data (dict) - healthcare_service_unit_name, count, service_unit_type, warehouse, service_unit_capacity
 	"""
-	if not parent or not data:
-		return
-
 	data = json.loads(data)
-	company = (
-		data.get("company")
-		or frappe.defaults.get_defaults().get("company")
-		or frappe.db.get_single_value("Global Defaults", "default_company")
-	)
+
+	company = frappe.get_cached_value("Healthcare Service Unit", parent, "company")
 
 	if not data.get("healthcare_service_unit_name") or not company:
 		frappe.throw(
