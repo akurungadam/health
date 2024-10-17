@@ -15,6 +15,8 @@ from healthcare.healthcare.doctype.service_request.test_service_request import (
 	create_sales_invoice,
 )
 
+EXTRA_TEST_RECORD_DEPENDENCIES = ["Gender"]
+
 
 class TestMedicationRequest(unittest.TestCase):
 	def setup(self):
