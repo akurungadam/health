@@ -46,11 +46,15 @@
   "column_break_yo05",
   "sample_status",
   "sample_collection_time",
-  "radiology_section",
+  "imaging_procedure_section",
   "ups_appointment",
+  "modality",
+  "exam_status",
+  "column_break_cgmc",
   "study_instance_uid",
-  "column_break_zkwe",
   "imaging_study",
+  "imaging_series",
+  "image_instance",
   "result_section",
   "result_template",
   "result_text",
@@ -577,10 +581,35 @@
    "read_only": 1
   },
   {
-   "fieldname": "appointment",
+   "depends_on": "eval:doc.observation_category == \"Imaging\"",
+   "description": "Accession Number",
+   "fieldname": "ups_appointment",
    "fieldtype": "Link",
-   "label": "Appointment",
-   "options": "Patient Appointment"
+   "label": "UPS Appointment",
+   "options": "UPS Appointment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "imaging_procedure_section",
+   "fieldtype": "Section Break",
+   "label": "Imaging Procedure"
+  },
+  {
+   "fetch_from": "ups_appointment.status",
+   "fieldname": "exam_status",
+   "fieldtype": "Data",
+   "label": "Exam Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_cgmc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "study_instance_uid",
+   "fieldtype": "Data",
+   "label": "Study Instance UID",
+   "read_only": 1
   },
   {
    "fetch_from": "patient.emergency_record",

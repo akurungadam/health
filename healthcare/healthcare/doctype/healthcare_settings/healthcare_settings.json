@@ -39,6 +39,15 @@
   "lab_test_approval_required",
   "employee_name_and_designation_in_print",
   "custom_signature_in_print",
+  "radiology_section",
+  "pacs_base_url",
+  "pacs_ae_title",
+  "username",
+  "password",
+  "column_break_dbvh",
+  "qido_rs_url",
+  "wado_rs_preview_url",
+  "wado_rs_url",
   "billing_accounts",
   "healthcare_service_items",
   "inpatient_visit_charge_item",
@@ -356,7 +365,7 @@
   {
    "fieldname": "laboratory_tab",
    "fieldtype": "Tab Break",
-   "label": "Laboratory"
+   "label": "Diagnostics"
   },
   {
    "fieldname": "billing_accounts",
