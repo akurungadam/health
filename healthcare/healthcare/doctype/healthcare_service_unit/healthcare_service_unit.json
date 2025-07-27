@@ -257,6 +257,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "AE Title",
+   "length": 16,
    "mandatory_depends_on": "eval:doc.is_modality",
    "no_copy": 1,
    "search_index": 1
