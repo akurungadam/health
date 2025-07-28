@@ -19,6 +19,7 @@
   "inpatient_occupancy",
   "occupancy_status",
   "ae_title",
+  "ae_status",
   "column_break_9",
   "company",
   "warehouse",
@@ -261,6 +262,13 @@
    "mandatory_depends_on": "eval:doc.is_modality",
    "no_copy": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "ae_status",
+   "fieldtype": "Data",
+   "label": "AE Status",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "is_tree": 1,
