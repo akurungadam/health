@@ -1,22 +1,27 @@
 {
-    "name": "healthcare",
-    "version": "1.0.0",
-    "type": "commonjs",
-    "private": true,
-    "workspaces": ["patient_portal", "frappe-ui"],
-    "scripts": {
-        "postinstall": "cd patient_portal && yarn install --check-files",
-        "build": "cd patient_portal && yarn build"
-    },
-    "main": "commitlint.config.js",
-    "keywords": [],
-    "author": "earthians Health Informatics Pvt. Ltd.",
-    "license": "ISC",
-    "dependencies": {
-        "vite": "4.4.9",
-        "@vitejs/plugin-vue": "4.2.3",
-        "postcss": "^8.4.5",
-        "tailwindcss": "3.4.15",
-        "autoprefixer": "^10.4.2"
-    }
+  "name": "healthcare",
+  "version": "1.0.0",
+  "description": "<div align=\"center\"> <a href=\"https://marleyhealth.io\"> <img src=\"https://raw.githubusercontent.com/frappe/healthcare/develop/healthcare/public/images/healthcare.svg\" height=\"128\" alt=\"Marley Health Logo\"> </a>  <h2>Marley Health</h2>  <p align=\"center\"> <p>Open source & easy-to-use hospital information system(HIS) for all healthcare organisations.</p>   </p>",
+  "type": "commonjs",
+  "private": true,
+  "workspaces": ["patient_portal", "frappe-ui"],
+  "scripts": {
+      "postinstall": "install_portal && install_viewer",
+      "build": "build_portal && build_viewer",
+      "install_portal": "cd patient_portal && yarn install --check-files",
+      "install_viewer": "cd viewer && yarn install",
+      "build_portal": "cd patient_portal && yarn build",
+      "build_viewer": "cd viewer && yarn build"
+  },
+  "main": "commitlint.config.js",
+  "keywords": [],
+  "author": "earthians Health Informatics Pvt. Ltd.",
+  "license": "ISC",
+  "dependencies": {
+      "vite": "4.4.9",
+      "@vitejs/plugin-vue": "4.2.3",
+      "postcss": "^8.4.5",
+      "tailwindcss": "3.4.15",
+      "autoprefixer": "^10.4.2"
+  }
 }
