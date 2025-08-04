@@ -41,24 +41,18 @@ function buildImageIds(instances, wadoRoot) {
 		"1.2.840.10008.5.1.4.1.1.128",   // PET Image Storage
 		"1.2.840.10008.5.1.4.1.1.1",     // CR Image Storage
 		"1.2.840.10008.5.1.4.1.1.6.1",   // Ultrasound Image Storage
-		"1.2.840.10008.5.1.4.1.1.2.1",     // Enhanced CT Image Storage
+		"1.2.840.10008.5.1.4.1.1.2.1",   // Enhanced CT Image Storage
 	]
-	console.log("instances: ", instances)
-	instances.forEach((instance, i) => {
-		const sopClassUID = instance["00080016"]?.Value?.[0]
-		console.log(`Instance #${i}: SOP Class UID =`, sopClassUID)
-	})
-
 
 	return instances
 		.map((instance, i) => {
 			const studyUID = instance["0020000D"]?.Value?.[0];
 			const seriesUID = instance["0020000E"]?.Value?.[0];
 			const sopUID = instance["00080018"]?.Value?.[0];
+
+			if (!studyUID || !seriesUID || !sopUID) return null;
+
 			const sopClassUID = instance["00080016"]?.Value?.[0];
-
-			if (!studyUID || !seriesUID || !sopUID || !sopClassUID) return null;
-
 			if (!allowedSOPs.includes(sopClassUID)) {
 				console.warn(`Skipping unsupported SOP instance ${i}:`, sopClassUID);
 				return null;
@@ -82,7 +76,6 @@ onMounted(async () => {
 	}
 
 	cornerstone.init()
-
 	wadouri.external = {
 		cornerstone,
 		dicomParser,
@@ -91,7 +84,6 @@ onMounted(async () => {
 
 	const instances = await fetchInstanceMetadata({ qidoRoot, seriesUID })
 	const imageIds = buildImageIds(instances, wadoRoot)
-	console.log("Image IDs:", imageIds)
 
 	if (imageIds.length === 0) {
 		console.warn("No valid images in stack.")
@@ -113,9 +105,7 @@ onMounted(async () => {
 	for (const imageId of imageIds) {
 		try {
 			await cornerstone.imageLoader.loadAndCacheImage(imageId)
-			console.log("✅ Loaded first image:", imageIds[0])
-
-			viewport.setStack({ imageIds, currentImageIdIndex: 0 })
+			await viewportObj.setStack({ imageIds, currentImageIdIndex: 0 })
 			viewport.render()
 			break
 		} catch (err) {
