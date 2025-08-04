@@ -16,7 +16,7 @@ export default defineConfig({
 		}),
 	],
 	build: {
-		outDir: "../public/dcmviewer",
+		outDir: "../healthcare/public/dcmviewer",
 		sourcemap: true,
 		assetsDir: ".",
 	},
