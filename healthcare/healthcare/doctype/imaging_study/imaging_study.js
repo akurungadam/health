@@ -1,6 +1,16 @@
 frappe.ui.form.on("Imaging Study", {
-	refresh(frm) {
+	async refresh(frm) {
+		const [pacs_base_url, pacs_username] = await Promise.all([
+			frappe.db.get_single_value('Healthcare Settings', 'pacs_base_url'),
+			frappe.db.get_single_value('Healthcare Settings', 'pacs_username')
+		]);
+
+		const pacs_password = await frappe.call({
+			method: 'healthcare.healthcare.doctype.healthcare_settings.healthcare_settings.get_pacs_password'
+		}).then(r => r.message);
+
 		if (!frm.doc.__islocal && frm.doc.preview_json) {
+			let series_list_new = JSON.parse(frm.doc.series || "[]").Series;
 			let series_list = JSON.parse(frm.doc.preview_json || "[]");
 
 			let html = `
@@ -48,41 +58,48 @@ frappe.ui.form.on("Imaging Study", {
 			// setTimeout(() => {
 			// 	const cards = frm.fields_dict.preview_html.$wrapper.find(".series-card");
 
-			// 	cards.each(function () {
-			// 		const card = $(this);
-			// 		const index = card.data("series-index");
-			// 		const series = series_list[index];
+				cards.each(function () {
+					const card = $(this);
+					const index = card.data("series-index");
+					const series = series_list_new[index];
+					console.log("series", series_list_new);
 
 			// 		card.on("click", function () {
 			// 			cards.css("border", "1px solid #ccc");
 			// 			card.css("border", "3px solid #ccc");
 
-			// 			const d = new frappe.ui.Dialog({
-			// 				title: `${series.SeriesInstanceUID}`,
-			// 				size: "large",
-			// 				fields: [
-			// 					{
-			// 					fieldname: "viewer_html",
-			// 					fieldtype: "HTML",
-			// 					options: `
-			// 						<iframe
-			// 							src="http://localhost:5173?studyUID=1.2.826.0.1.3680043.10.43.1753456010
-			// 							&seriesUID=1.2.826.0.1.3680043.8.498.86520435611506356480470154314530210093
-			// 							&sopUID=1.2.826.0.1.3680043.8.498.15683553860601812852607030574701453248
-			// 							&qidoRoot=/dicom-proxy
-			// 							&wadoRoot=/dicom-proxy"
-			// 							width="100%" height="600" frameborder="0"
-			// 						></iframe>
-			// 					`
-			// 					}
-			// 				]
-			// 			});
-			// 			d.show();
-			// 			// src="http://localhost:5173?seriesUID=${series.series_uid}&qidoRoot=/dicom-proxy&wadoRoot=/dicom-proxy"
-			// 			// src="/assets/healthcare/dcmviewer/index.html?seriesUID=${series.series_uid}&wadoRoot=http://localhost:8042/dicom-web&qidoRoot=http://localhost:8042/dicom-web"
-			// 			// src="http://localhost:5173?studyUID=1.2.826.0.1.3680043.10.43.1753456010&seriesUID=1.2.826.0.1.3680043.8.498.86520435611506356480470154314530210093&sopUID=1.2.826.0.1.3680043.8.498.15683553860601812852607030574701453248&qidoRoot=/dicom-proxZ&wadoRoot=/dicom-proxy"
-			// 		});
-			// 	});
+						const site = frappe.boot.developer_mode ?  "/viewer" : "/viewer" // "http://localhost:5173";
+						const url = new URL(site, window.location.origin);
+						url.searchParams.set("studyUID", frm.doc.study_instance_uid);
+						url.searchParams.set("seriesUID", series.SeriesInstanceUID);
+						url.searchParams.set("objectUID", series.Instances?.[0]?.SOPInstanceUID || '');
+						url.searchParams.set("pacs_base_url", pacs_base_url);
+						url.searchParams.set("pacs_username", pacs_username);
+						url.searchParams.set("pacs_password", pacs_password);
+						url.searchParams.set("wadoRoot", `${pacs_base_url}/dicom-web`);
+						url.searchParams.set("qidoRoot", `${pacs_base_url}/dicom-web`);
+
+						console.log(url.toString());
+
+						const d = new frappe.ui.Dialog({
+							title: `${series.SeriesInstanceUID}`,
+							size: "large",
+							fields: [
+								{
+								fieldname: "viewer_html",
+								fieldtype: "HTML",
+								options: `
+									<iframe
+										src="${url.toString()}"
+										width='100%' height='600' frameborder='0'
+									></iframe>
+								`
+								}
+							]
+						});
+						d.show();
+					});
+				// });
 			// }, 50);
 		}
 	}
