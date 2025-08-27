@@ -1,119 +1,143 @@
 <template>
-	<div ref="viewport" class="w-[512px] h-[512px] bg-black"></div>
+	<div class="w-full h-full bg-red">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="p-4 text-white bg-blue-600">
+      Loading DICOM viewer...
+    </div>
+    
+    <!-- Error State -->
+    <div v-else-if="error" class="p-4 text-white bg-red-600">
+      Error: {{ error }}
+    </div>
+    
+    <!-- Viewport is always rendered so the ref exists at mount -->
+    <div class="flex flex-col items-center justify-center h-full">
+      <div ref="viewportRef" class="w-[512px] h-[512px] bg-gray-800" tabindex="-1"
+           data-viewport-uid="dicomViewport"
+           data-rendering-engine-uid="dicomRenderingEngine">
+      </div>
+      <div v-if="!error" class="mt-4 text-sm text-white">
+        Study: {{ studyUID }}
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, defineProps } from "vue"
 import * as cornerstone from "@cornerstonejs/core"
-import * as dicomParser from "dicom-parser"
-import { wadouri } from "@cornerstonejs/dicom-image-loader"
+import { RenderingEngine, Enums } from "@cornerstonejs/core"
+import { init as initDicomImageLoader } from "@cornerstonejs/dicom-image-loader"
 
-const viewport = ref(null)
 
-function getQueryParams() {
-	const params = new URLSearchParams(window.location.search)
-	return {
-		studyUID: params.get("studyUID"),
-		seriesUID: params.get("seriesUID"),
-		sopUID: params.get("sopUID"),
-		qidoRoot: params.get("qidoRoot"),
-		wadoRoot: params.get("wadoRoot"),
-	}
-}
+const props = defineProps({
+  pacsBaseUrl: {
+    type: String,
+    required: true
+  },
+  pacsUsername: {
+    type: String,
+    required: true
+  },
+  pacsPassword: {
+    type: String,
+    required: true
+  },
+  studyUID: {
+    type: String,
+    required: true,
+    validator: value => {
+      if (!value) {
+        console.error('Error: studyUID is required');
+        return false;
+      }
+      return true;
+    }
+  },
+  seriesUID: {
+    type: String,
+    required: true,
+    validator: value => {
+      if (!value) {
+        console.error('Error: seriesUID is required');
+        return false;
+      }
+      return true;
+    }
+  },
+  objectUID: {
+    type: [String, Array],
+    required: true,
+    validator: value => {
+      if (!value || (Array.isArray(value) && value.length === 0)) {
+        console.error('Error: At least one objectUID is required');
+        return false;
+      }
+      return true;
+    }
+  }
+})
 
-async function fetchInstanceMetadata({ qidoRoot, seriesUID }) {
-	// const url = `${qidoRoot}/instances?SeriesInstanceUID=${seriesUID}`
-	const url = `/dicom-proxy/instances?SeriesInstanceUID=${seriesUID}`
-	const res = await fetch(url, {
-		headers: {
-			Accept: "application/dicom+json",
-			// Authorization: "Basic " + btoa("orthanc:orthanc"),
-		},
-	})
-	if (!res.ok) throw new Error("QIDO-RS fetch failed")
-	return await res.json()
-}
 
-function buildImageIds(instances, wadoRoot) {
-	const allowedSOPs = [
-		"1.2.840.10008.5.1.4.1.1.2",     // CT Image Storage
-		"1.2.840.10008.5.1.4.1.1.4",     // MR Image Storage
-		"1.2.840.10008.5.1.4.1.1.128",   // PET Image Storage
-		"1.2.840.10008.5.1.4.1.1.1",     // CR Image Storage
-		"1.2.840.10008.5.1.4.1.1.6.1",   // Ultrasound Image Storage
-		"1.2.840.10008.5.1.4.1.1.2.1",   // Enhanced CT Image Storage
-	]
-
-	return instances
-		.map((instance, i) => {
-			const studyUID = instance["0020000D"]?.Value?.[0];
-			const seriesUID = instance["0020000E"]?.Value?.[0];
-			const sopUID = instance["00080018"]?.Value?.[0];
-
-			if (!studyUID || !seriesUID || !sopUID) return null;
-
-			const sopClassUID = instance["00080016"]?.Value?.[0];
-			if (!allowedSOPs.includes(sopClassUID)) {
-				console.warn(`Skipping unsupported SOP instance ${i}:`, sopClassUID);
-				return null;
-			}
-
-			return `wadouri:${wadoRoot}/wado?requestType=WADO&studyUID=${studyUID}&seriesUID=${seriesUID}&objectUID=${sopUID}&contentType=application/dicom`
-			// return `wadouri:/dicom-proxy/wado?requestType=WADO&studyUID=${studyUID}&seriesUID=${seriesUID}&objectUID=${sopUID}&contentType=application/dicom`;
-		})
-		.filter(Boolean);
-}
-
+const error = ref(null);
+const isLoading = ref(true);
 
 onMounted(async () => {
-	const element = viewport.value
-	if (!element) return
+  try {
+    // Validate all required props
+    if (!props.studyUID || !props.seriesUID || !props.objectUID || 
+        !props.pacsBaseUrl || !props.pacsUsername || !props.pacsPassword) {
+      throw new Error('Required DICOM or PACS parameters are missing');
+    }
 
-	const { seriesUID, qidoRoot, wadoRoot } = getQueryParams()
-	if (!seriesUID || !qidoRoot || !wadoRoot) {
-		console.error("Missing query params")
-		return
-	}
+await cornerstone.init()
 
-	cornerstone.init()
-	wadouri.external = {
-		cornerstone,
-		dicomParser,
-	}
-	cornerstone.imageLoader.registerImageLoader("wadouri", wadouri.loadImage)
+initDicomImageLoader({
+  beforeSend: (xhr) => {
+    const base64Credentials = btoa(`${props.pacsUsername}:${props.pacsPassword}`)
+    xhr.setRequestHeader('Authorization', `Basic ${base64Credentials}`)
+  }
+})
+		const element = viewportRef.value
+		if (!element) throw new Error("Viewport element not found")
 
-	const instances = await fetchInstanceMetadata({ qidoRoot, seriesUID })
-	const imageIds = buildImageIds(instances, wadoRoot)
+		const renderingEngine = new RenderingEngine(renderingEngineId)
+		renderingEngine.enableElement({
+			viewportId,
+			element,
+			type: Enums.ViewportType.STACK,
+		})
 
-	if (imageIds.length === 0) {
-		console.warn("No valid images in stack.")
-		return
-	}
+		const viewPort = renderingEngine.getViewport(viewportId)
 
+		const { studyUID, seriesUID } = props
+		const objectUIDs = Array.isArray(props.objectUID) ? props.objectUID : [props.objectUID]
+		let imageIds = []
 
-	const renderingEngineId = "basicRenderingEngine"
-	const viewportId = "basicViewport"
-	const renderingEngine = new cornerstone.RenderingEngine(renderingEngineId)
+		objectUIDs.forEach(o => {
+			// const imageId = `wadori:http://localhost:8080/wado?requestType=WADO&studyUID=${studyUID}&seriesUID=${seriesUID}&objectUID=${o}`
+			// const imageId = `wadors:http://localhost:8080/dicom-web/studies=${studyUID}&series=${seriesUID}&instances=${o}`
+			// const imageId = `wadors://localhost:8080/dicom-web/studies/${studyUID}/series/${seriesUID}/instances/${o}/frames/1`
+			// const imageId = `wadors:${props.pacsBaseUrl}/dicom-web/studies/${studyUID}/series/${seriesUID}/instances/${o}`
+			// const imageId = `wadouri:${props.pacsBaseUrl}/instances/0664aace-03bbf140-61a682a1-2f777d8b-96a352ec/file`
+			const imageId = `wadouri:${props.pacsBaseUrl}/wado?requestType=WADO&studyUID=${studyUID}&seriesUID=${seriesUID}&objectUID=${o}&contentType=application/dicom`;
+			// const imageId = `wadouri:${props.pacsBaseUrl}/wado?requestType=WADO&studyUID=${studyUID}&seriesUID=${seriesUID}&objectUID=${o}`
+			imageIds.push(imageId)
+		})
+		console.log("imageIds:", imageIds)
 
-	renderingEngine.enableElement({
-		viewportId,
-		element,
-		type: "stack",
-	})
-
-	const viewportObj = renderingEngine.getViewport(viewportId)
-	for (const imageId of imageIds) {
-		try {
-			await cornerstone.imageLoader.loadAndCacheImage(imageId)
-			await viewportObj.setStack({ imageIds, currentImageIdIndex: 0 })
-			viewport.render()
-			break
-		} catch (err) {
-			console.warn("Skipping invalid image:", imageId, err)
+		if (!Array.isArray(imageIds) || imageIds.length === 0) {
+			throw new Error("imageIds must be a non-empty array of strings")
 		}
-	}
-
-
-
+		await viewPort.setStack(imageIds)
+		await viewPort.render()
+		console.log("Rendered!")
+  } catch (err) {
+    const errorMsg = `Failed to load DICOM viewer: ${err.message}`;
+    error.value = errorMsg;
+    console.error('DICOMViewer error:', errorMsg, err);
+  } finally {
+    isLoading.value = false;
+  }
 })
 </script>
