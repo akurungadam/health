@@ -4,26 +4,15 @@
 import json
 
 import frappe
-from frappe import _, generate_hash
+from frappe import generate_hash
 from frappe.model.document import Document
 
-from healthcare.healthcare.doctype.imaging_study.imaging_study import (
-	build_dicom_hierarchy,
-)
+from healthcare.healthcare.doctype.imaging_study.imaging_study import build_dicom_hierarchy
 
 
 class ImagingAppointment(Document):
 	def autoname(self):
 		self.name = generate_hash(length=16)  # accession number VR SH 16
-
-	def before_insert(self):
-		if not self.ups_instance_uid:
-			settings = frappe.get_cached_doc("Healthcare Settings")
-			if not settings.uid_root:
-				frappe.throw(_("UPS Instance UID root is not configured in Healthcare Settings"))
-			self.ups_instance_uid = (
-				f"{settings.uid_root.rstrip('.')}.{frappe.utils.now_datetime().strftime('%Y%m%d%H%M%S%f')}"
-			)
 
 	def on_update(self):
 		if self.status == "In Progress":
