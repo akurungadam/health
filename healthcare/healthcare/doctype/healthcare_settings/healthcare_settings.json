@@ -558,11 +558,7 @@
  ],
  "issingle": 1,
  "links": [],
-<<<<<<< HEAD
  "modified": "2025-09-17 15:20:01.438478",
-=======
- "modified": "2025-08-29 11:11:10.581293",
->>>>>>> 9085894c (fix: not allowing user config for qido, wado urls)
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
