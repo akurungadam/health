@@ -5,13 +5,13 @@ frappe.ui.form.on("Imaging Study", {
 			frappe.db.get_single_value('Healthcare Settings', 'pacs_username')
 		]);
 
+		// TODO: REMOVE, prompt instead?
 		const pacs_password = await frappe.call({
 			method: 'healthcare.healthcare.doctype.healthcare_settings.healthcare_settings.get_pacs_password'
 		}).then(r => r.message);
 
 		if (!frm.doc.__islocal && frm.doc.preview_json) {
-			let series_list_new = JSON.parse(frm.doc.series || "[]").Series;
-			let series_list = JSON.parse(frm.doc.preview_json || "[]");
+			let series_list = JSON.parse(frm.doc.preview_json || "[]")	;
 
 			let html = `
 				<div class="series-container" style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:1em;">
@@ -54,53 +54,47 @@ frappe.ui.form.on("Imaging Study", {
 			`;
 
 			frm.fields_dict.preview_html.$wrapper.html(html);
+			const cards = frm.fields_dict.preview_html.$wrapper.find(".series-card");
+			cards.each(function () {
+				const card = $(this);
+				const index = card.data("series-index");
+				const series = series_list[index];
 
-			// setTimeout(() => {
-			// 	const cards = frm.fields_dict.preview_html.$wrapper.find(".series-card");
+				card.on("click", function () {
+					cards.css("border", "1px solid #ccc");
+					card.css("border", "3px solid #ccc");
 
-				cards.each(function () {
-					const card = $(this);
-					const index = card.data("series-index");
-					const series = series_list_new[index];
-					console.log("series", series_list_new);
+					// const site = frappe.boot.developer_mode ? "http://localhost:8080" : "/viewer" // "http://localhost:5173" : "/viewer";
+					const site = "/viewer";
+					const url = new URL(site, window.location.origin);
+					url.searchParams.set("studyUID", frm.doc.study_instance_uid);
+					url.searchParams.set("seriesUID", series.SeriesInstanceUID);
+					url.searchParams.set("objectUID", series.Instances?.[0]?.SOPInstanceUID || '');
+					url.searchParams.set("pacs_base_url", pacs_base_url);
+					url.searchParams.set("pacs_username", pacs_username);
+					url.searchParams.set("pacs_password", pacs_password);
+					url.searchParams.set("wadoRoot", `${pacs_base_url}/dicom-web`);
+					url.searchParams.set("qidoRoot", `${pacs_base_url}/dicom-web`);
 
-			// 		card.on("click", function () {
-			// 			cards.css("border", "1px solid #ccc");
-			// 			card.css("border", "3px solid #ccc");
-
-						const site = frappe.boot.developer_mode ?  "/viewer" : "/viewer" // "http://localhost:5173";
-						const url = new URL(site, window.location.origin);
-						url.searchParams.set("studyUID", frm.doc.study_instance_uid);
-						url.searchParams.set("seriesUID", series.SeriesInstanceUID);
-						url.searchParams.set("objectUID", series.Instances?.[0]?.SOPInstanceUID || '');
-						url.searchParams.set("pacs_base_url", pacs_base_url);
-						url.searchParams.set("pacs_username", pacs_username);
-						url.searchParams.set("pacs_password", pacs_password);
-						url.searchParams.set("wadoRoot", `${pacs_base_url}/dicom-web`);
-						url.searchParams.set("qidoRoot", `${pacs_base_url}/dicom-web`);
-
-						console.log(url.toString());
-
-						const d = new frappe.ui.Dialog({
-							title: `${series.SeriesInstanceUID}`,
-							size: "large",
-							fields: [
-								{
-								fieldname: "viewer_html",
-								fieldtype: "HTML",
-								options: `
-									<iframe
-										src="${url.toString()}"
-										width='100%' height='600' frameborder='0'
-									></iframe>
-								`
-								}
-							]
-						});
-						d.show();
+					const d = new frappe.ui.Dialog({
+						title: `Study: ${frm.doc.study_instance_uid}`,
+						size: "large",
+						fields: [
+							{
+							fieldname: "viewer_html",
+							fieldtype: "HTML",
+							options: `
+								<iframe
+									src="${url.toString()}"
+									width="100%" height="600" frameborder="0"
+								></iframe>
+							`,
+							}
+						]
 					});
-				// });
-			// }, 50);
+					d.show();
+				});
+			});
 		}
 	}
 });
