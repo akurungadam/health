@@ -38,18 +38,14 @@
   "lab_test_approval_required",
   "employee_name_and_designation_in_print",
   "custom_signature_in_print",
-  "radiology_ups_rs_settings_section",
-  "uid_root",
-  "column_break_dgbu",
   "radiology_section",
   "pacs_ae_title",
-  "pacs_username",
-  "pacs_password",
-  "column_break_dbvh",
   "pacs_base_url",
   "qido_rs_url",
   "wado_rs_url",
-  "wado_rs_preview_url",
+  "column_break_dbvh",
+  "pacs_username",
+  "pacs_password",
   "billing_accounts",
   "healthcare_service_items",
   "inpatient_visit_charge_item",
@@ -457,27 +453,25 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Query for a DICOM Series",
+   "description": "Not configurable by end user",
    "fieldname": "qido_rs_url",
    "fieldtype": "Data",
-   "label": "QIDO-RS URL"
+   "hidden": 1,
+   "label": "QIDO-RS URL",
+   "read_only": 1
   },
   {
-   "description": "To access Image Instances",
+   "description": "Not configurable by end user",
    "fieldname": "wado_rs_url",
    "fieldtype": "Data",
-   "label": "WADO-RS URL"
+   "hidden": 1,
+   "label": "WADO-RS URL",
+   "read_only": 1
   },
   {
    "fieldname": "pacs_ae_title",
    "fieldtype": "Data",
    "label": "PACS AE Title"
-  },
-  {
-   "fieldname": "wado_rs_preview_url",
-   "fieldtype": "Data",
-   "label": "WADO-RS Preview URL",
-   "read_only": 1
   },
   {
    "fieldname": "pacs_username",
@@ -488,26 +482,11 @@
    "fieldname": "pacs_password",
    "fieldtype": "Password",
    "label": "PACS Password"
-  },
-  {
-   "fieldname": "radiology_ups_rs_settings_section",
-   "fieldtype": "Section Break",
-   "label": "Radiology - UPS RS Settings"
-  },
-  {
-   "description": "Root for UPS Instance UID",
-   "fieldname": "uid_root",
-   "fieldtype": "Data",
-   "label": "Organisation UID Root"
-  },
-  {
-   "fieldname": "column_break_dgbu",
-   "fieldtype": "Column Break"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2025-07-29 13:31:59.317865",
+ "modified": "2025-08-29 11:11:10.581293",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
