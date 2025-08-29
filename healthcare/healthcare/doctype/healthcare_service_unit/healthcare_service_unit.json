@@ -14,10 +14,10 @@
   "service_unit_type",
   "allow_appointments",
   "overlap_appointments",
-  "is_modality",
   "service_unit_capacity",
   "inpatient_occupancy",
   "occupancy_status",
+  "is_modality",
   "ae_title",
   "ae_status",
   "column_break_9",
@@ -44,7 +44,8 @@
    "in_global_search": 1,
    "in_list_view": 1,
    "label": "Service Unit",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "bold": 1,
@@ -89,7 +90,8 @@
    "in_list_view": 1,
    "label": "Allow Appointments",
    "no_copy": 1,
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "default": "0",
@@ -101,7 +103,8 @@
    "hide_seconds": 1,
    "label": "Allow Overlap",
    "no_copy": 1,
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "bold": 1,
@@ -249,7 +252,8 @@
    "fieldname": "is_modality",
    "fieldtype": "Check",
    "label": "Is Modality",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "depends_on": "eval:doc.is_modality",
@@ -273,7 +277,7 @@
  ],
  "is_tree": 1,
  "links": [],
- "modified": "2025-07-29 13:33:50.686772",
+ "modified": "2025-08-29 14:31:39.116837",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Service Unit",
