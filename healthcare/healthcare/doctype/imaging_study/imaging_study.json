@@ -6,11 +6,10 @@
  "engine": "InnoDB",
  "field_order": [
   "study_section",
-  "ups_appointment",
   "study_instance_uid",
+  "imaging_appointment",
   "column_break_hkud",
   "status",
-  "description",
   "section_break_qfab",
   "patient",
   "patient_name",
@@ -53,11 +52,6 @@
    "search_index": 1
   },
   {
-   "fieldname": "description",
-   "fieldtype": "Small Text",
-   "label": "Description"
-  },
-  {
    "fieldname": "column_break_hkud",
    "fieldtype": "Column Break"
   },
@@ -96,13 +90,6 @@
    "fieldname": "patient_name",
    "fieldtype": "Data",
    "label": "Patient Name"
-  },
-  {
-   "description": "Accession Number",
-   "fieldname": "ups_appointment",
-   "fieldtype": "Link",
-   "label": "Imaging Appointment",
-   "options": "Imaging Appointment"
   },
   {
    "fieldname": "study_section",
@@ -187,12 +174,24 @@
    "label": "Preview JSON",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "description": "Accession Number",
+   "fieldname": "imaging_appointment",
+   "fieldtype": "Link",
+   "label": "Imaging Appointment",
+   "options": "Imaging Appointment"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2025-08-02 14:35:01.216884",
+ "links": [
+  {
+   "link_doctype": "Observation",
+   "link_fieldname": "imaging_study"
+  }
+ ],
+ "modified": "2025-08-29 18:02:28.223412",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Study",
