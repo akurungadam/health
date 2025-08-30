@@ -3,8 +3,6 @@
 
 import json
 
-import shortuuid
-
 import frappe
 from frappe import _
 
@@ -15,20 +13,19 @@ DICOM_TO_FRAPPE_MAP = {
 	"00100010": "patient_name",  # Patient Name
 	"00100030": "date_of_birth",  # DOB
 	"00100040": "gender",  # Gender
-	"00400001": "scheduled_date",  # Scheduled Date
-	"00400002": "scheduled_date",  # Fallback Scheduled Date
-	"00400003": "scheduled_time",  # Scheduled Time
+	"00400001": "scheduled_station_ae_title",  # Scheduled Station AE Title
+	"00400002": "scheduled_date",  # Scheduled Procedure Step Start Date
+	"00400003": "scheduled_time",  # 	Scheduled Procedure Step Start Time
 	"00404010": "observation_template",  # Procedure Code
 	"00080050": "name",  # Accession Number
-	"00081030": "modality",  # Modality
-	"0008005A": "station_ae",  # Scheduled Device
+	"00080060": "modality",  # Modality
 }
 
 # supporting "like"
-PARTIAL_MATCH_FIELDS = {"00100010"}
+PARTIAL_MATCH_FIELDS = ["00100010"]
 
 # supporting range filters "between"
-RANGE_FIELDS = {"00400002"}
+RANGE_FIELDS = ["00400002", "00400001"]
 
 
 def get_ups_tasks(filters=None):
@@ -57,7 +54,9 @@ def get_ups_tasks(filters=None):
 	)
 	result = []
 	for task in worklist:
-		uid = task.get("ups_instance_uid") or str(shortuuid.uuid())
+		uid = task.get("ups_instance_uid") or task.get(
+			"name"
+		)  # use accession number for now. TODO: should ideally generate one
 
 		if not task.get("ups_instance_uid"):
 			frappe.db.set_value("Imaging Appointment", task.name, "ups_instance_uid", uid)
@@ -73,14 +72,14 @@ def get_ups_tasks(filters=None):
 
 			result.append(
 				{
-					"00080016": {"vr": "UI", "Value": ["1.2.840.10008.5.1.4.34.5"]},
+					"00080016": {"vr": "UI", "Value": ["1.2.840.10008.5.1.4.34.6.3"]},  # UPS Pull SOP Class
 					"00080018": {"vr": "UI", "Value": [task.get("ups_instance_uid")]},
 					"00080050": {"vr": "SH", "Value": [task.get("name")]},
 					"00100020": {"vr": "LO", "Value": [task.get("patient").replace(" ", "-")]},
 					"00100010": {"vr": "PN", "Value": [task.get("patient_name").replace(" ", "^")]},
 					"00100040": {"vr": "CS", "Value": [dicomify_gender(task.get("gender"))]},
 					"00100030": {"vr": "DA", "Value": [task.get("date_of_birth").strftime("%Y%m%d")]},
-					"00404010": {
+					"00404010": {  # TODO: sequence to extract method and add multiple values
 						"vr": "SQ",
 						"Value": [
 							{
@@ -135,8 +134,10 @@ def handle_workitem_event(uid, data, ae_title):
 	doc = get_imaging_appointment(uid)
 
 	new_status = data.get("Status", "Completed")
+
 	if new_status not in ["In Progress", "Completed"]:
 		frappe.throw(f"Invalid workitem status for Imaging Appointment ({uid})")
+
 	doc.status = new_status
 	doc.station_ae = ae_title
 	doc.n_set = json.dumps(humanize_dicom_json(data), indent=1)
@@ -163,7 +164,7 @@ def update_from_modality(uid, update_data, ae_title):
 def get_existing_imaging_appointment(id):
 	result = frappe.db.get_all(
 		"Imaging Appointment",
-		or_filters=[
+		or_filters=[  # try match any of the three fields
 			["ups_instance_uid", "=", id],
 			["study_instance_uid", "=", id],
 			["name", "=", id],
@@ -198,7 +199,7 @@ def dicomify_gender(value):
 def dicom_to_frappe_value(tag, value):
 	"""TODO: handle '*'"""
 	if isinstance(value, str):
-		if tag in {"00100010", "00081030"}:  # Patient Name, Modality
+		if tag in {"00100010", "00080060"}:  # Patient Name, Modality
 			return value.replace("^", " ")
 	return value
 
