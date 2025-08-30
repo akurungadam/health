@@ -7,35 +7,33 @@
  "field_order": [
   "ups_rs_section",
   "ups_instance_uid",
-  "column_break_ehcs",
-  "claimed_by",
-  "details_section",
   "appointment",
   "observation_template",
-  "referred_to_practitioner",
-  "practitioner_name",
-  "referring_practitioner",
-  "column_break_fszz",
+  "column_break_ehcs",
+  "claimed_by",
   "status",
-  "station_ae",
-  "modality",
-  "scheduled_date",
-  "scheduled_time",
   "section_break_klcv",
   "patient",
   "patient_name",
   "column_break_nypq",
   "gender",
   "date_of_birth",
+  "details_section",
+  "referred_to_practitioner",
+  "practitioner_name",
+  "referring_practitioner",
+  "column_break_fszz",
+  "modality",
+  "service_unit",
+  "scheduled_station_ae_title",
+  "scheduled_date",
+  "scheduled_time",
   "section_break_xewj",
   "study_instance_uid",
-  "imaging_study",
+  "performer",
+  "column_break_decp",
   "cancelled_by",
   "modality_transaction_id",
-  "column_break_decp",
-  "study_start_time",
-  "study_finish_time",
-  "performer",
   "mpps_tab",
   "mpps_events_section",
   "n_create",
@@ -73,6 +71,7 @@
    "fetch_from": "appointment.patient",
    "fieldname": "patient",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Patient",
    "options": "Patient",
@@ -80,12 +79,12 @@
    "search_index": 1
   },
   {
-   "fetch_from": "station_ae.service_unit_type",
+   "fetch_from": "observation_template.service_unit",
    "fieldname": "modality",
    "fieldtype": "Link",
-   "label": "Modality",
+   "label": "Service Unit Type (Modality)",
+   "link_filters": "[[\"Healthcare Service Unit Type\",\"is_modality\",\"=\",1]]",
    "options": "Healthcare Service Unit Type",
-   "read_only": 1,
    "search_index": 1
   },
   {
@@ -113,6 +112,7 @@
    "fetch_from": "patient.sex",
    "fieldname": "gender",
    "fieldtype": "Link",
+   "in_standard_filter": 1,
    "label": "Gender",
    "options": "Gender",
    "read_only": 1
@@ -125,6 +125,7 @@
    "read_only": 1
   },
   {
+   "default": "Today",
    "fetch_from": "appointment.appointment_date",
    "fieldname": "scheduled_date",
    "fieldtype": "Date",
@@ -134,6 +135,7 @@
    "read_only": 1
   },
   {
+   "default": "Now",
    "fetch_from": "appointment.appointment_time",
    "fieldname": "scheduled_time",
    "fieldtype": "Time",
@@ -141,18 +143,12 @@
    "label": "Scheduled Time"
   },
   {
-   "fieldname": "study_start_time",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Study Start Time",
-   "read_only": 1
-  },
-  {
    "fetch_from": "appointment.template_dn",
+   "fetch_if_empty": 1,
    "fieldname": "observation_template",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Observation Template",
+   "label": "Procedure",
    "options": "Observation Template",
    "search_index": 1
   },
@@ -164,12 +160,8 @@
    "read_only": 1
   },
   {
-   "fieldname": "study_finish_time",
-   "fieldtype": "Data",
-   "label": "Study Finish Time",
-   "read_only": 1
-  },
-  {
+   "fetch_from": "appointment.practitioner",
+   "fetch_if_empty": 1,
    "fieldname": "referred_to_practitioner",
    "fieldtype": "Link",
    "label": "Referred to Practitioner",
@@ -183,7 +175,7 @@
    "options": "Healthcare Practitioner"
   },
   {
-   "description": "Modality",
+   "description": "Modality AE Title",
    "fieldname": "claimed_by",
    "fieldtype": "Data",
    "in_standard_filter": 1,
@@ -194,7 +186,6 @@
   {
    "fieldname": "ups_instance_uid",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "UPS Instance UID",
    "read_only": 1,
    "search_index": 1
@@ -227,33 +218,20 @@
    "label": "MPPS Events"
   },
   {
-   "fieldname": "imaging_study",
-   "fieldtype": "Link",
-   "label": "Imaging Study",
-   "options": "Imaging Study",
-   "read_only": 1
-  },
-  {
    "fieldname": "n_create",
    "fieldtype": "Code",
    "label": "N-CREATE",
-   "read_only": 1
+   "print_hide": 1,
+   "read_only": 1,
+   "report_hide": 1
   },
   {
    "fieldname": "n_set",
    "fieldtype": "Code",
    "label": "N-SET",
-   "read_only": 1
-  },
-  {
-   "fetch_from": "appointment.service_unit",
-   "fieldname": "station_ae",
-   "fieldtype": "Link",
-   "label": "Station AE Title",
-   "link_filters": "[[\"Healthcare Service Unit\",\"is_modality\",\"=\",1]]",
-   "options": "Healthcare Service Unit",
+   "print_hide": 1,
    "read_only": 1,
-   "search_index": 1
+   "report_hide": 1
   },
   {
    "fetch_from": "referred_to_practitioner.practitioner_name",
@@ -287,19 +265,46 @@
    "fieldname": "n_cancel",
    "fieldtype": "Code",
    "label": "N-CANCEL",
-   "read_only": 1
+   "print_hide": 1,
+   "read_only": 1,
+   "report_hide": 1
   },
   {
    "fieldname": "dataset",
    "fieldtype": "Code",
    "label": "Dataset",
-   "read_only": 1
+   "print_hide": 1,
+   "read_only": 1,
+   "report_hide": 1
+  },
+  {
+   "fetch_if_empty": 1,
+   "fieldname": "service_unit",
+   "fieldtype": "Link",
+   "label": "Service Unit ",
+   "link_filters": "[[\"Healthcare Service Unit\",\"is_modality\",\"=\",1]]",
+   "options": "Healthcare Service Unit"
+  },
+  {
+   "fetch_from": "service_unit.ae_title",
+   "fieldname": "scheduled_station_ae_title",
+   "fieldtype": "Data",
+   "label": "Scheduled Station AE Title"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2025-08-02 14:35:49.577282",
+ "links": [
+  {
+   "link_doctype": "Imaging Study",
+   "link_fieldname": "imaging_appointment"
+  },
+  {
+   "link_doctype": "Observation",
+   "link_fieldname": "imaging_appointment"
+  }
+ ],
+ "modified": "2025-08-29 18:32:16.267991",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Appointment",
@@ -353,5 +358,6 @@
  "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "observation_template"
 }

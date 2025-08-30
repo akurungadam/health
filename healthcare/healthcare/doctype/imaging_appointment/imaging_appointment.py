@@ -4,7 +4,7 @@
 import json
 
 import frappe
-from frappe import generate_hash
+from frappe import _, generate_hash
 from frappe.model.document import Document
 
 from healthcare.healthcare.doctype.imaging_study.imaging_study import build_dicom_hierarchy
@@ -17,19 +17,19 @@ class ImagingAppointment(Document):
 	def on_update(self):
 		if self.status == "In Progress":
 			pass  # nothing to do (?)
-		elif self.status == "Completed" and self.study_instance_uid:
-			frappe.db.set_value("Patient Appointment", self.appointment, "status", "Closed")
+		elif self.status == "Completed":
+			if self.appointment:
+				frappe.db.set_value("Patient Appointment", self.appointment, "status", "Closed")
 
-			self.create_imaging_study()
-			self.create_observation()
+			study = self.create_imaging_study()
+			self.create_observation(study)
 
 	def create_imaging_study(self):
 		if frappe.db.exists("Imaging Study", {"study_instance_uid": self.study_instance_uid}):
-			frappe.log_error(f"Imaging Study already exist for Study {self.study_instance_uid}")
-			return
+			frappe.throw(_(f"Imaging Study already exists for UID {self.study_instance_uid}"))
+			return  #  edit?
 
 		mpps_data = json.loads(self.dataset)
-
 		study = frappe.new_doc("Imaging Study")
 		study.patient = self.patient
 		study.patient_name = self.patient_name
@@ -37,27 +37,29 @@ class ImagingAppointment(Document):
 		study.date_of_birth = self.date_of_birth
 		study.study_instance_uid = self.study_instance_uid
 		study.imaging_appointment = self.name
+		study.modality = self.modality
 		study.station_ae = self.claimed_by or self.station_ae
-		study.completed_on = mpps_data.get("end_time", frappe.utils.now())
+		study.competed_on = mpps_data.get("end_time", frappe.utils.now())
 		study.performer = mpps_data.get("performer_name", "")
 		study.status = "Pending Review"
 
-		study.series = json.dumps(build_dicom_hierarchy(mpps_data), indent=1)  # for readability
+		study.series = json.dumps(build_dicom_hierarchy(mpps_data), indent=1)
 		study.dataset = json.dumps(mpps_data, indent=1)
 		study.save(ignore_permissions=True)
 		study.reload()
+		return study.name
 
-		# self.db_set("imaging_study", study.name)
-
-	def create_observation(self):
+	def create_observation(self, study):
 		if not frappe.db.exists("Observation", {"appointment": self.name}):
 			obs = frappe.new_doc("Observation")
+			obs.imaging_study = study
 			obs.patient = self.patient
 			obs.observation_template = self.observation_template
 			obs.observation_type = "Imaging"
-			obs.accession_number = self.name
+			obs.imaging_appointment = self.name
 			obs.study_instance_uid = self.study_instance_uid
+			obs.station_ae = self.claimed_by or self.station_ae
+			obs.exam_status = self.status
 			obs.appointment = self.appointment
-			obs.imaging_study = self.imaging_study
 			obs.status = "Preliminary"
 			obs.save(ignore_permissions=True)
