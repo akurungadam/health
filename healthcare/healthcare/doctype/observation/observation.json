@@ -46,8 +46,9 @@
   "imaging_procedure_section",
   "study_instance_uid",
   "imaging_study",
+  "imaging_appointment",
   "column_break_cgmc",
-  "ups_appointment",
+  "station_ae",
   "modality",
   "exam_status",
   "result_section",
@@ -573,15 +574,6 @@
    "read_only": 1
   },
   {
-   "depends_on": "eval:doc.observation_category == \"Imaging\"",
-   "description": "Accession Number",
-   "fieldname": "ups_appointment",
-   "fieldtype": "Link",
-   "label": "Imaging Appointment",
-   "options": "Imaging Appointment",
-   "read_only": 1
-  },
-  {
    "fieldname": "imaging_procedure_section",
    "fieldtype": "Section Break",
    "label": "Imaging Procedure"
@@ -612,17 +604,33 @@
   },
   {
    "depends_on": "eval:doc.observation_category == \"Imaging\"",
-   "fetch_from": "ups_appointment.claimed_by",
+   "fetch_from": "observation_template.service_unit",
    "fieldname": "modality",
+   "fieldtype": "Link",
+   "label": "Modality",
+   "options": "Healthcare Service Unit Type",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.observation_category == \"Imaging\"",
+   "description": "Accession Number",
+   "fieldname": "imaging_appointment",
+   "fieldtype": "Link",
+   "label": "Imaging Appointment",
+   "options": "Imaging Appointment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "station_ae",
    "fieldtype": "Data",
-   "label": "Modality (Service Unit)",
+   "label": "Station AE",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-07-27 16:21:28.789577",
+ "modified": "2025-08-29 17:24:18.721075",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Observation",
