@@ -46,8 +46,9 @@
   "imaging_procedure_section",
   "study_instance_uid",
   "imaging_study",
+  "imaging_appointment",
   "column_break_cgmc",
-  "ups_appointment",
+  "station_ae",
   "modality",
   "exam_status",
   "result_section",
@@ -572,15 +573,6 @@
    "fieldname": "invoiced",
    "fieldtype": "Check",
    "label": "Invoiced",
-   "read_only": 1
-  },
-  {
-   "depends_on": "eval:doc.observation_category == \"Imaging\"",
-   "description": "Accession Number",
-   "fieldname": "ups_appointment",
-   "fieldtype": "Link",
-   "label": "Imaging Appointment",
-   "options": "Imaging Appointment",
    "read_only": 1
   },
   {
