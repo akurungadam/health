@@ -8,7 +8,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "clinical_note_type",
   "section_break_umme",
   "patient",
   "gender",
@@ -22,9 +21,45 @@
   "user",
   "practitioner",
   "department",
+  "section_break_jncu",
+  "clinical_note_type",
+  "column_break_czlp",
+  "note_format",
+  "clinical_note_section",
+  "note",
   "note_section",
   "terms_and_conditions",
   "narrative",
+  "soap_section",
+  "subjective",
+  "objective",
+  "column_break_qkjt",
+  "assessment",
+  "plan",
+  "eir_section",
+  "evaluation",
+  "column_break_xzsg",
+  "intervention",
+  "column_break_czxs",
+  "revision",
+  "pie_section",
+  "pie_problem",
+  "column_break_wqfl",
+  "pie_intervention",
+  "column_break_gfbk",
+  "pie_evaluation",
+  "section_break_dqfh",
+  "topic",
+  "data",
+  "column_break_ckxm",
+  "action",
+  "response",
+  "sbar_section",
+  "sbar_situation",
+  "sbar_background",
+  "column_break_znpi",
+  "sbar_assessment",
+  "sbar_recommendation",
   "reference_section",
   "reference_doc",
   "reference_name"
@@ -71,11 +106,14 @@
   {
    "fieldname": "reference_name",
    "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Reference Name",
    "options": "reference_doc",
    "read_only": 1
   },
   {
+   "depends_on": "eval: doc.note_format == \"Narrative\"",
    "fieldname": "note_section",
    "fieldtype": "Section Break",
    "label": "Narrative"
@@ -107,20 +145,17 @@
   {
    "fieldname": "clinical_note_type",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Clinical Note Type",
    "options": "Clinical Note Type"
   },
   {
+   "depends_on": "eval: doc.note_format == \"Narrative\"",
    "fieldname": "terms_and_conditions",
    "fieldtype": "Link",
-   "label": "Terms and Conditions",
+   "label": "Narrative Template",
    "options": "Terms and Conditions"
-  },
-  {
-   "allow_in_quick_entry": 1,
-   "fieldname": "narrative",
-   "fieldtype": "Text Editor",
-   "label": "Note"
   },
   {
    "fetch_from": "practitioner.department",
@@ -165,12 +200,231 @@
    "label": "Inpatient Status",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_jncu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_czlp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "Narrative",
+   "fieldname": "note_format",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Note Format",
+   "options": "Narrative\nSOAP\nEIR\nFOCUS/DAR\nPIE\nSBAR"
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"SOAP\"",
+   "fieldname": "soap_section",
+   "fieldtype": "Section Break",
+   "label": "SOAP"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SOAP\"",
+   "fieldname": "subjective",
+   "fieldtype": "Small Text",
+   "label": "Subjective"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SOAP\"",
+   "fieldname": "objective",
+   "fieldtype": "Small Text",
+   "label": "Objective"
+  },
+  {
+   "fieldname": "column_break_qkjt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SOAP\"",
+   "fieldname": "assessment",
+   "fieldtype": "Small Text",
+   "label": "Assessment"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SOAP\"",
+   "fieldname": "plan",
+   "fieldtype": "Small Text",
+   "label": "Plan"
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"EIR\"",
+   "fieldname": "eir_section",
+   "fieldtype": "Section Break",
+   "label": "EIR"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"EIR\"",
+   "fieldname": "evaluation",
+   "fieldtype": "Small Text",
+   "label": "Evaluation"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"EIR\"",
+   "fieldname": "intervention",
+   "fieldtype": "Small Text",
+   "label": "Intervention "
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"EIR\"",
+   "fieldname": "revision",
+   "fieldtype": "Small Text",
+   "label": "Revision"
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"FOCUS/DAR\"",
+   "fieldname": "section_break_dqfh",
+   "fieldtype": "Section Break",
+   "label": "F-DAR"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"FOCUS/DAR\"",
+   "fieldname": "topic",
+   "fieldtype": "Small Text",
+   "label": "Topic"
+  },
+  {
+   "fieldname": "column_break_ckxm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"FOCUS/DAR\"",
+   "fieldname": "action",
+   "fieldtype": "Small Text",
+   "label": "Action"
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"SBAR\"",
+   "fieldname": "sbar_section",
+   "fieldtype": "Section Break",
+   "label": "SBAR"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SBAR\"",
+   "fieldname": "sbar_situation",
+   "fieldtype": "Small Text",
+   "label": "Situation"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SBAR\"",
+   "fieldname": "sbar_background",
+   "fieldtype": "Small Text",
+   "label": "Background"
+  },
+  {
+   "fieldname": "column_break_znpi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SBAR\"",
+   "fieldname": "sbar_assessment",
+   "fieldtype": "Small Text",
+   "label": "Assessment"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"SBAR\"",
+   "fieldname": "sbar_recommendation",
+   "fieldtype": "Small Text",
+   "label": "Recommendation"
+  },
+  {
+   "depends_on": "eval: doc.note_format == \"PIE\"",
+   "fieldname": "pie_section",
+   "fieldtype": "Section Break",
+   "label": "PIE"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"PIE\"",
+   "fieldname": "pie_problem",
+   "fieldtype": "Small Text",
+   "label": "Problem"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"PIE\"",
+   "fieldname": "pie_intervention",
+   "fieldtype": "Small Text",
+   "label": "Intervention"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"PIE\"",
+   "fieldname": "pie_evaluation",
+   "fieldtype": "Small Text",
+   "label": "Evaluation"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"FOCUS/DAR\"",
+   "fieldname": "data",
+   "fieldtype": "Small Text",
+   "label": "Data"
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Text Editor",
+   "label": "Note",
+   "read_only": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"FOCUS/DAR\"",
+   "fieldname": "response",
+   "fieldtype": "Small Text",
+   "label": "Response"
+  },
+  {
+   "fieldname": "clinical_note_section",
+   "fieldtype": "Section Break",
+   "label": "Clinical Note"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.note_format == \"Narrative\"",
+   "fieldname": "narrative",
+   "fieldtype": "Text Editor",
+   "label": "Narrative"
+  },
+  {
+   "fieldname": "column_break_xzsg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_czxs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wqfl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_gfbk",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-26 18:21:25.977449",
+ "modified": "2025-09-05 14:34:58.727356",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Note",

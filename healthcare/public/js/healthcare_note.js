@@ -45,10 +45,15 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 		])
 	}
 
-
 	add_clinical_note () {
 		let me = this;
 		let _add_clinical_note = () => {
+
+			frappe.require("/assets/healthcare/js/clinical_note_quick_entry.js", () => {
+				healthcare.createClinicalNoteViaDialog(cur_frm.doc)
+				.then(() => cur_frm.reload_doc());
+			});
+
 			var d = new frappe.ui.Dialog({
 				title: __('Add Clinical Note'),
 				fields: [
@@ -86,7 +91,7 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 				},
 				primary_action_label: __('Add')
 			});
-			d.show();
+			// d.show();
 		};
 		$(".new-note-btn").click(_add_clinical_note);
 	}
@@ -95,6 +100,12 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 		var me = this;
 		let row = $(edit_btn).closest('.comment-content');
 		let note_name = row.attr("name");
+
+		frappe.require("/assets/healthcare/js/clinical_note_quick_entry.js", () => {
+			healthcare.editClinicalNoteViaDialog(cur_frm.doc, note_name)
+			.then(() => cur_frm.reload_doc());
+		});
+
 		let note_type = $(row).find(".note-type").html().trim();
 		let row_content = $(row).find(".content").html();
 			var d = new frappe.ui.Dialog({
@@ -135,7 +146,7 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 				},
 				primary_action_label: __('Done')
 			});
-			d.show();
+			// d.show();
 	}
 
 	delete_clinical_note (delete_btn) {
