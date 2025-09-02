@@ -22,12 +22,19 @@ class ImagingAppointment(Document):
 				frappe.db.set_value("Patient Appointment", self.appointment, "status", "Closed")
 
 			study = self.create_imaging_study()
+			if not study:
+				frappe.throw(_("Cannot create Imaging Study. Please check Error Logs for details."))
+
 			self.create_observation(study)
 
 	def create_imaging_study(self):
 		if frappe.db.exists("Imaging Study", {"study_instance_uid": self.study_instance_uid}):
 			frappe.throw(_(f"Imaging Study already exists for UID {self.study_instance_uid}"))
 			return  #  edit?
+
+		if not self.dataset:
+			frappe.log_error(f"Dataset not initialized to create study. {self.study_instance_uid}")
+			return
 
 		mpps_data = json.loads(self.dataset)
 		study = frappe.new_doc("Imaging Study")
