@@ -49,7 +49,7 @@ def get_ups_tasks(filters=None):
 			"scheduled_date",
 			"scheduled_time",
 			"modality",
-			"station_ae",
+			"scheduled_station_ae_title",
 		],
 	)
 	result = []
@@ -79,7 +79,7 @@ def get_ups_tasks(filters=None):
 					"00100010": {"vr": "PN", "Value": [task.get("patient_name").replace(" ", "^")]},
 					"00100040": {"vr": "CS", "Value": [dicomify_gender(task.get("gender"))]},
 					"00100030": {"vr": "DA", "Value": [task.get("date_of_birth").strftime("%Y%m%d")]},
-					"00404010": {  # TODO: sequence to extract method and add multiple values
+					"00404010": {  # TODO: sequences: to extract method and add multiple values
 						"vr": "SQ",
 						"Value": [
 							{
@@ -89,7 +89,7 @@ def get_ups_tasks(filters=None):
 						],
 					},
 					"0008005A": {"vr": "AE"},
-					"Value": [task.get("station_ae")],
+					"Value": [task.get("scheduled_station_ae_title")],
 					"00400002": {"vr": "DA", "Value": [scheduled_date]},
 					"00404011": {
 						"vr": "DT",
