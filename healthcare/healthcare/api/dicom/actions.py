@@ -63,11 +63,11 @@ def get_ups_tasks(filters=None):
 		try:
 
 			if task.get("scheduled_date") and task.get("scheduled_time"):
-				scheduled_date = task["scheduled_date"].strftime("%Y%m%d")
+				scheduled_date = task.get("scheduled_date", "").strftime("%Y%m%d")
 				scheduled_time = "{:02d}{:02d}{:02d}".format(
-					task["scheduled_time"].seconds // 3600,
-					(task["scheduled_time"].seconds % 3600) // 60,
-					task["scheduled_time"].seconds % 60,
+					task.get("scheduled_time").seconds // 3600,
+					(task.get("scheduled_time").seconds % 3600) // 60,
+					task.get("scheduled_time").seconds % 60,
 				)
 
 			result.append(
@@ -78,7 +78,10 @@ def get_ups_tasks(filters=None):
 					"00100020": {"vr": "LO", "Value": [task.get("patient").replace(" ", "-")]},
 					"00100010": {"vr": "PN", "Value": [task.get("patient_name").replace(" ", "^")]},
 					"00100040": {"vr": "CS", "Value": [dicomify_gender(task.get("gender"))]},
-					"00100030": {"vr": "DA", "Value": [task.get("date_of_birth").strftime("%Y%m%d")]},
+					"00100030": {
+						"vr": "DA",
+						"Value": [task.get("date_of_birth").strftime("%Y%m%d") if task.get("date_of_birth") else ""],
+					},
 					"00404010": {  # TODO: sequences: to extract method and add multiple values
 						"vr": "SQ",
 						"Value": [
