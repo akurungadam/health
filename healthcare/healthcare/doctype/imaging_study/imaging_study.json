@@ -191,7 +191,7 @@
    "link_fieldname": "imaging_study"
   }
  ],
- "modified": "2025-08-29 18:02:28.223412",
+ "modified": "2025-09-02 17:20:35.197629",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Study",
@@ -241,5 +241,6 @@
  "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }
