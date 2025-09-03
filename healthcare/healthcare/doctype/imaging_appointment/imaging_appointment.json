@@ -308,7 +308,7 @@
    "link_fieldname": "imaging_appointment"
   }
  ],
- "modified": "2025-09-02 16:25:08.167056",
+ "modified": "2025-09-02 17:20:25.204535",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Appointment",
@@ -363,5 +363,6 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "title_field": "observation_template"
+ "title_field": "observation_template",
+ "track_changes": 1
 }

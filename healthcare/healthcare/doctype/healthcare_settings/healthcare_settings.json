@@ -526,6 +526,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "/dicom-web/instances?SeriesInstanceUID={series_uid}",
    "description": "Not configurable by end user",
    "fieldname": "qido_rs_url",
    "fieldtype": "Data",
@@ -534,6 +535,7 @@
    "read_only": 1
   },
   {
+   "default": "/dicom-web/studies/{study_uid}/series/{series_uid}/instances/{sop_instance_uid}/frames/1/rendered",
    "description": "Not configurable by end user",
    "fieldname": "wado_rs_url",
    "fieldtype": "Data",
