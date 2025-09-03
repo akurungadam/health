@@ -1,0 +1,242 @@
+{
+ "actions": [],
+ "beta": 1,
+ "creation": "2025-06-01 06:45:53.178979",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "is_active",
+  "fhir_version",
+  "fhir_profile",
+  "section_break_vaer",
+  "fhir_structure_def",
+  "resource_type",
+  "sd_version",
+  "base",
+  "column_break_sbfw",
+  "status",
+  "kind",
+  "url",
+  "publisher",
+  "contact",
+  "section_break_losh",
+  "frappe_doctype",
+  "column_break_nvkk",
+  "narrative_template",
+  "section_break_aicb",
+  "description",
+  "section_break_nqfe",
+  "map",
+  "tab_break_kivw",
+  "fhir_json_section",
+  "structure_definition"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "depends_on": "eval: !doc.__islocal",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "section_break_losh",
+   "fieldtype": "Section Break",
+   "label": "Frappe DocType"
+  },
+  {
+   "fieldname": "fhir_version",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "FHIR Version",
+   "link_filters": "[[\"FHIR Version\",\"is_active\",\"=\",1]]",
+   "options": "FHIR Version",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "fhir_profile",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "FHIR Profile",
+   "link_filters": "[[\"FHIR Profile\",\"is_active\",\"=\",1]]",
+   "options": "FHIR Profile",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_nvkk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "frappe_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Frappe DocType",
+   "options": "DocType",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_nqfe",
+   "fieldtype": "Section Break",
+   "label": "Element \u2192 Field Map"
+  },
+  {
+   "fieldname": "section_break_vaer",
+   "fieldtype": "Section Break",
+   "label": "FHIR Resource"
+  },
+  {
+   "fieldname": "column_break_sbfw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fhir_structure_def",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "FHIR Structure Def",
+   "options": "FHIR Structure Definition"
+  },
+  {
+   "fieldname": "map",
+   "fieldtype": "Table",
+   "options": "FHIR Resource Element Map"
+  },
+  {
+   "fetch_from": "fhir_structure_def.fhir_sd",
+   "fieldname": "resource_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Resource Type",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_aicb",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fetch_from": "fhir_structure_def.sd_version",
+   "fieldname": "sd_version",
+   "fieldtype": "Data",
+   "label": "Structure Definition Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "base",
+   "fieldtype": "Data",
+   "label": "Base"
+  },
+  {
+   "fetch_from": "fhir_structure_def.status",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nDraft\nActive\nRetired\nUnknown",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fhir_structure_def.kind",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "\nResource\nDatatype\nComplex-type\nLogical\nPrimitive-type",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fhir_structure_def.url",
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "URL",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fhir_structure_def.publisher",
+   "fieldname": "publisher",
+   "fieldtype": "Data",
+   "label": "Publisher",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "fhir_structure_def.contact",
+   "fieldname": "contact",
+   "fieldtype": "Data",
+   "label": "Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tab_break_kivw",
+   "fieldtype": "Tab Break",
+   "label": "Raw"
+  },
+  {
+   "fieldname": "fhir_json_section",
+   "fieldtype": "Section Break",
+   "label": "FHIR JSON"
+  },
+  {
+   "fieldname": "structure_definition",
+   "fieldtype": "Code",
+   "label": "Structure Definition",
+   "read_only": 1
+  },
+  {
+   "fieldname": "narrative_template",
+   "fieldtype": "Link",
+   "label": "Narrative Template",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-07-18 16:55:51.113786",
+ "modified_by": "Administrator",
+ "module": "Interoperability",
+ "name": "FHIR Resource Map",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Healthcare Administrator",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
