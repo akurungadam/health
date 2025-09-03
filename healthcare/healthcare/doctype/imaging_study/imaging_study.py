@@ -17,6 +17,7 @@ class ImagingStudy(Document):
 	def build_series_with_previews(self):
 		dataset = json.loads(self.dataset) if isinstance(self.dataset, str) else self.dataset
 		if not dataset:
+			frappe.log_error(f"Dataset not initialized to create study. {self.study_instance_uid}")
 			return
 
 		config = self.get_config()
@@ -59,6 +60,7 @@ class ImagingStudy(Document):
 	def get_instance_metadata(self, config, study_uid, series_uid, auth):
 		base_url = config.get("pacs_base_url", "").rstrip("/")
 		qido_url = config.get("qido_rs_url", "").lstrip("/")
+
 		url = f"{base_url}/{qido_url}".format(series_uid=series_uid)
 
 		try:
