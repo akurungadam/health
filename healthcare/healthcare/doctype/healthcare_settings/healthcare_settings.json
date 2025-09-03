@@ -453,6 +453,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "/dicom-web/instances?SeriesInstanceUID={series_uid}",
    "description": "Not configurable by end user",
    "fieldname": "qido_rs_url",
    "fieldtype": "Data",
@@ -461,6 +462,7 @@
    "read_only": 1
   },
   {
+   "default": "/dicom-web/studies/{study_uid}/series/{series_uid}/instances/{sop_instance_uid}/frames/1/rendered",
    "description": "Not configurable by end user",
    "fieldname": "wado_rs_url",
    "fieldtype": "Data",
@@ -486,7 +488,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2025-08-29 11:11:10.581293",
+ "modified": "2025-09-02 20:09:51.063655",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
