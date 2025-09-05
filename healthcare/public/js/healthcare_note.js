@@ -53,45 +53,6 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 				healthcare.createClinicalNoteViaDialog(cur_frm.doc)
 				.then(() => cur_frm.reload_doc());
 			});
-
-			var d = new frappe.ui.Dialog({
-				title: __('Add Clinical Note'),
-				fields: [
-					{
-						"label": "Clinical Note Type",
-						"fieldname": "note_type",
-						"fieldtype": "Link",
-						"options": "Clinical Note Type"
-					},
-					{
-						"label": "Note",
-						"fieldname": "note",
-						"fieldtype": "Text Editor",
-						"reqd": 1,
-						"enable_mentions": true,
-					}
-				],
-				primary_action: function() {
-					var data = d.get_values();
-					frappe.call({
-						method: "add_clinical_note",
-						doc: me.frm.doc,
-						args: {
-							note: data.note,
-							note_type: data.note_type
-						},
-						freeze: true,
-						callback: function(r) {
-							if (!r.exc) {
-								me.refresh();
-							}
-							d.hide();
-						}
-					});
-				},
-				primary_action_label: __('Add')
-			});
-			// d.show();
 		};
 		$(".new-note-btn").click(_add_clinical_note);
 	}
@@ -108,45 +69,6 @@ healthcare.ClinicalNotes = class ClinicalNotes {
 
 		let note_type = $(row).find(".note-type").html().trim();
 		let row_content = $(row).find(".content").html();
-			var d = new frappe.ui.Dialog({
-				title: __('Edit Clinical Note'),
-				fields: [
-					{
-						"label": "Clinical Note Type",
-						"fieldname": "note_type",
-						"fieldtype": "Link",
-						"options": "Clinical Note Type",
-						"default": note_type,
-					},
-					{
-						"label": "Note",
-						"fieldname": "note",
-						"fieldtype": "Text Editor",
-						"default": row_content,
-					}
-				],
-				primary_action: function() {
-					var data = d.get_values();
-					frappe.call({
-						method: "edit_clinical_note",
-						doc: me.frm.doc,
-						args: {
-							note: data.note,
-							note_name: note_name
-						},
-						freeze: true,
-						callback: function(r) {
-							if (!r.exc) {
-								me.refresh();
-								d.hide();
-							}
-
-						}
-					});
-				},
-				primary_action_label: __('Done')
-			});
-			// d.show();
 	}
 
 	delete_clinical_note (delete_btn) {
