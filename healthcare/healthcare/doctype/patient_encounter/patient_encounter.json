@@ -65,7 +65,12 @@
   "order_history_html",
   "encounter_details",
   "notes_tab",
-  "clinical_notes"
+  "clinical_notes",
+  "section_break_tgan",
+  "data_ohqu",
+  "dental_tab_tab",
+  "dental_chart",
+  "dental_chart_store"
  ],
  "fields": [
   {
@@ -452,6 +457,30 @@
    "fieldname": "order_history_html",
    "fieldtype": "HTML",
    "label": "Order History"
+  },
+  {
+   "fieldname": "data_ohqu",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "section_break_tgan",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "dental_tab_tab",
+   "fieldtype": "Tab Break",
+   "label": "Dental"
+  },
+  {
+   "fieldname": "dental_chart",
+   "fieldtype": "HTML",
+   "label": "Dental Chart"
+  },
+  {
+   "fieldname": "dental_chart_store",
+   "fieldtype": "Code",
+   "label": "Dental Chart Store",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -466,7 +495,7 @@
    "link_fieldname": "admission_encounter"
   }
  ],
- "modified": "2025-07-03 23:06:16.148505",
+ "modified": "2025-09-21 14:01:33.681901",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Encounter",

@@ -6,3 +6,5 @@ import "./observation_widget.js";
 import "./healthcare_note.js";
 import "./healthcare_note.html";
 import "./healthcare_orders.html";
+import "./dental_chart/dental_chart.js"
+import "./dental_chart/dental_chart.html"

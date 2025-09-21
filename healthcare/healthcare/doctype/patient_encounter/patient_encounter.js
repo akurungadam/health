@@ -2,105 +2,156 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Patient Encounter', {
-	onload: function(frm) {
+	onload: function (frm) {
+		// 		frm.set_value("dental_chart", `<div id="dental-chart" class="dc-wrap compact"></div>
+		// <div class="dc-tip" id="dc-tip"></div>`);
 		if (!frm.doc.__islocal && frm.doc.docstatus === 1 &&
 			frm.doc.inpatient_status == 'Admission Scheduled') {
-				frappe.db.get_value('Inpatient Record', frm.doc.inpatient_record,
-					['admission_encounter', 'status']).then(r => {
-						if (r.message) {
-							if (r.message.admission_encounter == frm.doc.name &&
-								r.message.status == 'Admission Scheduled') {
-									frm.add_custom_button(__('Cancel Admission'), function() {
-										cancel_ip_order(frm);
-									});
-								}
-							if (r.message.status == 'Admitted') {
-								frm.add_custom_button(__('Schedule Discharge'), function() {
-									schedule_discharge(frm);
-								});
-							}
+			frappe.db.get_value('Inpatient Record', frm.doc.inpatient_record,
+				['admission_encounter', 'status']).then(r => {
+					if (r.message) {
+						if (r.message.admission_encounter == frm.doc.name &&
+							r.message.status == 'Admission Scheduled') {
+							frm.add_custom_button(__('Cancel Admission'), function () {
+								cancel_ip_order(frm);
+							});
 						}
+						if (r.message.status == 'Admitted') {
+							frm.add_custom_button(__('Schedule Discharge'), function () {
+								schedule_discharge(frm);
+							});
+						}
+					}
 				})
 		}
 		show_clinical_notes(frm);
 		show_orders(frm);
 	},
 
-	onload_post_render: function(frm) {
+	onload_post_render: function (frm) {
+		// 		frm.set_value("dental_chart", `<div id="dental-chart" class="dc-wrap compact"></div>
+		// <div class="dc-tip" id="dc-tip"></div>`);
+
 		frm.get_field('therapies').grid.editable_fields = [
-			{fieldname: 'therapy_type', columns: 6},
-			{fieldname: 'no_of_sessions', columns: 2},
-			{fieldname: 'interval', columns: 2},
+			{ fieldname: 'therapy_type', columns: 6 },
+			{ fieldname: 'no_of_sessions', columns: 2 },
+			{ fieldname: 'interval', columns: 2 },
 		];
 		frm.get_field('drug_prescription').grid.editable_fields = [
-			{fieldname: 'drug_code', columns: 2},
-			{fieldname: 'drug_name', columns: 2},
-			{fieldname: 'dosage', columns: 2},
-			{fieldname: 'period', columns: 2},
-			{fieldname: 'dosage_form', columns: 2},
+			{ fieldname: 'drug_code', columns: 2 },
+			{ fieldname: 'drug_name', columns: 2 },
+			{ fieldname: 'dosage', columns: 2 },
+			{ fieldname: 'period', columns: 2 },
+			{ fieldname: 'dosage_form', columns: 2 },
 		];
 		if (frappe.meta.get_docfield('Drug Prescription', 'medication').in_list_view === 1) {
-			frm.get_field('drug_prescription').grid.editable_fields.splice(0, 0, {fieldname: 'medication', columns: 3});
+			frm.get_field('drug_prescription').grid.editable_fields.splice(0, 0, { fieldname: 'medication', columns: 3 });
 			frm.get_field('drug_prescription').grid.editable_fields.splice(2, 1); // remove item description
 		}
 	},
+	validate: function (frm) {
+		if (frm._dcBuffer) {
+			// Write directly to the doc to avoid triggering another dirty-change loop
+			// frm.doc.dental_chart_store = JSON.stringify(frm._dcBuffer);
+			frm.set_value("dental_chart_store", JSON.stringify(frm._dcBuffer));
+			frm.refresh_field('dental_chart_store');
+		}
+	},
+	refresh(frm) {
+		const htmlField = frm.fields_dict.dental_chart;
+		if (!htmlField) return;
+		const wrap = htmlField.$wrapper;
 
-	refresh: function(frm) {
+		if (!wrap.data('dc-mounted')) {
+			if (!wrap.find('#dental-chart').length) {
+				wrap.html('<div id="dental-chart" class="dc-wrap compact"></div><div class="dc-tip" id="dc-tip"></div>');
+			}
+			wrap.data('dc-mounted', true);
+		}
 
+		waitFor(() => typeof window.DentalChart === 'function', 40, 75)
+			.then(() => {
+				if (frm._dentalChart) return;
+
+				const initial = safeJson(frm.doc.dental_chart_store);
+				frm._dcBuffer = initial;
+				frm._dcMarkedDirty = false;
+
+				frm._dentalChart = new window.DentalChart('#dental-chart', {
+					initial,
+					height: 780,
+					archTightness: 0.92,
+					gapPx: 10,
+					minScale: 0.95,
+					quadrantLabels: { 1: 'Upper Left', 2: 'Upper Right', 3: 'Lower Left', 4: 'Lower Right' },
+					onChange: (state) => {
+						// Buffer changes
+						frm._dcBuffer = state;
+
+						// Mark the form dirty once (no server call)
+						if (!frm._dcMarkedDirty && typeof frm.dirty === 'function') {
+							frm.dirty();               // shows “Not Saved”
+							frm._dcMarkedDirty = true;
+						}
+					},
+				});
+			})
+			.catch(() => console.error('DentalChart not loaded. Check hooks.py and bench build.'));
+		// end dental
 		refresh_field('drug_prescription');
 		refresh_field('lab_test_prescription');
 
 		if (!frm.doc.__islocal) {
 			if (frm.doc.docstatus === 1) {
-				if(!['Discharge Scheduled', 'Admission Scheduled', 'Admitted', 'Treatment Counselling Created'].includes(frm.doc.inpatient_status)) {
-					frm.add_custom_button(__('Schedule Admission'), function() {
+				if (!['Discharge Scheduled', 'Admission Scheduled', 'Admitted', 'Treatment Counselling Created'].includes(frm.doc.inpatient_status)) {
+					frm.add_custom_button(__('Schedule Admission'), function () {
 						schedule_inpatient(frm);
 					});
 				}
 			}
 
-			frm.add_custom_button(__("Refer Patient"), function() {
+			frm.add_custom_button(__("Refer Patient"), function () {
 				create_patient_referral(frm);
-			},__("Create"));
+			}, __("Create"));
 
-			frm.add_custom_button(__('Patient History'), function() {
+			frm.add_custom_button(__('Patient History'), function () {
 				if (frm.doc.patient) {
-					frappe.route_options = {'patient': frm.doc.patient};
+					frappe.route_options = { 'patient': frm.doc.patient };
 					frappe.set_route('patient_history');
 				} else {
 					frappe.msgprint(__('Please select Patient'));
 				}
-			},__('View'));
+			}, __('View'));
 
-			if (frm.doc.docstatus == 1 && frm.doc.drug_prescription && frm.doc.drug_prescription.length>0) {
-				frm.add_custom_button(__('Medication Request'), function() {
+			if (frm.doc.docstatus == 1 && frm.doc.drug_prescription && frm.doc.drug_prescription.length > 0) {
+				frm.add_custom_button(__('Medication Request'), function () {
 					create_medication_request(frm);
-				},__('Create'));
+				}, __('Create'));
 			}
 
 			if (frm.doc.docstatus == 1 && (
-				(frm.doc.lab_test_prescription && frm.doc.lab_test_prescription.length>0) ||
-				(frm.doc.procedure_prescription && frm.doc.procedure_prescription.length>0) ||
-				(frm.doc.therapies && frm.doc.therapies.length>0)
-				)) {
-				frm.add_custom_button(__('Service Request'), function() {
+				(frm.doc.lab_test_prescription && frm.doc.lab_test_prescription.length > 0) ||
+				(frm.doc.procedure_prescription && frm.doc.procedure_prescription.length > 0) ||
+				(frm.doc.therapies && frm.doc.therapies.length > 0)
+			)) {
+				frm.add_custom_button(__('Service Request'), function () {
 					create_service_request(frm);
-				},__('Create'));
+				}, __('Create'));
 			}
 
-			frm.add_custom_button(__('Vital Signs'), function() {
+			frm.add_custom_button(__('Vital Signs'), function () {
 				create_vital_signs(frm);
-			},__('Create'));
+			}, __('Create'));
 
-			frm.add_custom_button(__('Medical Record'), function() {
+			frm.add_custom_button(__('Medical Record'), function () {
 				create_medical_record(frm);
-			},__('Create'));
+			}, __('Create'));
 
-			frm.add_custom_button(__('Clinical Procedure'), function() {
+			frm.add_custom_button(__('Clinical Procedure'), function () {
 				create_procedure(frm);
-			},__('Create'));
+			}, __('Create'));
 
-			frm.add_custom_button(__("Clinical Note"), function() {
+			frm.add_custom_button(__("Clinical Note"), function () {
 				frappe.route_options = {
 					"patient": frm.doc.patient,
 					"reference_doc": "Patient Encounter",
@@ -108,30 +159,30 @@ frappe.ui.form.on('Patient Encounter', {
 					"practitioner": frm.doc.practitioner
 				}
 				frappe.new_doc("Clinical Note");
-			},__('Create'));
+			}, __('Create'));
 
 
 			if (frm.doc.drug_prescription && frm.doc.inpatient_record && frm.doc.inpatient_status === "Admitted") {
-				frm.add_custom_button(__('Inpatient Medication Order'), function() {
+				frm.add_custom_button(__('Inpatient Medication Order'), function () {
 					frappe.model.open_mapped_doc({
 						method: 'healthcare.healthcare.doctype.patient_encounter.patient_encounter.make_ip_medication_order',
 						frm: frm
 					});
-				},__('Create'));
+				}, __('Create'));
 			}
 
-			frm.add_custom_button(__('Nursing Tasks'), function() {
+			frm.add_custom_button(__('Nursing Tasks'), function () {
 				create_nursing_tasks(frm);
-			},__('Create'));
+			}, __('Create'));
 		}
 
-		frm.set_query('patient', function() {
+		frm.set_query('patient', function () {
 			return {
-				filters: {'status': 'Active'}
+				filters: { 'status': 'Active' }
 			};
 		});
 
-		frm.set_query('lab_test_code', 'lab_test_prescription', function() {
+		frm.set_query('lab_test_code', 'lab_test_prescription', function () {
 			return {
 				filters: {
 					is_billable: 1
@@ -139,16 +190,16 @@ frappe.ui.form.on('Patient Encounter', {
 			};
 		});
 
-		frm.set_query('appointment', function() {
+		frm.set_query('appointment', function () {
 			return {
 				filters: {
 					//	Scheduled filter for demo ...
-					status:['in',['Open','Scheduled']]
+					status: ['in', ['Open', 'Scheduled']]
 				}
 			};
 		});
 
-		frm.set_query("code_value", "codification_table", function(doc, cdt, cdn) {
+		frm.set_query("code_value", "codification_table", function (doc, cdt, cdn) {
 			let row = frappe.get_doc(cdt, cdn);
 			if (row.code_system) {
 				return {
@@ -159,7 +210,7 @@ frappe.ui.form.on('Patient Encounter', {
 			}
 		});
 
-		frm.set_query("medication", "drug_prescription", function() {
+		frm.set_query("medication", "drug_prescription", function () {
 			return {
 				filters: {
 					disabled: false
@@ -178,7 +229,7 @@ frappe.ui.form.on('Patient Encounter', {
 		}
 
 		if (frappe.meta.get_docfield('Drug Prescription', 'medication').in_list_view === 1) {
-			frm.set_query('drug_code', 'drug_prescription', function(doc, cdt, cdn) {
+			frm.set_query('drug_code', 'drug_prescription', function (doc, cdt, cdn) {
 				let row = frappe.get_doc(cdt, cdn);
 				let filters = { is_stock_item: 1 };
 				if (row.medication) {
@@ -190,11 +241,11 @@ frappe.ui.form.on('Patient Encounter', {
 				};
 			});
 		}
-		var table_list =  ["drug_prescription", "lab_test_prescription", "procedure_prescription", "therapies"]
+		var table_list = ["drug_prescription", "lab_test_prescription", "procedure_prescription", "therapies"]
 		apply_code_sm_filter_to_child(frm, "priority", table_list, "Priority")
 		apply_code_sm_filter_to_child(frm, "intent", table_list, "Intent")
 
-		frm.set_query('insurance_policy', function() {
+		frm.set_query('insurance_policy', function () {
 			return {
 				filters: {
 					'patient': frm.doc.patient,
@@ -204,20 +255,20 @@ frappe.ui.form.on('Patient Encounter', {
 		});
 	},
 
-	appointment: function(frm) {
+	appointment: function (frm) {
 		frm.events.set_appointment_fields(frm);
 	},
 
-	patient: function(frm) {
+	patient: function (frm) {
 		frm.events.set_patient_info(frm);
 	},
 
-	practitioner: function(frm) {
+	practitioner: function (frm) {
 		if (!frm.doc.practitioner) {
 			frm.set_value('practitioner_name', '');
 		}
 	},
-	set_appointment_fields: function(frm) {
+	set_appointment_fields: function (frm) {
 		if (frm.doc.appointment) {
 			frappe.call({
 				method: 'frappe.client.get',
@@ -225,9 +276,9 @@ frappe.ui.form.on('Patient Encounter', {
 					doctype: 'Patient Appointment',
 					name: frm.doc.appointment
 				},
-				callback: function(data) {
+				callback: function (data) {
 					let values = {
-						'patient':data.message.patient,
+						'patient': data.message.patient,
 						'type': data.message.appointment_type,
 						'practitioner': data.message.practitioner,
 						'invoiced': data.message.invoiced,
@@ -261,37 +312,37 @@ frappe.ui.form.on('Patient Encounter', {
 		}
 	},
 
-	set_patient_info: async function(frm) {
+	set_patient_info: async function (frm) {
 		if (frm.doc.patient) {
 			frappe.call({
 				method: 'healthcare.healthcare.doctype.patient.patient.get_patient_detail',
 				args: {
 					patient: frm.doc.patient
 				},
-				callback: function(data) {
+				callback: function (data) {
 					let age = '';
 					if (data.message.dob) {
 						age = calculate_age(data.message.dob);
 					}
 					let values = {
 						'patient_age': age,
-						'patient_name':data.message.patient_name,
+						'patient_name': data.message.patient_name,
 						'patient_sex': data.message.sex,
 						'inpatient_record': data.message.inpatient_record,
 						'inpatient_status': data.message.inpatient_status
 					};
 
 					frappe.run_serially([
-						()=>frm.set_value(values),
-						()=>show_clinical_notes(frm),
-						()=>show_orders(frm),
+						() => frm.set_value(values),
+						() => show_clinical_notes(frm),
+						() => show_orders(frm),
 					]);
 				}
 			});
 		} else {
 			let values = {
 				'patient_age': '',
-				'patient_name':'',
+				'patient_name': '',
 				'patient_sex': '',
 				'inpatient_record': '',
 				'inpatient_status': ''
@@ -300,14 +351,14 @@ frappe.ui.form.on('Patient Encounter', {
 		}
 	},
 
-	get_applicable_treatment_plans: function(frm) {
+	get_applicable_treatment_plans: function (frm) {
 		frappe.call({
 			method: 'get_applicable_treatment_plans',
 			doc: frm.doc,
-			args: {'encounter': frm.doc},
+			args: { 'encounter': frm.doc },
 			freeze: true,
 			freeze_message: __('Fetching Treatment Plans'),
-			callback: function() {
+			callback: function () {
 				new frappe.ui.form.MultiSelectDialog({
 					doctype: "Treatment Plan Template",
 					target: this.cur_frm,
@@ -332,25 +383,25 @@ frappe.ui.form.on('Patient Encounter', {
 });
 
 
-var schedule_inpatient = function(frm) {
+var schedule_inpatient = function (frm) {
 	let service_unit_type = "";
 	var dialog = new frappe.ui.Dialog({
 		title: 'Patient Admission',
 		fields: [
-			{fieldtype: 'Link', label: 'Medical Department', fieldname: 'medical_department', options: 'Medical Department', reqd: 1},
-			{fieldtype: 'Link', label: 'Healthcare Practitioner (Primary)', fieldname: 'primary_practitioner', options: 'Healthcare Practitioner', reqd: 1},
-			{fieldtype: 'Link', label: 'Healthcare Practitioner (Secondary)', fieldname: 'secondary_practitioner', options: 'Healthcare Practitioner'},
-			{fieldtype: 'Link', label: 'Nursing Checklist Template', fieldname: 'admission_nursing_checklist_template', options: 'Nursing Checklist Template'},
-			{fieldtype: 'Column Break'},
-			{fieldtype: 'Date', label: 'Admission Ordered For', fieldname: 'admission_ordered_for', default: 'Today'},
-			{fieldtype: 'Link', label: 'Service Unit Type', fieldname: 'service_unit_type', options: 'Healthcare Service Unit Type'},
-			{fieldtype: 'Int', label: 'Expected Length of Stay', fieldname: 'expected_length_of_stay'},
-			{fieldtype: 'Link', label: 'Treatment Plan Template', fieldname: 'treatment_plan_template', options: 'Treatment Plan Template'},
-			{fieldtype: 'Section Break'},
-			{fieldtype: 'Long Text', label: 'Admission Instructions', fieldname: 'admission_instruction'}
+			{ fieldtype: 'Link', label: 'Medical Department', fieldname: 'medical_department', options: 'Medical Department', reqd: 1 },
+			{ fieldtype: 'Link', label: 'Healthcare Practitioner (Primary)', fieldname: 'primary_practitioner', options: 'Healthcare Practitioner', reqd: 1 },
+			{ fieldtype: 'Link', label: 'Healthcare Practitioner (Secondary)', fieldname: 'secondary_practitioner', options: 'Healthcare Practitioner' },
+			{ fieldtype: 'Link', label: 'Nursing Checklist Template', fieldname: 'admission_nursing_checklist_template', options: 'Nursing Checklist Template' },
+			{ fieldtype: 'Column Break' },
+			{ fieldtype: 'Date', label: 'Admission Ordered For', fieldname: 'admission_ordered_for', default: 'Today' },
+			{ fieldtype: 'Link', label: 'Service Unit Type', fieldname: 'service_unit_type', options: 'Healthcare Service Unit Type' },
+			{ fieldtype: 'Int', label: 'Expected Length of Stay', fieldname: 'expected_length_of_stay' },
+			{ fieldtype: 'Link', label: 'Treatment Plan Template', fieldname: 'treatment_plan_template', options: 'Treatment Plan Template' },
+			{ fieldtype: 'Section Break' },
+			{ fieldtype: 'Long Text', label: 'Admission Instructions', fieldname: 'admission_instruction' }
 		],
 		primary_action_label: __('Order Admission'),
-		primary_action : function() {
+		primary_action: function () {
 			var args = {
 				patient: frm.doc.patient,
 				admission_encounter: frm.doc.name,
@@ -371,7 +422,7 @@ var schedule_inpatient = function(frm) {
 				args: {
 					admission_order: args
 				},
-				callback: function(data) {
+				callback: function (data) {
 					if (!data.exc) {
 						frm.reload_doc();
 					}
@@ -389,7 +440,7 @@ var schedule_inpatient = function(frm) {
 		'primary_practitioner': frm.doc.practitioner,
 	});
 
-	dialog.fields_dict['service_unit_type'].get_query = function() {
+	dialog.fields_dict['service_unit_type'].get_query = function () {
 		return {
 			filters: {
 				'inpatient_occupancy': 1,
@@ -401,16 +452,16 @@ var schedule_inpatient = function(frm) {
 	dialog.fields_dict["service_unit_type"].df.onchange = () => {
 		if (dialog.get_value("service_unit_type") && dialog.get_value("service_unit_type") != service_unit_type) {
 			service_unit_type = dialog.get_value("service_unit_type");
-			frappe.db.get_value("Healthcare Service Unit Type", {name: dialog.get_value("service_unit_type")}, ["is_billable", "item"])
-			.then(r => {
-				if (r.message.is_billable && !r.message.item) {
-					frappe.msgprint({
-						message: __("Selected service unit type doesn't have any item linked"),
-						title: __("Warning"),
-						indicator: "orange",
-					});
-				}
-			})
+			frappe.db.get_value("Healthcare Service Unit Type", { name: dialog.get_value("service_unit_type") }, ["is_billable", "item"])
+				.then(r => {
+					if (r.message.is_billable && !r.message.item) {
+						frappe.msgprint({
+							message: __("Selected service unit type doesn't have any item linked"),
+							title: __("Warning"),
+							indicator: "orange",
+						});
+					}
+				})
 		}
 	};
 
@@ -419,20 +470,20 @@ var schedule_inpatient = function(frm) {
 };
 
 
-var schedule_discharge = function(frm) {
-	var dialog = new frappe.ui.Dialog ({
+var schedule_discharge = function (frm) {
+	var dialog = new frappe.ui.Dialog({
 		title: 'Inpatient Discharge',
 		fields: [
-			{fieldtype: 'Date', label: 'Discharge Ordered Date', fieldname: 'discharge_ordered_date', default: 'Today', read_only: 1},
-			{fieldtype: 'Date', label: 'Followup Date', fieldname: 'followup_date'},
-			{fieldtype: 'Link', label: 'Nursing Checklist Template', options: 'Nursing Checklist Template', fieldname: 'discharge_nursing_checklist_template'},
-			{fieldtype: 'Column Break'},
-			{fieldtype: 'Small Text', label: 'Discharge Instructions', fieldname: 'discharge_instructions'},
-			{fieldtype: 'Section Break', label:'Discharge Summary'},
-			{fieldtype: 'Long Text', label: 'Discharge Note', fieldname: 'discharge_note'}
+			{ fieldtype: 'Date', label: 'Discharge Ordered Date', fieldname: 'discharge_ordered_date', default: 'Today', read_only: 1 },
+			{ fieldtype: 'Date', label: 'Followup Date', fieldname: 'followup_date' },
+			{ fieldtype: 'Link', label: 'Nursing Checklist Template', options: 'Nursing Checklist Template', fieldname: 'discharge_nursing_checklist_template' },
+			{ fieldtype: 'Column Break' },
+			{ fieldtype: 'Small Text', label: 'Discharge Instructions', fieldname: 'discharge_instructions' },
+			{ fieldtype: 'Section Break', label: 'Discharge Summary' },
+			{ fieldtype: 'Long Text', label: 'Discharge Note', fieldname: 'discharge_note' }
 		],
 		primary_action_label: __('Order Discharge'),
-		primary_action : function() {
+		primary_action: function () {
 			var args = {
 				patient: frm.doc.patient,
 				discharge_encounter: frm.doc.name,
@@ -443,11 +494,11 @@ var schedule_discharge = function(frm) {
 				discharge_note: dialog.get_value('discharge_note'),
 				discharge_nursing_checklist_template: dialog.get_value('discharge_nursing_checklist_template')
 			}
-			frappe.call ({
+			frappe.call({
 				method: 'healthcare.healthcare.doctype.inpatient_record.inpatient_record.schedule_discharge',
-				args: {args},
-				callback: function(data) {
-					if(!data.exc){
+				args: { args },
+				callback: function (data) {
+					if (!data.exc) {
 						frm.reload_doc();
 					}
 				},
@@ -464,7 +515,7 @@ var schedule_discharge = function(frm) {
 };
 
 
-let create_medical_record = function(frm) {
+let create_medical_record = function (frm) {
 	if (!frm.doc.patient) {
 		frappe.throw(__('Please select patient'));
 	}
@@ -478,7 +529,7 @@ let create_medical_record = function(frm) {
 };
 
 
-let create_vital_signs = function(frm) {
+let create_vital_signs = function (frm) {
 	if (!frm.doc.patient) {
 		frappe.throw(__('Please select patient'));
 	}
@@ -491,7 +542,7 @@ let create_vital_signs = function(frm) {
 };
 
 
-let create_procedure = function(frm) {
+let create_procedure = function (frm) {
 	if (!frm.doc.patient) {
 		frappe.throw(__('Please select patient'));
 	}
@@ -504,7 +555,7 @@ let create_procedure = function(frm) {
 };
 
 
-let create_nursing_tasks = function(frm) {
+let create_nursing_tasks = function (frm) {
 	const d = new frappe.ui.Dialog({
 
 		title: __('Create Nursing Tasks'),
@@ -548,7 +599,7 @@ let create_nursing_tasks = function(frm) {
 				}
 			});
 
-			d.hide();		frm.set_query('lab_test_code', 'lab_test_prescription', function() {
+			d.hide(); frm.set_query('lab_test_code', 'lab_test_prescription', function () {
 				return {
 					filters: {
 						is_billable: 1
@@ -562,16 +613,16 @@ let create_nursing_tasks = function(frm) {
 };
 
 
-let calculate_age = function(birth) {
+let calculate_age = function (birth) {
 	let ageMS = Date.parse(Date()) - Date.parse(birth);
 	let age = new Date();
 	age.setTime(ageMS);
-	let years =  age.getFullYear() - 1970;
+	let years = age.getFullYear() - 1970;
 	return `${years} ${__('Years(s)')} ${age.getMonth()} ${__('Month(s)')} ${age.getDate()} ${__('Day(s)')}`;
 };
 
 
-let cancel_ip_order = function(frm) {
+let cancel_ip_order = function (frm) {
 	frappe.prompt([
 		{
 			fieldname: 'reason_for_cancellation',
@@ -580,34 +631,34 @@ let cancel_ip_order = function(frm) {
 			reqd: 1
 		}
 	],
-	function(data) {
-		frappe.call({
-			method: 'healthcare.healthcare.doctype.inpatient_record.inpatient_record.set_ip_order_cancelled',
-			async: false,
-			freeze: true,
-			args: {
-				inpatient_record: frm.doc.inpatient_record,
-				reason: data.reason_for_cancellation,
-				encounter: frm.doc.name
-			},
-			callback: function(r) {
-				if (!r.exc) {
-					frm.reload_doc();
+		function (data) {
+			frappe.call({
+				method: 'healthcare.healthcare.doctype.inpatient_record.inpatient_record.set_ip_order_cancelled',
+				async: false,
+				freeze: true,
+				args: {
+					inpatient_record: frm.doc.inpatient_record,
+					reason: data.reason_for_cancellation,
+					encounter: frm.doc.name
+				},
+				callback: function (r) {
+					if (!r.exc) {
+						frm.reload_doc();
+					}
 				}
-			}
-		});
-	}, __('Reason for Cancellation'), __('Submit'));
+			});
+		}, __('Reason for Cancellation'), __('Submit'));
 }
 
 
-let create_service_request = function(frm) {
+let create_service_request = function (frm) {
 	frappe.call({
 		method: "healthcare.healthcare.doctype.patient_encounter.patient_encounter.create_service_request",
 		freeze: true,
 		args: {
 			encounter: frm.doc.name
 		},
-		callback: function(r) {
+		callback: function (r) {
 			if (r && !r.exc) {
 				frm.reload_doc();
 				frappe.show_alert({
@@ -620,14 +671,14 @@ let create_service_request = function(frm) {
 };
 
 
-let create_medication_request = function(frm) {
+let create_medication_request = function (frm) {
 	frappe.call({
 		method: "healthcare.healthcare.doctype.patient_encounter.patient_encounter.create_medication_request",
 		freeze: true,
 		args: {
 			encounter: frm.doc.name
 		},
-		callback: function(r) {
+		callback: function (r) {
 			if (r && !r.exc) {
 				frm.reload_doc();
 				frappe.show_alert({
@@ -641,7 +692,7 @@ let create_medication_request = function(frm) {
 
 
 frappe.ui.form.on('Drug Prescription', {
-	dosage: function(frm, cdt, cdn){
+	dosage: function (frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, 'update_schedule', 1);
 		let child = locals[cdt][cdn];
 		if (child.dosage) {
@@ -650,11 +701,11 @@ frappe.ui.form.on('Drug Prescription', {
 		}
 	},
 
-	period: function(frm, cdt, cdn) {
+	period: function (frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, 'update_schedule', 1);
 	},
 
-	interval_uom: function(frm, cdt, cdn) {
+	interval_uom: function (frm, cdt, cdn) {
 		frappe.model.set_value(cdt, cdn, 'update_schedule', 1);
 		let child = locals[cdt][cdn];
 		if (child.interval_uom == 'Hour') {
@@ -662,7 +713,7 @@ frappe.ui.form.on('Drug Prescription', {
 		}
 	},
 
-	medication:function(frm, cdt, cdn) {
+	medication: function (frm, cdt, cdn) {
 		// to set drug_code(item) if Medication Item table have only one item
 		let child = locals[cdt][cdn];
 		if (!child.medication) {
@@ -675,7 +726,7 @@ frappe.ui.form.on('Drug Prescription', {
 			args: {
 				medication: child.medication
 			},
-			callback: function(r) {
+			callback: function (r) {
 				if (r && !r.exc && r.message) {
 					let data = r.message
 					if (data.length == 1) {
@@ -692,9 +743,9 @@ frappe.ui.form.on('Drug Prescription', {
 });
 
 
-var apply_code_sm_filter_to_child = function(frm, field, table_list, code_system) {
-	table_list.forEach(function(table) {
-		frm.set_query(field, table, function() {
+var apply_code_sm_filter_to_child = function (frm, field, table_list, code_system) {
+	table_list.forEach(function (table) {
+		frm.set_query(field, table, function () {
 			return {
 				filters: {
 					code_system: code_system
@@ -705,7 +756,7 @@ var apply_code_sm_filter_to_child = function(frm, field, table_list, code_system
 };
 
 
-var show_clinical_notes = async function(frm) {
+var show_clinical_notes = async function (frm) {
 	if (frm.doc.docstatus == 0 && frm.doc.patient) {
 		const clinical_notes = new healthcare.ClinicalNotes({
 			frm: frm,
@@ -716,7 +767,7 @@ var show_clinical_notes = async function(frm) {
 }
 
 
-var show_orders = async function(frm) {
+var show_orders = async function (frm) {
 	if (frm.doc.docstatus == 0 && frm.doc.patient) {
 		const orders = new healthcare.Orders({
 			frm: frm,
@@ -729,8 +780,8 @@ var show_orders = async function(frm) {
 }
 
 
-let create_patient_referral = function(frm) {
-	var dialog = new frappe.ui.Dialog ({
+let create_patient_referral = function (frm) {
+	var dialog = new frappe.ui.Dialog({
 		title: "Patient Referral",
 		size: "large",
 		fields: [
@@ -774,8 +825,8 @@ let create_patient_referral = function(frm) {
 			},
 		],
 		primary_action_label: __("Refer"),
-		primary_action : function() {
-			if (dialog.get_value("references").length>0) {
+		primary_action: function () {
+			if (dialog.get_value("references").length > 0) {
 				frappe.call({
 					method: "healthcare.healthcare.doctype.patient_encounter.patient_encounter.create_patient_referral",
 					freeze: true,
@@ -783,7 +834,7 @@ let create_patient_referral = function(frm) {
 						encounter: frm.doc.name,
 						references: dialog.get_value("references"),
 					},
-					callback: function(r) {
+					callback: function (r) {
 						if (r && !r.exc) {
 							dialog.hide();
 							frm.reload_doc();
@@ -803,7 +854,7 @@ let create_patient_referral = function(frm) {
 };
 
 
-async function get_medical_codes(dn, dt="Diagnosis") {
+async function get_medical_codes(dn, dt = "Diagnosis") {
 	const { message } = await frappe.call({
 		method: "healthcare.healthcare.utils.get_medical_codes",
 		args: {
@@ -860,3 +911,10 @@ frappe.ui.form.on("Patient Encounter Diagnosis", {
 		remove_codes(frm, cdt, cdn);
 	},
 });
+function safeJson(s) { try { return JSON.parse(s || '{}'); } catch { return {}; } }
+function waitFor(cond, tries, delay) {
+	return new Promise((res, rej) => {
+		const tick = () => (cond() ? res() : (--tries > 0 ? setTimeout(tick, delay) : rej()));
+		tick();
+	});
+}
