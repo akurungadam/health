@@ -62,10 +62,57 @@ frappe.ui.form.on("Patient Encounter", {
 			frm.get_field("drug_prescription").grid.editable_fields.splice(2, 1); // remove item description
 		}
 	},
+	validate: function (frm) {
+		if (frm._dcBuffer) {
+			// Write directly to the doc to avoid triggering another dirty-change loop
+			// frm.doc.dental_chart_store = JSON.stringify(frm._dcBuffer);
+			frm.set_value("dental_chart_store", JSON.stringify(frm._dcBuffer));
+			frm.refresh_field('dental_chart_store');
+		}
+	},
+	refresh(frm) {
+		const htmlField = frm.fields_dict.dental_chart;
+		if (!htmlField) return;
+		const wrap = htmlField.$wrapper;
 
-	refresh: function (frm) {
-		refresh_field("drug_prescription");
-		refresh_field("lab_test_prescription");
+		if (!wrap.data('dc-mounted')) {
+			if (!wrap.find('#dental-chart').length) {
+				wrap.html('<div id="dental-chart" class="dc-wrap compact"></div><div class="dc-tip" id="dc-tip"></div>');
+			}
+			wrap.data('dc-mounted', true);
+		}
+
+		waitFor(() => typeof window.DentalChart === 'function', 40, 75)
+			.then(() => {
+				if (frm._dentalChart) return;
+
+				const initial = safeJson(frm.doc.dental_chart_store);
+				frm._dcBuffer = initial;
+				frm._dcMarkedDirty = false;
+
+				frm._dentalChart = new window.DentalChart('#dental-chart', {
+					initial,
+					height: 780,
+					archTightness: 0.92,
+					gapPx: 10,
+					minScale: 0.95,
+					quadrantLabels: { 1: 'Upper Left', 2: 'Upper Right', 3: 'Lower Left', 4: 'Lower Right' },
+					onChange: (state) => {
+						// Buffer changes
+						frm._dcBuffer = state;
+
+						// Mark the form dirty once (no server call)
+						if (!frm._dcMarkedDirty && typeof frm.dirty === 'function') {
+							frm.dirty();               // shows “Not Saved”
+							frm._dcMarkedDirty = true;
+						}
+					},
+				});
+			})
+			.catch(() => console.error('DentalChart not loaded. Check hooks.py and bench build.'));
+		// end dental
+		refresh_field('drug_prescription');
+		refresh_field('lab_test_prescription');
 
 		if (!frm.doc.__islocal) {
 			if (frm.doc.docstatus === 1) {
@@ -1011,3 +1058,10 @@ frappe.ui.form.on("Patient Encounter Diagnosis", {
 		remove_codes(frm, cdt, cdn);
 	},
 });
+function safeJson(s) { try { return JSON.parse(s || '{}'); } catch { return {}; } }
+function waitFor(cond, tries, delay) {
+	return new Promise((res, rej) => {
+		const tick = () => (cond() ? res() : (--tries > 0 ? setTimeout(tick, delay) : rej()));
+		tick();
+	});
+}

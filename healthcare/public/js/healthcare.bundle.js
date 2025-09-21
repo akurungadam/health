@@ -7,5 +7,7 @@ import "./healthcare_note.js";
 import "./healthcare_note.html";
 import "./healthcare_orders.html";
 import "./er_triage_indicator.js";
+import "./dental_chart/dental_chart.js"
+import "./dental_chart/dental_chart.html"
 // import "./er_triage_indicator_list.js";
 
