@@ -62,14 +62,7 @@ frappe.ui.form.on("Patient Encounter", {
 			frm.get_field("drug_prescription").grid.editable_fields.splice(2, 1); // remove item description
 		}
 	},
-	validate: function (frm) {
-		if (frm._dcBuffer) {
-			// Write directly to the doc to avoid triggering another dirty-change loop
-			// frm.doc.dental_chart_store = JSON.stringify(frm._dcBuffer);
-			frm.set_value("dental_chart_store", JSON.stringify(frm._dcBuffer));
-			frm.refresh_field('dental_chart_store');
-		}
-	},
+
 	refresh(frm) {
 		const htmlField = frm.fields_dict.dental_chart;
 		if (!htmlField) return;
@@ -97,16 +90,9 @@ frappe.ui.form.on("Patient Encounter", {
 					gapPx: 10,
 					minScale: 0.95,
 					quadrantLabels: { 1: 'Upper Left', 2: 'Upper Right', 3: 'Lower Left', 4: 'Lower Right' },
-					onChange: (state) => {
-						// Buffer changes
-						frm._dcBuffer = state;
-
-						// Mark the form dirty once (no server call)
-						if (!frm._dcMarkedDirty && typeof frm.dirty === 'function') {
-							frm.dirty();               // shows “Not Saved”
-							frm._dcMarkedDirty = true;
-						}
-					},
+					quadPill:{padX:10,padY:5,radius:10,minW:90,minH:20},
+					theme: 'light',
+					onChange: (s) => frm.set_value('dental_chart_store', JSON.stringify(s, null, 1)),
 				});
 			})
 			.catch(() => console.error('DentalChart not loaded. Check hooks.py and bench build.'));
