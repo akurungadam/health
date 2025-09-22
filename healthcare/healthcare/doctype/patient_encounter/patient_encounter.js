@@ -89,9 +89,12 @@ frappe.ui.form.on("Patient Encounter", {
 					archTightness: 0.92,
 					gapPx: 10,
 					minScale: 0.95,
-					quadrantLabels: { 1: 'Upper Left', 2: 'Upper Right', 3: 'Lower Left', 4: 'Lower Right' },
-					quadPill:{padX:10,padY:5,radius:10,minW:90,minH:20},
-					theme: 'light',
+					quadrantSpread: 60,
+					quadPill: { padX: 12, padY: 6, radius: 12, minW: 110, minH: 22 },
+					showQuadrantAxes: true,
+					quadrantAxisStyle: { stroke: '#9ca3af', width: 1, dash: '4 3', opacity: 0.9 },
+					quadrantLabels: ['Upper Right', 'Upper Left', 'Lower Left', 'Lower Right'],
+					quadPill: { padX: 10, padY: 5, radius: 10, minW: 90, minH: 20 },
 					onChange: (s) => frm.set_value('dental_chart_store', JSON.stringify(s, null, 1)),
 				});
 			})
