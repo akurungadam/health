@@ -64,41 +64,66 @@ frappe.ui.form.on("Patient Encounter", {
 	},
 
 	refresh(frm) {
-		const htmlField = frm.fields_dict.dental_chart;
-		if (!htmlField) return;
-		const wrap = htmlField.$wrapper;
+		const wrap = frm.fields_dict.dental_chart?.$wrapper?.get(0);
+		if (!wrap) return; // field not visible yet
+		frm.__dentalChart = new window.DentalChart(wrap, {
+			theme: 'auto',
+			readOnly: 'auto',
+			bindToFrappe: true,
+			storeField: 'dental_chart_store',
+			showQuadrantAxes: true,
+			autoSave: true,
+		});
+		// let old = false;
+		// if (!old) {
+		// 	frm.__dentalChart = new window.DentalChart(
+		// 		frm.fields_dict.dental_chart?.$wrapper?.get(0),
+		// 		{
+		// 			theme: 'auto',
+		// 			readOnly: 'auto',
+		// 			bindToFrappe: true,
+		// 			storeField: 'dental_chart_store',
+		// 			autoSave: true, // set true if you want live writes to the field
+		// 		}
+		// 	);
+		// } else {
+		// 	const htmlField = frm.fields_dict.dental_chart;
+		// 	if (!htmlField) return;
+		// 	const wrap = htmlField.$wrapper;
 
-		if (!wrap.data('dc-mounted')) {
-			if (!wrap.find('#dental-chart').length) {
-				wrap.html('<div id="dental-chart" class="dc-wrap compact"></div><div class="dc-tip" id="dc-tip"></div>');
-			}
-			wrap.data('dc-mounted', true);
-		}
+		// 	if (!wrap.data('dc-mounted')) {
+		// 		if (!wrap.find('#dental-chart').length) {
+		// 			wrap.html('<div id="dental-chart" class="dc-wrap compact"></div><div class="dc-tip" id="dc-tip"></div>');
+		// 		}
+		// 		wrap.data('dc-mounted', true);
+		// 	}
+		// 	const isReadOnly = frm.doc.docstatus === 1;
 
-		waitFor(() => typeof window.DentalChart === 'function', 40, 75)
-			.then(() => {
-				if (frm._dentalChart) return;
+		// 	waitFor(() => typeof window.DentalChart === 'function', 40, 75)
+		// 		.then(() => {
+		// 			if (frm._dentalChart) return;
 
-				const initial = safeJson(frm.doc.dental_chart_store);
-				frm._dcBuffer = initial;
-				frm._dcMarkedDirty = false;
+		// 			const initial = safeJson(frm.doc.dental_chart_store);
+		// 			frm._dcBuffer = initial;
+		// 			frm._dcMarkedDirty = false;
 
-				frm._dentalChart = new window.DentalChart('#dental-chart', {
-					initial,
-					height: 780,
-					archTightness: 0.92,
-					gapPx: 10,
-					minScale: 0.95,
-					quadrantSpread: 60,
-					quadPill: { padX: 12, padY: 6, radius: 12, minW: 110, minH: 22 },
-					showQuadrantAxes: true,
-					quadrantAxisStyle: { stroke: '#9ca3af', width: 1, dash: '4 3', opacity: 0.9 },
-					quadrantLabels: ['Upper Right', 'Upper Left', 'Lower Left', 'Lower Right'],
-					quadPill: { padX: 10, padY: 5, radius: 10, minW: 90, minH: 20 },
-					onChange: (s) => frm.set_value('dental_chart_store', JSON.stringify(s, null, 1)),
-				});
-			})
-			.catch(() => console.error('DentalChart not loaded. Check hooks.py and bench build.'));
+		// 			frm._dentalChart = new window.DentalChart('#dental-chart', {
+		// 				initial,
+		// 				height: 780,
+		// 				archTightness: 0.92,
+		// 				gapPx: 10,
+		// 				minScale: 0.95,
+		// 				quadrantSpread: 60,
+		// 				quadPill: { padX: 12, padY: 6, radius: 12, minW: 110, minH: 22 },
+		// 				showQuadrantAxes: true,
+		// 				quadrantAxisStyle: { stroke: '#9ca3af', width: 1, dash: '4 3', opacity: 0.9 },
+		// 				quadrantLabels: ['Upper Right', 'Upper Left', 'Lower Left', 'Lower Right'],
+		// 				quadPill: { padX: 10, padY: 5, radius: 10, minW: 90, minH: 20 },
+		// 				onChange: (s) => frm.set_value('dental_chart_store', JSON.stringify(s, null, 1)),
+		// 			});
+		// 		})
+		// 		.catch(() => console.error('DentalChart not loaded. Check hooks.py and bench build.'));
+		// }
 		// end dental
 		refresh_field('drug_prescription');
 		refresh_field('lab_test_prescription');
