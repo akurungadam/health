@@ -1,8 +1,9 @@
 /* dental_chart.js — Dental Chart (Frappe-ready)
-   - Whole-tooth states + per-surface markers
-   - Rounded surface rects, robust click handling (SVG-level delegation)
+   - Whole-tooth states + per-surface markers (rounded corners)
+   - Hover hint works (CSS wins; we clear inline opacity for unmarked cells)
    - Buttons: black text, colored pills; Healthy/Missing disabled when Surfaces ON
    - Right-aligned Surfaces toggle switch
+   - SVG-level delegated surface clicks (reliable)
    - Theme: 'light' | 'dark' | 'auto'
 */
 (function () {
@@ -10,74 +11,74 @@
   function injectStylesOnce() {
     if (document.getElementById('dc-styles')) return;
     const css = `
-.dc-wrap{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;user-select:none;color:#111827}
-.dc-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.75rem}
-.dc-btn{border:1px solid #e5e7eb;padding:.45rem .9rem;border-radius:999px;background:#fff;cursor:pointer;font-size:.85rem;box-shadow:0 1px 0 rgba(0,0,0,.03);color:#111827}
-.dc-btn:hover{background:#f9fafb}
-.dc-btn.active{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.25)}
-.dc-btn:disabled,.dc-btn.disabled{opacity:.55;box-shadow:none;cursor:not-allowed}
-.dc-badge{padding:.25rem .5rem;border-radius:999px;font-size:.75rem;background:#eef2ff;color:#3730a3}
+		.dc-wrap{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;user-select:none;color:#111827}
+		.dc-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.75rem}
+		.dc-btn{border:1px solid #e5e7eb;padding:.45rem .9rem;border-radius:999px;background:#fff;cursor:pointer;font-size:.85rem;box-shadow:0 1px 0 rgba(0,0,0,.03);color:#111827}
+		.dc-btn:hover{background:#f9fafb}
+		.dc-btn.active{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.25)}
+		.dc-btn:disabled,.dc-btn.disabled{opacity:.55;box-shadow:none;cursor:not-allowed}
 
-.dc-canvas{width:100%;min-height:740px}
-.dc-canvas svg{width:100%;height:100%;display:block;touch-action:none}
+		.dc-canvas{width:100%;min-height:740px}
+		.dc-canvas svg{width:100%;height:100%;display:block;touch-action:none}
 
-.tooth-rect{fill:#fff;stroke:#64748b;stroke-width:1}
-.tooth .tooth-rect{filter:drop-shadow(0 .5px .5px rgba(0,0,0,.08))}
-.tooth.selected .tooth-rect{stroke:#6366f1;stroke-width:2}
+		.tooth-rect{fill:#fff;stroke:#64748b;stroke-width:1}
+		.tooth .tooth-rect{filter:drop-shadow(0 .5px .5px rgba(0,0,0,.08))}
+		.tooth.selected .tooth-rect{stroke:#6366f1;stroke-width:2}
 
-/* surfaces (styles set inline in JS so they win) */
-.surf{cursor:pointer;fill-opacity:.001;stroke-linejoin:round}
-.surf.hover{fill:#94a3b8;fill-opacity:.08}
+		/* surfaces: let CSS control idle opacity so hover can override it */
+		.surf{cursor:pointer;fill-opacity:.001;stroke-linejoin:round}
+		.surf.hover{fill:#94a3b8; fill-opacity:.20; stroke: #60606060; stroke-width: 1.6; stroke-opacity: .85;}
 
-.body-hit{cursor:pointer;fill:#000;fill-opacity:.001;stroke:transparent;pointer-events:all}
+		.body-hit{cursor:pointer;fill:#000;fill-opacity:.001;stroke:transparent;pointer-events:all}
 
-.state-healthy .tooth-rect{fill:#f8fafc}
-.state-caries .tooth-rect{fill:#fee2e2;stroke:#ef4444}
-.state-missing .tooth-rect{fill:#f3f4f6;stroke:#9ca3af;stroke-dasharray:3 2}
-.state-crown .tooth-rect{fill:#fff7ed;stroke:#f59e0b}
-.state-implant .tooth-rect{fill:#eff6ff;stroke:#3b82f6}
+		.state-healthy .tooth-rect{fill:#f8fafc}
+		.state-caries .tooth-rect{fill:#fee2e2;stroke:#ef4444}
+		.state-missing .tooth-rect{fill:#f3f4f6;stroke:#9ca3af;stroke-dasharray:3 2}
+		.state-crown .tooth-rect{fill:#fff7ed;stroke:#f59e0b}
+		.state-implant .tooth-rect{fill:#eff6ff;stroke:#3b82f6}
 
-.chip{pointer-events:none;font-size:10px;fill:#111827;display:none}
-.chip-bg{fill:#e5e7eb;rx:3;ry:3}
+		.chip{pointer-events:none;font-size:10px;fill:#111827;display:none}
+		.chip-bg{fill:#e5e7eb;rx:3;ry:3}
 
-.dc-tip{position:fixed;pointer-events:none;background:#111827;color:#fff;font-size:12px;padding:.2rem .4rem;border-radius:.35rem;transform:translate(-50%,calc(-100% - 8px));display:none;z-index:50}
-.dc-tip::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#111827}
+		.dc-tip{position:fixed;pointer-events:none;background:#111827;color:#fff;font-size:12px;padding:.2rem .4rem;border-radius:.35rem;transform:translate(-50%,calc(-100% - 8px));display:none;z-index:50}
+		.dc-tip::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#111827}
 
-/* tool button pill backgrounds (text forced black by base .dc-btn) */
-.dc-btn.tool-healthy{background:#f8fafc;border-color:#e5e7eb}
-.dc-btn.tool-caries{background:#fff5f5;border-color:#fecaca}
-.dc-btn.tool-filled{background:#f0fdf4;border-color:#bbf7d0}
-.dc-btn.tool-missing{background:#f3f4f6;border-color:#e5e7eb}
-.dc-btn.tool-crown{background:#fff7ed;border-color:#fed7aa}
-.dc-btn.tool-implant{background:#eff6ff;border-color:#bfdbfe}
+		/* tool button pill backgrounds (text forced black by base .dc-btn) */
+		.dc-btn.tool-healthy{background:#f8fafc;border-color:#e5e7eb}
+		.dc-btn.tool-caries{background:#fff5f5;border-color:#fecaca}
+		.dc-btn.tool-filled{background:#f0fdf4;border-color:#bbf7d0}
+		.dc-btn.tool-missing{background:#f3f4f6;border-color:#e5e7eb}
+		.dc-btn.tool-crown{background:#fff7ed;border-color:#fed7aa}
+		.dc-btn.tool-implant{background:#eff6ff;border-color:#bfdbfe}
 
-/* dark theme */
-.dc-wrap[data-theme="dark"]{color:#e5e7eb}
-.dc-wrap[data-theme="dark"] .dc-btn{background:#0b0f19;border-color:#1f2937;color:#e5e7eb}
-.dc-wrap[data-theme="dark"] .dc-btn:hover{background:#111827}
-.dc-wrap[data-theme="dark"] .tooth-rect{fill:#0b0f19;stroke:#94a3b8}
-.dc-wrap[data-theme="dark"] .tooth .tooth-rect{filter:none}
-.dc-wrap[data-theme="dark"] .state-healthy .tooth-rect{fill:#0b1220}
-.dc-wrap[data-theme="dark"] .state-caries .tooth-rect{fill:#3a1b1b;stroke:#f87171}
-.dc-wrap[data-theme="dark"] .state-missing .tooth-rect{fill:#0f172a;stroke:#64748b}
-.dc-wrap[data-theme="dark"] .state-crown .tooth-rect{fill:#3b2a17;stroke:#f59e0b}
-.dc-wrap[data-theme="dark"] .state-implant .tooth-rect{fill:#0b1b34;stroke:#60a5fa}
-.dc-wrap[data-theme="dark"] .chip{fill:#e5e7eb}
-.dc-wrap[data-theme="dark"] .chip-bg{fill:#334155}
-.dc-wrap[data-theme="dark"] .dc-tip{background:#0b0f19}
-.dc-wrap[data-theme="dark"] .dc-tip::after{border-top-color:#0b0f19}
+		/* dark theme */
+		.dc-wrap[data-theme="dark"]{color:#e5e7eb}
+		.dc-wrap[data-theme="dark"] .dc-btn{background:#0b0f19;border-color:#1f2937;color:#e5e7eb}
+		.dc-wrap[data-theme="dark"] .dc-btn:hover{background:#111827}
+		.dc-wrap[data-theme="dark"] .tooth-rect{fill:#0b0f19;stroke:#94a3b8}
+		.dc-wrap[data-theme="dark"] .tooth .tooth-rect{filter:none}
+		.dc-wrap[data-theme="dark"] .state-healthy .tooth-rect{fill:#0b1220}
+		.dc-wrap[data-theme="dark"] .state-caries .tooth-rect{fill:#3a1b1b;stroke:#f87171}
+		.dc-wrap[data-theme="dark"] .state-missing .tooth-rect{fill:#0f172a;stroke:#64748b}
+		.dc-wrap[data-theme="dark"] .state-crown .tooth-rect{fill:#3b2a17;stroke:#f59e0b}
+		.dc-wrap[data-theme="dark"] .state-implant .tooth-rect{fill:#0b1b34;stroke:#60a5fa}
+		.dc-wrap[data-theme="dark"] .chip{fill:#e5e7eb}
+		.dc-wrap[data-theme="dark"] .chip-bg{fill:#334155}
+		.dc-wrap[data-theme="dark"] .dc-tip{background:#0b0f19}
+		.dc-wrap[data-theme="dark"] .dc-tip::after{border-top-color:#0b0f19}
+		.dc-wrap[data-theme="dark"] .surf.hover {fill: #94a3b8; fill-opacity: .22; stroke: #a5b4fc; stroke-width: 1.6; stroke-opacity: .95;}
 
-/* --- Surfaces toggle (right side) --- */
-.dc-toolbar .dc-spacer{margin-left:auto}
-.dc-switch{display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;user-select:none}
-.dc-switch input{display:none}
-.dc-switch-ui{position:relative;width:42px;height:24px;border-radius:999px;background:#e5e7eb;border:1px solid #d1d5db;transition:all .18s ease}
-.dc-switch-ui::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);transition:transform .18s ease}
-.dc-switch input:checked + .dc-switch-ui{background:#6366f1;border-color:#6366f1}
-.dc-switch input:checked + .dc-switch-ui::after{transform:translateX(18px)}
-.dc-wrap[data-theme="dark"] .dc-switch-ui{background:#1f2937;border-color:#374151}
-.dc-wrap[data-theme="dark"] .dc-switch input:checked + .dc-switch-ui{background:#4f46e5;border-color:#4f46e5}
-`;
+		/* --- Surfaces toggle (right side) --- */
+		.dc-toolbar .dc-spacer{margin-left:auto}
+		.dc-switch{display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;user-select:none}
+		.dc-switch input{display:none}
+		.dc-switch-ui{position:relative;width:42px;height:24px;border-radius:999px;background:#e5e7eb;border:1px solid #d1d5db;transition:all .18s ease}
+		.dc-switch-ui::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);transition:transform .18s ease}
+		.dc-switch input:checked + .dc-switch-ui{background:#6366f1;border-color:#6366f1}
+		.dc-switch input:checked + .dc-switch-ui::after{transform:translateX(18px)}
+		.dc-wrap[data-theme="dark"] .dc-switch-ui{background:#1f2937;border-color:#374151}
+		.dc-wrap[data-theme="dark"] .dc-switch input:checked + .dc-switch-ui{background:#4f46e5;border-color:#4f46e5}
+	`;
     const s = document.createElement('style'); s.id = 'dc-styles'; s.textContent = css; document.head.appendChild(s);
   }
 
@@ -143,8 +144,7 @@
         useSurfaceToggle: true, startSurfaceMode: false,
         theme: 'light',               // 'light' | 'dark' | 'auto'
         onChange: null, initial: {},
-        // order here controls button order
-        palette: ['caries','filled','crown','implant','missing','healthy']
+        palette: ['caries','filled','crown','implant','missing','healthy'] // left-to-right buttons
       }, opts);
 
       const theme = (this.opts.theme === 'auto')
@@ -319,11 +319,16 @@
 
       hits.forEach(r=>this._allSurfaces.push(r));
 
-      // Hover hint (only in surface mode)
+      // Hover hint (only in surface mode) — also ensure CSS can set opacity by clearing inline
       const tip = document.getElementById('dc-tip');
       g.addEventListener('pointerover', (e)=>{
         if(!this.surfaceMode) return;
-        if(e.target.classList?.contains('surf')) e.target.classList.add('hover');
+        const n = e.target;
+        if(n.classList?.contains('surf')){
+          n.classList.add('hover');
+          // allow CSS .surf.hover to control opacity
+          n.style.removeProperty('fill-opacity');
+        }
         if(tip){ const t=this._tooltipFor(e,fdi); if(t){ tip.textContent=t; tip.style.display='block'; } }
       });
       g.addEventListener('pointermove', (e)=>{
@@ -331,7 +336,12 @@
         const r=e.target.getBoundingClientRect(); tip.style.left=(r.left+r.width/2)+'px'; tip.style.top=(r.top)+'px';
       });
       g.addEventListener('pointerout', (e)=>{
-        if(e.target.classList?.contains('surf')) e.target.classList.remove('hover');
+        const n = e.target;
+        if(n.classList?.contains('surf')){
+          n.classList.remove('hover');
+          // keep idle opacity CSS-driven
+          n.style.removeProperty('fill-opacity');
+        }
         if(tip) tip.style.display='none';
       });
 
@@ -397,17 +407,27 @@
           const mark = k ? T.surfaces?.[k] : null;
 
           if(isMissing){
-            cell.style.fillOpacity = '.001';
-            cell.style.fill = ''; cell.style.stroke=''; cell.style.strokeWidth='';
+            // No inline styles; base CSS keeps surfaces at idle transparent state
+            cell.style.removeProperty('fill');
+            cell.style.removeProperty('fill-opacity');
+            cell.style.removeProperty('stroke');
+            cell.style.removeProperty('stroke-width');
             return;
           }
+
           if(mark){
+            // Marked: set inline so it wins over CSS
             cell.style.fill = this._surfaceTint(mark);
-            cell.style.fillOpacity = '1';
+            cell.style.fillOpacity = '0.95';
             cell.style.stroke = this._surfaceStroke(mark);
-            cell.style.strokeWidth = '1.2';
+            cell.style.strokeWidth = '2';
+			cell.style.strokeOpacity = '0.95';
           }else{
-            cell.style.fill=''; cell.style.fillOpacity='.001'; cell.style.stroke=''; cell.style.strokeWidth='';
+            // Unmarked: clear inline styles so hover CSS can apply
+            cell.style.removeProperty('fill');
+            cell.style.removeProperty('fill-opacity');  // critical for hover to show
+            cell.style.removeProperty('stroke');
+            cell.style.removeProperty('stroke-width');
           }
         });
       }else{
@@ -415,7 +435,10 @@
         g._cells.forEach(cell=>{
           const rr = (cell.dataset && cell.dataset.rx) ? cell.dataset.rx : '4';
           cell.setAttribute('rx', rr); cell.setAttribute('ry', rr);
-          cell.style.fill=''; cell.style.fillOpacity='.001'; cell.style.stroke=''; cell.style.strokeWidth='';
+          cell.style.removeProperty('fill');
+          cell.style.removeProperty('fill-opacity');
+          cell.style.removeProperty('stroke');
+          cell.style.removeProperty('stroke-width');
         });
       }
     }
