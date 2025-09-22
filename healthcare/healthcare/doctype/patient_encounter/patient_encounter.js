@@ -51,6 +51,16 @@ frappe.ui.form.on('Patient Encounter', {
 	},
 
 	refresh(frm) {
+		// Robust ctor grab (works for UMD and ESM-default bundles)
+		const DC = (window.DentalChart && (
+			typeof window.DentalChart === "function"
+				? window.DentalChart
+				: window.DentalChart.default // when bundle sets { default: class }
+		)) || null;
+
+		if (!DC) {
+			frappe.throw(__("DentalChart library is present but not a constructor. Check that the file sets window.DentalChart or window.DentalChart.default to a class."));
+		}
 		const wrap = frm.fields_dict.dental_chart?.$wrapper?.get(0);
 		if (!wrap) return; // field not visible yet
 		frm.__dentalChart = new window.DentalChart(wrap, {
@@ -60,6 +70,10 @@ frappe.ui.form.on('Patient Encounter', {
 			storeField: 'dental_chart_store',
 			showQuadrantAxes: true,
 			autoSave: true,
+			renderer: 'dental',
+			maskId: null,
+			maskShapes: null,
+			regionLabels: null,
 		});
 		// let old = false;
 		// if (!old) {
