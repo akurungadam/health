@@ -2,31 +2,59 @@
 	function injectStylesOnce() {
 		if (document.getElementById('dc-styles')) return;
 		const css = `
-			/* --- layout wrapper --- */
 			.dc-wrap{font-family:ui-sans-serif,system-ui,Roboto,Arial;user-select:none;color:#111827;display:flex;flex-direction:column}
 			.dc-toolbar{display:flex;flex-direction:column;gap:.4rem;align-items:center}
 			.dc-row{display:flex;gap:.4rem;align-items:center;justify-content:center;flex-wrap:wrap}
 			.dc-row.dc-palette{margin-top:.15rem}
 
+			/* normalize heights for the controls row */
+			.dc-row.dc-controls{ align-items:center; min-height:28px; }
+			.dc-row.dc-controls > *{
+				display:inline-flex; align-items:center;
+				height:28px; line-height:28px;
+			}
+
 			/* buttons & selects */
-			.dc-btn{border:1px solid #e5e7eb;padding:.28rem .55rem;border-radius:999px;background:#fff;cursor:pointer;font-size:.78rem;line-height:1.2;box-shadow:0 1px 0 rgba(0,0,0,.03);color:#111827}
+			.dc-btn{border:1px solid #e5e7eb;padding:.28rem .55rem;border-radius:999px;background:#fff;cursor:pointer;font-size:.78rem;line-height:1.2;box-shadow:0 1px 0 rgba(0,0,0,.03);color:#111827;vertical-align:middle}
 			.dc-btn:hover{background:#f9fafb}
 			.dc-btn.active{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.25)}
 			.dc-btn:disabled,.dc-btn.disabled{opacity:.55;box-shadow:none;cursor:not-allowed}
 			.dc-toolbar select.dc-btn{min-width:auto;max-width:140px;padding-right:1rem;appearance:none}
+			.dc-row.dc-controls .dc-btn,
+			.dc-row.dc-controls select.dc-btn{
+				height:28px; line-height:28px; padding-top:0; padding-bottom:0; display:inline-flex; align-items:center;
+			}
 
 			/* edit mode stronger base buttons (skip palette) */
 			.dc-wrap.dc-edit .dc-row.dc-controls .dc-btn{background:#f3f4f6;border-color:#cbd5e1;box-shadow:0 1px 0 rgba(0,0,0,.04)}
 			.dc-wrap.dc-edit .dc-row.dc-controls .dc-btn:hover{background:#e5e7eb}
 			.dc-wrap.dc-edit .dc-row.dc-controls .dc-btn.active{border-color:#4f46e5;box-shadow:0 0 0 2px rgba(79,70,229,.25)}
 
-			/* switches */
-			.dc-switch{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.78rem;white-space:nowrap;height:28px}
+			/* switches (label + pill + text) */
+			.dc-switch{
+				display:inline-flex; align-items:center; gap:.45rem; cursor:pointer;
+				font-size:.78rem; white-space:nowrap; height:28px; line-height:28px;
+				vertical-align:middle;
+			}
 			.dc-switch input{display:none}
-			.dc-switch-ui{position:relative;width:34px;height:18px;border-radius:999px;background:#e5e7eb;border:1px solid #d1d5db;transition:all .18s ease}
-			.dc-switch-ui::after{content:"";position:absolute;left:2px;top:50%;width:14px;height:14px;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);transform:translateY(-50%);transition:transform .18s ease}
+			.dc-switch-ui{
+				position:relative; width:34px; height:18px;
+				border-radius:999px; background:#e5e7eb; border:1px solid #d1d5db; transition:all .18s ease;
+				align-self:center; margin:0;
+			}
+			.dc-switch-ui::after{
+				content:""; position:absolute; left:2px; top:50%;
+				width:14px; height:14px; border-radius:999px; background:#fff;
+				box-shadow:0 1px 2px rgba(0,0,0,.12);
+				transform:translateY(-50%); transition:transform .18s ease;
+			}
 			.dc-switch input:checked + .dc-switch-ui{background:#6366f1;border-color:#6366f1}
 			.dc-switch input:checked + .dc-switch-ui::after{transform:translate(16px,-50%)}
+
+			/* optional: make the label text participate as a flex item (even when it's a text node) */
+			.dc-switch{ line-height:0; }
+			.dc-switch .dc-switch-text{ display:inline-flex; align-items:center; height:28px; line-height:28px; }
+			.dc-switch .dc-switch-text::before{ content:attr(data-text); line-height:28px; }
 
 			/* canvas */
 			.dc-canvas{width:100%;min-height:740px;position:relative;margin-top:.5rem}
@@ -99,7 +127,19 @@
 				.dc-canvas{min-height:0!important}
 				.dc-canvas svg{width:100%!important;height:auto!important}
 			}
+			.dc-row.dc-controls [data-role="surfaces-toggle"]{
+				display: inline-flex;
+				align-items: center;
+				gap: .35rem;
+				height: 28px;
+				line-height: 28px;
+				transform: translateY(3px);   /* tweak 3px, vertical-align doesn't work */
+			}
+			.dc-row.dc-controls [data-role="surfaces-toggle"] .dc-switch-ui{
+				position: static !important;  /* or: position:relative; top:0 */
+			}
 		`;
+
 		const s = document.createElement('style');
 		s.id = 'dc-styles';
 		s.textContent = css;
@@ -478,7 +518,8 @@
 			const surfLabel = el('label', { class: 'dc-switch', 'data-role': 'surfaces-toggle', for: surfId });
 			const surfInput = el('input', { type: 'checkbox', id: surfId, role: 'switch' });
 			const surfUI = el('span', { class: 'dc-switch-ui' });
-			surfLabel.append(surfInput, surfUI, document.createTextNode('Surface Marks'));
+			const surfTxt = el('span', { class: 'dc-switch-txt' }, 'Surface Marks');
+			surfLabel.append(surfInput, surfUI, surfTxt);
 
 			const isOrtho = String(this.opts.preset || 'anatomic').toLowerCase() === 'ortho';
 			if (isOrtho) {
@@ -539,7 +580,7 @@
 							</ul>
 						`,
 						onKeep: proceed,
-						onClear: () => { this._clearSurfaceMarksOnly(); this._redrawStates(); proceed(); },
+						onClear: () => { this._clearSurfaceMarksOnly(); this._redrawStates(); try { this.save && this.save(); } catch { }; proceed(); },
 						onCancel: () => { presetSel.value = this.opts.preset; }
 					});
 				} else {
