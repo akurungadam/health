@@ -65,29 +65,65 @@ frappe.ui.form.on("Patient Encounter", {
 
 	refresh(frm) {
 		// Robust ctor grab (works for UMD and ESM-default bundles)
-		const DC = (window.DentalChart && (
-			typeof window.DentalChart === "function"
-				? window.DentalChart
-				: window.DentalChart.default // when bundle sets { default: class }
-		)) || null;
+		// const DC = (window.DentalChart && (
+		// 	typeof window.DentalChart === "function"
+		// 		? window.DentalChart
+		// 		: window.DentalChart.default // when bundle sets { default: class }
+		// )) || null;
 
-		if (!DC) {
-			frappe.throw(__("DentalChart library is present but not a constructor. Check that the file sets window.DentalChart or window.DentalChart.default to a class."));
-		}
+		// if (!DC) {
+		// 	frappe.throw(__("DentalChart library is present but not a constructor. Check that the file sets window.DentalChart or window.DentalChart.default to a class."));
+		// }
+		// const wrap = frm.fields_dict.dental_chart?.$wrapper?.get(0);
+		// if (!wrap) return; // field not visible yet
+		// frm.__dentalChart = new window.DentalChart(wrap, {
+		// 	theme: 'auto',
+		// 	readOnly: 'auto',
+		// 	bindToFrappe: true,
+		// 	storeField: 'dental_chart_store',
+		// 	showQuadrantAxes: true,
+		// 	autoSave: true,
+		// 	renderer: 'dental',
+		// 	maskId: null,
+		// 	maskShapes: null,
+		// 	regionLabels: null,
+		// });
+
 		const wrap = frm.fields_dict.dental_chart?.$wrapper?.get(0);
-		if (!wrap) return; // field not visible yet
+		if (!wrap) return;
+
 		frm.__dentalChart = new window.DentalChart(wrap, {
 			theme: 'auto',
 			readOnly: 'auto',
 			bindToFrappe: true,
 			storeField: 'dental_chart_store',
-			showQuadrantAxes: true,
 			autoSave: true,
+
+			// normal dental renderer default
 			renderer: 'dental',
-			maskId: null,
-			maskShapes: null,
-			regionLabels: null,
+			preset: 'anatomic',
+			numbering: 'FDI',
+
+			// 👉 Perio mask config (enables the Perio switch)
+			maskId: 'perio',
+			maskShapes: [
+				// simple relative rectangles (x,y,w,h in 0..1 of canvas)
+				{ id: 'UR-sextant', rel: { x: 0.08, y: 0.18, w: 0.30, h: 0.18 } },
+				{ id: 'U-front', rel: { x: 0.38, y: 0.16, w: 0.24, h: 0.20 } },
+				{ id: 'UL-sextant', rel: { x: 0.64, y: 0.18, w: 0.28, h: 0.18 } },
+				{ id: 'LR-sextant', rel: { x: 0.08, y: 0.62, w: 0.30, h: 0.18 } },
+				{ id: 'L-front', rel: { x: 0.38, y: 0.60, w: 0.24, h: 0.20 } },
+				{ id: 'LL-sextant', rel: { x: 0.64, y: 0.62, w: 0.28, h: 0.18 } },
+			],
+			regionLabels: {
+				'UR-sextant': 'UR Sextant', 'U-front': 'Upper Anterior', 'UL-sextant': 'UL Sextant',
+				'LR-sextant': 'LR Sextant', 'L-front': 'Lower Anterior', 'LL-sextant': 'LL Sextant'
+			},
+
+			// optional: swap to perio-friendly palette (you can keep your default too)
+			palette: ['bleeding', 'calculus', 'recession', 'furcation', 'mobility', 'healthy'],
 		});
+
 		// let old = false;
 		// if (!old) {
 		// 	frm.__dentalChart = new window.DentalChart(

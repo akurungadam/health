@@ -502,7 +502,9 @@
    "fieldname": "dental_chart_store",
    "fieldtype": "Code",
    "label": "Dental Chart Store",
-   "read_only": 1
+   "print_hide": 1,
+   "read_only": 1,
+   "report_hide": 1
   }
  ],
  "grid_page_length": 50,
@@ -554,11 +556,7 @@
    "link_fieldname": "reference_name"
   }
  ],
-<<<<<<< HEAD
  "modified": "2025-11-09 09:58:23.055554",
-=======
- "modified": "2025-09-21 14:01:33.681901",
->>>>>>> 6f9c8d8a (feat:dental chart with quadrants)
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Encounter",
