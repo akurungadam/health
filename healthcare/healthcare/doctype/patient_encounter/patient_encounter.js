@@ -90,25 +90,6 @@ frappe.ui.form.on('Patient Encounter', {
 			renderer: 'dental',
 			preset: 'anatomic',
 			numbering: 'FDI',
-
-			// 👉 Perio mask config (enables the Perio switch)
-			maskId: 'perio',
-			maskShapes: [
-				// simple relative rectangles (x,y,w,h in 0..1 of canvas)
-				{ id: 'UR-sextant', rel: { x: 0.08, y: 0.18, w: 0.30, h: 0.18 } },
-				{ id: 'U-front', rel: { x: 0.38, y: 0.16, w: 0.24, h: 0.20 } },
-				{ id: 'UL-sextant', rel: { x: 0.64, y: 0.18, w: 0.28, h: 0.18 } },
-				{ id: 'LR-sextant', rel: { x: 0.08, y: 0.62, w: 0.30, h: 0.18 } },
-				{ id: 'L-front', rel: { x: 0.38, y: 0.60, w: 0.24, h: 0.20 } },
-				{ id: 'LL-sextant', rel: { x: 0.64, y: 0.62, w: 0.28, h: 0.18 } },
-			],
-			regionLabels: {
-				'UR-sextant': 'UR Sextant', 'U-front': 'Upper Anterior', 'UL-sextant': 'UL Sextant',
-				'LR-sextant': 'LR Sextant', 'L-front': 'Lower Anterior', 'LL-sextant': 'LL Sextant'
-			},
-
-			// optional: swap to perio-friendly palette (you can keep your default too)
-			palette: ['bleeding', 'calculus', 'recession', 'furcation', 'mobility', 'healthy'],
 		});
 
 		// let old = false;
