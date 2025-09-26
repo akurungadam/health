@@ -273,7 +273,7 @@ domains = {
 
 # nosemgrep
 standard_portal_menu_items = [
-	{
+    {
 		"title": "Patient Portal",
 		"route": "/patient-portal",
 		"reference_doctype": "Patient",
