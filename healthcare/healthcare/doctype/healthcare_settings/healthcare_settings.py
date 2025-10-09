@@ -139,6 +139,8 @@ def check_payments_app():
 
 		return True
 
+
+@frappe.whitelist()
 def get_pacs_password():
 	"""Get decrypted PACS password"""
 	if not frappe.has_permission("Healthcare Settings", "read"):
