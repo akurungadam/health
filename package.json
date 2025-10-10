@@ -9,10 +9,10 @@
     "frappe-ui"
   ],
   "scripts": {
-    "postinstall": "yarn  install-portal && yarn install-viewer --check-files",
+    "postinstall": "yarn install-viewer && yarn  install-portal",
     "install-portal": "cd patient_portal && yarn install --check-files",
-    "install-viewer": "cd viewer && yarn install",
-    "build": "yarn build-portal && yarn build-viewer",
+    "install-viewer": "cd viewer && yarn install --check-files",
+    "build": "yarn build-viewer && yarn build-portal",
     "build-portal": "cd patient_portal && yarn build",
     "build-viewer": "cd viewer && yarn build"
   },
