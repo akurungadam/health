@@ -28,6 +28,8 @@
   "practitioner_name",
   "medical_department",
   "google_meet_link",
+  "encounter_doctype",
+  "encounter",
   "invoiced",
   "submit_orders_on_save",
   "sb_symptoms",
@@ -452,6 +454,18 @@
    "fieldname": "order_history_html",
    "fieldtype": "HTML",
    "label": "Order History"
+  },
+  {
+   "fieldname": "encounter_doctype",
+   "fieldtype": "Link",
+   "label": "Encounter DocType",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "encounter",
+   "fieldtype": "Dynamic Link",
+   "label": "Encounter",
+   "options": "encounter_doctype"
   }
  ],
  "grid_page_length": 50,
