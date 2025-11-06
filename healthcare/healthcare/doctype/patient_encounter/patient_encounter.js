@@ -72,6 +72,12 @@ frappe.ui.form.on('Patient Encounter', {
 				}
 			},__('View'));
 
+			if (frm.doc.encounter_doctype && frm.doc.encounter && frm.doc.docstatus == 1) {
+				frm.add_custom_button(__(frm.doc.encounter_doctype), function() {
+					frappe.set_route("Form", frm.doc.encounter_doctype, frm.doc.encounter);
+				},__('View'));
+			}
+
 			if (frm.doc.docstatus == 1 && frm.doc.drug_prescription && frm.doc.drug_prescription.length>0) {
 				frm.add_custom_button(__('Medication Request'), function() {
 					create_medication_request(frm);
