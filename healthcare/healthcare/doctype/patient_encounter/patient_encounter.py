@@ -621,3 +621,34 @@ def create_patient_referral(encounter, references):
 		)
 		order.insert(ignore_permissions=True, ignore_mandatory=True)
 		order.submit()
+
+
+def get_encounter_doctypes():
+	return set(frappe.get_all("Medical Department", pluck="encounter_doctype"))
+
+
+def handle_encounter_events(doc, method=None):
+	if doc.doctype not in get_encounter_doctypes():
+		return
+
+	if doc.doctype == "Patient Encounter":
+		return
+
+	if method == "on_submit":
+		create_encounter(doc)
+
+
+def create_encounter(doc):
+	frappe.get_doc(
+		{
+			"doctype": "Patient Encounter",
+			"encounter_doctype": doc.doctype,
+			"encounter": doc.name,
+			"patient": doc.patient,
+			"practitioner": doc.practitioner,
+			"encounter_date": doc.encounter_date,
+			"encounter_time": doc.encounter_time,
+			"appointment_type": doc.appointment_type,
+			"appointment": doc.appointment,
+		}
+	).insert(ignore_permissions=True).submit()
