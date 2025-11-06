@@ -120,7 +120,10 @@ override_doctype_class = {
 
 doc_events = {
 	"*": {
-		"on_submit": "healthcare.healthcare.doctype.patient_history_settings.patient_history_settings.create_medical_record",
+		"on_submit": [
+			"healthcare.healthcare.doctype.patient_history_settings.patient_history_settings.create_medical_record",
+			"healthcare.healthcare.doctype.patient_encounter.patient_encounter.handle_encounter_events",
+		],
 		"on_cancel": "healthcare.healthcare.doctype.patient_history_settings.patient_history_settings.delete_medical_record",
 		"on_update_after_submit": "healthcare.healthcare.doctype.patient_history_settings.patient_history_settings.update_medical_record",
 	},
