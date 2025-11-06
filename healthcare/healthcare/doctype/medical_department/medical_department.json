@@ -51,6 +51,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "description": "Doctype should be submittable and should have fields - patient, practitioner. appointment, appointment_type, encounter_date and encounter_time",
    "fieldname": "encounter_doctype",
    "fieldtype": "Link",
    "label": "Encounter DocType",
@@ -63,7 +64,7 @@
   }
  ],
  "links": [],
- "modified": "2025-11-06 11:02:02.962952",
+ "modified": "2025-11-06 13:15:38.220630",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Medical Department",

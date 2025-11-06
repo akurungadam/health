@@ -460,13 +460,16 @@
    "fieldname": "encounter_doctype",
    "fieldtype": "Link",
    "label": "Encounter DocType",
-   "options": "DocType"
+   "options": "DocType",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "encounter",
    "fieldtype": "Dynamic Link",
    "label": "Encounter",
    "options": "encounter_doctype",
+   "read_only": 1,
    "search_index": 1
   }
  ],
@@ -519,7 +522,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-11-05 18:19:46.449956",
+ "modified": "2025-11-06 12:59:40.350290",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Encounter",
