@@ -12,7 +12,7 @@
  "field_order": [
   "department",
   "patient_care_type",
-  "custom_doctype_for_encounter",
+  "encounter_doctype",
   "column_break_oagd",
   "show_in_portal",
   "portal_image"
@@ -50,20 +50,20 @@
    "mandatory_depends_on": "eval: doc.show_in_portal"
   },
   {
-   "fieldname": "column_break_oagd",
-   "fieldtype": "Column Break"
+   "allow_in_quick_entry": 1,
+   "fieldname": "encounter_doctype",
+   "fieldtype": "Link",
+   "label": "Encounter DocType",
+   "link_filters": "[[\"DocType\",\"module\",\"=\",\"Healthcare\"],[\"DocType\",\"is_submittable\",\"=\",1]]",
+   "options": "DocType"
   },
   {
-   "allow_in_quick_entry": 1,
-   "fieldname": "custom_doctype_for_encounter",
-   "fieldtype": "Link",
-   "label": "Custom DocType for Encounter",
-   "link_filters": "[[\"DocType\",\"module\",\"=\",\"Healthcare\"]]",
-   "options": "DocType"
+   "fieldname": "column_break_oagd",
+   "fieldtype": "Column Break"
   }
  ],
  "links": [],
- "modified": "2025-11-03 16:45:26.045543",
+ "modified": "2025-11-06 11:02:02.962952",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Medical Department",

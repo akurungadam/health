@@ -140,7 +140,8 @@
    "in_standard_filter": 1,
    "label": "Healthcare Practitioner",
    "options": "Healthcare Practitioner",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "default": "Today",
@@ -465,7 +466,8 @@
    "fieldname": "encounter",
    "fieldtype": "Dynamic Link",
    "label": "Encounter",
-   "options": "encounter_doctype"
+   "options": "encounter_doctype",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
@@ -517,7 +519,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-12-25 09:36:36.599782",
+ "modified": "2025-11-05 18:19:46.449956",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Encounter",
