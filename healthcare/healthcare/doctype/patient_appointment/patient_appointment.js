@@ -234,16 +234,29 @@ frappe.ui.form.on("Patient Appointment", {
 					"Create",
 				);
 			} else {
-				frm.add_custom_button(
-					__("Patient Encounter"),
-					function () {
-						frappe.model.open_mapped_doc({
-							method: "healthcare.healthcare.doctype.patient_appointment.patient_appointment.make_encounter",
-							frm: frm,
-						});
-					},
-					__("Create"),
-				);
+				if (frm.doc.department) {
+					frappe.db.get_value("Medical Department", frm.doc.department, "encounter_doctype")
+					.then(r => {
+						if (r.message && r.message.encounter_doctype) {
+							frm.add_custom_button(__(r.message.encounter_doctype), function() {
+								frappe.route_options = {
+									appointment: frm.doc.name,
+									patient: frm.doc.patient,
+									practitioner: frm.doc.practitioner,
+									appointment_type: frm.doc.appointment_type,
+								};
+								frappe.new_doc(r.message.encounter_doctype);
+							}, __("Create"));
+						} else {
+							frm.add_custom_button(__("Patient Encounter"), function() {
+								frappe.model.open_mapped_doc({
+									method: "healthcare.healthcare.doctype.patient_appointment.patient_appointment.make_encounter",
+									frm: frm,
+								});
+							}, __("Create"));
+						}
+					})
+				}
 			}
 
 			frm.add_custom_button(
