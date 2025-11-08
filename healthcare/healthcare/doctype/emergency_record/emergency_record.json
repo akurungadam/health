@@ -1,0 +1,312 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-08-21 12:39:58.979491",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_kpah",
+  "patient",
+  "patient_details",
+  "mode_of_arrival",
+  "arrival_datetime",
+  "column_break_kplp",
+  "company",
+  "status",
+  "naming_series",
+  "amended_from",
+  "disposition",
+  "triage_section",
+  "triage_level",
+  "triage_color",
+  "column_break_taat",
+  "triage_done_by",
+  "triage_datetime",
+  "section_break_bgsl",
+  "current_bed",
+  "column_break_nxqq",
+  "section_break_rqok",
+  "observations_html",
+  "mlc_tab",
+  "section_break_dhnj",
+  "is_medico_legal_case",
+  "column_break_hstk",
+  "section_break_pcoq",
+  "mlc_number",
+  "mlc_description",
+  "column_break_bwjn",
+  "mlc_status",
+  "details_section",
+  "mlc_details",
+  "tab_dashboard"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_kpah",
+   "fieldtype": "Section Break",
+   "label": "Preliminary Details"
+  },
+  {
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Patient",
+   "options": "Patient"
+  },
+  {
+   "fieldname": "patient_details",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Patient Details"
+  },
+  {
+   "fieldname": "mode_of_arrival",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Mode Of Arrival",
+   "options": "\nWalk\u2011in\nAmbulance\nReferral\nPolice\nTransfer"
+  },
+  {
+   "default": "Now",
+   "fieldname": "arrival_datetime",
+   "fieldtype": "Datetime",
+   "label": "Arrival Datetime"
+  },
+  {
+   "fieldname": "column_break_kplp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "depends_on": "eval: doc.status == \"Completed\"",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Arrived\nTriage\nObservation\nResus\nFast Track\nIsolation\nCompleted"
+  },
+  {
+   "default": "ER-",
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "label": "Series"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Emergency Record",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "disposition",
+   "fieldtype": "Select",
+   "label": "Disposition",
+   "options": "\nDischarge\nAdmit\nTransfer\nLWBS\nDeath"
+  },
+  {
+   "fieldname": "triage_section",
+   "fieldtype": "Section Break",
+   "label": "Triage"
+  },
+  {
+   "fieldname": "triage_level",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Triage Level",
+   "options": "Triage Level",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_taat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "triage_done_by",
+   "fieldtype": "Link",
+   "label": "Triage Done By",
+   "options": "User"
+  },
+  {
+   "fieldname": "triage_datetime",
+   "fieldtype": "Datetime",
+   "label": "Triage Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_bgsl",
+   "fieldtype": "Section Break",
+   "label": "Location / Zone"
+  },
+  {
+   "fieldname": "current_bed",
+   "fieldtype": "Link",
+   "label": "Current Bed",
+   "options": "Healthcare Service Unit"
+  },
+  {
+   "fieldname": "column_break_nxqq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_rqok",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "observations_html",
+   "fieldtype": "HTML",
+   "label": "Observations"
+  },
+  {
+   "fieldname": "mlc_tab",
+   "fieldtype": "Tab Break",
+   "label": "MLC"
+  },
+  {
+   "fieldname": "section_break_dhnj",
+   "fieldtype": "Section Break",
+   "label": "Medico Legal Case"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_medico_legal_case",
+   "fieldtype": "Check",
+   "label": "Is Medico Legal Case"
+  },
+  {
+   "fieldname": "column_break_hstk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.is_medico_legal_case",
+   "fieldname": "section_break_pcoq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "mlc_number",
+   "fieldtype": "Data",
+   "label": "MLC Number "
+  },
+  {
+   "fieldname": "mlc_description",
+   "fieldtype": "Small Text",
+   "label": "MLC Description"
+  },
+  {
+   "fieldname": "column_break_bwjn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mlc_status",
+   "fieldtype": "Data",
+   "label": "MLC Status"
+  },
+  {
+   "depends_on": "eval:doc.is_medico_legal_case",
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "mlc_details",
+   "fieldtype": "Text Editor",
+   "label": "MLC Details"
+  },
+  {
+   "fieldname": "tab_dashboard",
+   "fieldtype": "Tab Break",
+   "label": "Dashboard",
+   "show_dashboard": 1
+  },
+  {
+   "fieldname": "triage_color",
+   "fieldtype": "Color",
+   "label": "Triage Color"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-11-08 18:57:56.225298",
+ "modified_by": "Administrator",
+ "module": "Healthcare",
+ "name": "Emergency Record",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Physician",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Nursing User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Laboratory User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "patient_details",
+ "track_changes": 1
+}
