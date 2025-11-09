@@ -262,7 +262,7 @@ class PatientEncounter(Document):
 				"status": "draft-Medication Request Status" if medication_request else "draft-Request Status",
 				"patient": self.get("patient"),
 				"practitioner": self.practitioner,
-				"source_doc": "Patient Encounter",
+				"source_doc": self.doctype,
 				"order_group": self.name,
 				"sequence": line_item.get("sequence"),
 				"patient_care_type": line_item.get("patient_care_type"),
@@ -536,15 +536,18 @@ def cancel_request(doctype, request):
 
 
 @frappe.whitelist()
-def create_service_request_from_widget(encounter, data, medication_request=False):
+def create_service_request_from_widget(
+	source, data, source_dt="Patient Encounter", medication_request=False
+):
 	data = json.loads(data)
-	encounter_doc = frappe.get_doc("Patient Encounter", encounter)
+	order_doc = frappe.get_doc(source_dt, source)
 	if medication_request:
 		template = frappe.get_doc("Medication", data.get("medication"))
-		order = encounter_doc.get_order_details(template, data, True)
+		order = order_doc.get_order_details(template, data, True)
 	else:
 		template = frappe.get_doc(data.get("order_template_type"), data.get("order_template"))
-		order = encounter_doc.get_order_details(template, data)
+		order = order_doc.get_order_details(template, data)
+	print("order: ", order.as_json())
 	order.insert(ignore_permissions=True, ignore_mandatory=True)
 	order.submit()
 

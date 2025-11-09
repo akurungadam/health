@@ -363,8 +363,9 @@ healthcare.Orders = class Orders {
 					frappe.call({
 						method: "healthcare.healthcare.doctype.patient_encounter.patient_encounter.create_service_request_from_widget",
 						args: {
-							encounter: me.frm.doc.name,
+							source: me.frm.doc.name,
 							data: data,
+							source_dt: me.frm.doc.doctype,
 						},
 						freeze: true,
 						callback: function (r) {
@@ -546,8 +547,9 @@ healthcare.Orders = class Orders {
 					frappe.call({
 						method: "healthcare.healthcare.doctype.patient_encounter.patient_encounter.create_service_request_from_widget",
 						args: {
-							encounter: me.frm.doc.name,
+							source: me.frm.doc.name,
 							data: data,
+							source_dt: me.frm.doc.doctype,
 							medication_request: true,
 						},
 						freeze: true,
