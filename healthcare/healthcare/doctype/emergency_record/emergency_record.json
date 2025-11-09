@@ -17,6 +17,7 @@
   "naming_series",
   "amended_from",
   "disposition",
+  "inpatient_record",
   "triage_section",
   "triage_level",
   "triage_color",
@@ -24,10 +25,15 @@
   "triage_done_by",
   "triage_datetime",
   "section_break_bgsl",
-  "current_bed",
+  "practitioner",
   "column_break_nxqq",
+  "current_bed",
   "section_break_rqok",
   "observations_html",
+  "orders_tab",
+  "order_history_html",
+  "notes_tab",
+  "clinical_notes",
   "mlc_tab",
   "section_break_dhnj",
   "is_medico_legal_case",
@@ -148,7 +154,7 @@
   {
    "fieldname": "section_break_bgsl",
    "fieldtype": "Section Break",
-   "label": "Location / Zone"
+   "label": "Practitioner / Zone"
   },
   {
    "fieldname": "current_bed",
@@ -234,6 +240,39 @@
    "fieldname": "triage_color",
    "fieldtype": "Color",
    "label": "Triage Color"
+  },
+  {
+   "fieldname": "orders_tab",
+   "fieldtype": "Tab Break",
+   "label": "Orders"
+  },
+  {
+   "fieldname": "order_history_html",
+   "fieldtype": "HTML",
+   "label": "Order History HTML"
+  },
+  {
+   "fieldname": "notes_tab",
+   "fieldtype": "Tab Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "clinical_notes",
+   "fieldtype": "HTML",
+   "label": "Clinical Notes"
+  },
+  {
+   "fieldname": "inpatient_record",
+   "fieldtype": "Link",
+   "label": "Inpatient Record",
+   "options": "Inpatient Record",
+   "read_only": 1
+  },
+  {
+   "fieldname": "practitioner",
+   "fieldtype": "Link",
+   "label": "Practitioner",
+   "options": "Healthcare Practitioner"
   }
  ],
  "grid_page_length": 50,
@@ -286,7 +325,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-09 11:08:33.877442",
+ "modified": "2025-11-09 11:47:40.957276",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
