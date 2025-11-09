@@ -9,6 +9,7 @@
   "section_break_kpah",
   "patient",
   "patient_details",
+  "gender",
   "mode_of_arrival",
   "arrival_datetime",
   "column_break_kplp",
@@ -17,7 +18,6 @@
   "naming_series",
   "amended_from",
   "disposition",
-  "inpatient_record",
   "triage_section",
   "triage_level",
   "triage_color",
@@ -239,6 +239,7 @@
   {
    "fieldname": "triage_color",
    "fieldtype": "Color",
+   "in_list_view": 1,
    "label": "Triage Color"
   },
   {
@@ -262,17 +263,16 @@
    "label": "Clinical Notes"
   },
   {
-   "fieldname": "inpatient_record",
-   "fieldtype": "Link",
-   "label": "Inpatient Record",
-   "options": "Inpatient Record",
-   "read_only": 1
-  },
-  {
    "fieldname": "practitioner",
    "fieldtype": "Link",
    "label": "Practitioner",
    "options": "Healthcare Practitioner"
+  },
+  {
+   "fieldname": "gender",
+   "fieldtype": "Link",
+   "label": "Gender",
+   "options": "Gender"
   }
  ],
  "grid_page_length": 50,
@@ -325,7 +325,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-09 11:47:40.957276",
+ "modified": "2025-11-09 15:16:04.461669",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",

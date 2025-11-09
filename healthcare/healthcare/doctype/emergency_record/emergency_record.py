@@ -1,6 +1,8 @@
 # Copyright (c) 2025, earthians Health Informatics Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
 
@@ -12,6 +14,18 @@ class EmergencyRecord(Document):
 			if not patient_doc.emergency_record:
 				patient_doc.db_set("emergency_record", self.name)
 				patient_doc.notify_update()
+		else:
+			patient = frappe.get_doc(
+				{
+					"doctype": "Patient",
+					"first_name": self.name,
+					"sex": self.gender,
+					"emergency_record": self.name,
+				}
+			).insert(ignore_permissions=True)
+
+			self.db_set("patient", patient.name)
+			self.notify_update()
 
 	def get_order_details(self, template_doc, line_item, medication_request=False):
 		qty = 1
@@ -114,3 +128,47 @@ class EmergencyRecord(Document):
 			},
 			["posting_date", "note", "name", "practitioner", "user", "clinical_note_type"],
 		)
+
+	@frappe.whitelist()
+	def schedule_inpatient(self, admission_order):
+		if isinstance(admission_order, str):
+			admission_order = json.loads(admission_order)
+
+		ip_record = self.create_inpatient_record(admission_order)
+		self.db_set({"disposition": "Admit", "triage_level": "CLOSED-ESI", "triage_color": "#B9B9B9"})
+		frappe.db.set_value("Patient", self.patient, "emergency_record", "")
+
+		self.submit()
+		frappe.msgprint(f"Inpatient Record {ip_record} created", alert=1)
+
+	def create_inpatient_record(self, admission_order):
+		if isinstance(admission_order, str):
+			admission_order = json.loads(admission_order)
+
+		if not admission_order or not admission_order["patient"]:
+			frappe.throw(frappe._("Missing required details, did not create Inpatient Record"))
+
+		inpatient_record = frappe.new_doc("Inpatient Record")
+
+		# Admission order details
+		self.set_details_from_ip_order(inpatient_record, admission_order)
+
+		# Patient details
+		patient = frappe.get_doc("Patient", admission_order["patient"])
+		inpatient_record.patient = patient.name
+		inpatient_record.patient_name = patient.patient_name
+		inpatient_record.gender = patient.sex
+		inpatient_record.blood_group = patient.blood_group
+		inpatient_record.dob = patient.dob
+		inpatient_record.mobile = patient.mobile
+		inpatient_record.email = patient.email
+		inpatient_record.phone = patient.phone
+		inpatient_record.scheduled_date = frappe.utils.today()
+
+		inpatient_record.status = "Admission Scheduled"
+		inpatient_record.save(ignore_permissions=True)
+		return inpatient_record.name
+
+	def set_details_from_ip_order(self, inpatient_record, ip_order):
+		for key in ip_order:
+			inpatient_record.set(key, ip_order[key])

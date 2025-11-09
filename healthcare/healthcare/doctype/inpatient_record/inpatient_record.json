@@ -34,6 +34,7 @@
   "approval_status",
   "references",
   "admission_encounter",
+  "emergency_record",
   "admission_practitioner",
   "medical_department",
   "admission_ordered_for",
@@ -103,6 +104,7 @@
    "label": "Patient",
    "options": "Patient",
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -249,7 +251,8 @@
    "fieldtype": "Link",
    "label": "Patient Encounter",
    "options": "Patient Encounter",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "chief_complaint",
@@ -582,6 +585,13 @@
    "fieldtype": "Tab Break",
    "label": "Connections",
    "show_dashboard": 1
+  },
+  {
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record",
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -599,7 +609,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-12-25 09:36:36.211469",
+ "modified": "2025-11-09 14:43:35.285867",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",
