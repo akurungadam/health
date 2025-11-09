@@ -15,9 +15,11 @@
   "section_break_klcv",
   "patient",
   "patient_name",
-  "column_break_nypq",
   "gender",
   "date_of_birth",
+  "column_break_nypq",
+  "inpatient_record",
+  "emergency_record",
   "details_section",
   "referred_to_practitioner",
   "practitioner_name",
@@ -294,6 +296,20 @@
    "fieldtype": "Data",
    "label": "Scheduled Station AE Title",
    "search_index": 1
+  },
+  {
+   "fetch_from": "patient.inpatient_record",
+   "fieldname": "inpatient_record",
+   "fieldtype": "Link",
+   "label": "Inpatient Record",
+   "options": "Inpatient Record"
+  },
+  {
+   "fetch_from": "patient.emergency_record",
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record"
   }
  ],
  "grid_page_length": 50,
@@ -308,7 +324,7 @@
    "link_fieldname": "imaging_appointment"
   }
  ],
- "modified": "2025-09-02 17:20:25.204535",
+ "modified": "2025-11-09 10:45:30.844401",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Appointment",

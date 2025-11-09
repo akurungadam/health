@@ -19,33 +19,53 @@
   "sex",
   "blood_group",
   "dob",
+  "patient_age",
   "age_html",
   "image",
   "column_break_14",
   "status",
+  "abha_address",
+  "abha_number",
   "uid",
+  "custom_aadhaar_number",
+  "custom_passport_number",
   "inpatient_record",
   "inpatient_status",
+  "emergency_record",
   "report_preference",
+  "custom_source",
+  "custom_employee",
   "mobile",
   "phone",
+  "adhar_card",
   "email",
   "invite_user",
   "user_id",
-  "emergency_record",
   "customer_details_section",
   "customer",
   "customer_group",
   "territory",
   "country",
   "column_break_24",
+  "preferred_mode_of_payment",
   "default_currency",
   "default_price_list",
   "language",
   "more_info",
   "patient_details",
+  "abha_card",
+  "consent_for_aadhaar_use",
+  "invoiced",
+  "payment_entry_created",
   "dashboard_tab",
   "address_and_contact_tab",
+  "custom_address",
+  "address_line1",
+  "state",
+  "zip_code",
+  "custom_column_break_nic4m",
+  "address_line2",
+  "city",
   "address_contacts",
   "address_html",
   "column_break_22",
@@ -70,7 +90,13 @@
   "alcohol_current_use",
   "column_break_32",
   "surrounding_factors",
-  "other_risk_factors"
+  "other_risk_factors",
+  "referral",
+  "referring_practitioner",
+  "referring_hospital",
+  "column_break_kd8ex",
+  "referred_to_practitioner",
+  "referred_to_department"
  ],
  "fields": [
   {
@@ -121,6 +147,7 @@
   {
    "fieldname": "sex",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "in_preview": 1,
    "label": "Gender",
    "options": "Gender",
@@ -466,7 +493,7 @@
    "fieldname": "uid",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "Identification Number (UID)",
+   "label": "National ID",
    "unique": 1
   },
   {
@@ -497,6 +524,161 @@
    "fieldtype": "Link",
    "label": "Emergency Record",
    "options": "Emergency Record"
+  },
+  {
+   "fieldname": "patient_age",
+   "fieldtype": "Int",
+   "label": "Patient Age"
+  },
+  {
+   "fieldname": "abha_address",
+   "fieldtype": "Data",
+   "label": "PHR Address",
+   "read_only": 1,
+   "translatable": 1
+  },
+  {
+   "fieldname": "abha_number",
+   "fieldtype": "Data",
+   "label": "ABHA Number",
+   "read_only": 1,
+   "translatable": 1
+  },
+  {
+   "fieldname": "custom_aadhaar_number",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Aadhaar Number",
+   "unique": 1
+  },
+  {
+   "fieldname": "custom_passport_number",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Passport Number",
+   "unique": 1
+  },
+  {
+   "fieldname": "custom_source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "\nEmployee\nSocial Media\nFriends or Relative"
+  },
+  {
+   "depends_on": "eval: doc.custom_source == \"Employee\"",
+   "fieldname": "custom_employee",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Employee",
+   "mandatory_depends_on": "eval: doc.custom_source == \"Employee\"",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "adhar_card",
+   "fieldtype": "Data",
+   "label": "Aadhar Card"
+  },
+  {
+   "fieldname": "preferred_mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Preferred Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "abha_card",
+   "fieldtype": "Attach",
+   "hidden": 1,
+   "label": "ABHA Card"
+  },
+  {
+   "fieldname": "consent_for_aadhaar_use",
+   "fieldtype": "Attach",
+   "hidden": 1,
+   "label": "Consent For Aadhaar Use"
+  },
+  {
+   "default": "0",
+   "fieldname": "invoiced",
+   "fieldtype": "Check",
+   "label": "Registration Paid",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "payment_entry_created",
+   "fieldtype": "Check",
+   "label": " Paid",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_address",
+   "fieldtype": "Section Break",
+   "label": "Address"
+  },
+  {
+   "fieldname": "address_line1",
+   "fieldtype": "Data",
+   "label": "Address Line1"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State"
+  },
+  {
+   "fieldname": "zip_code",
+   "fieldtype": "Data",
+   "label": "ZIP Code"
+  },
+  {
+   "fieldname": "custom_column_break_nic4m",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "address_line2",
+   "fieldtype": "Data",
+   "label": "Address Line2"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "referral",
+   "fieldtype": "Tab Break",
+   "label": "Referral"
+  },
+  {
+   "fieldname": "referring_practitioner",
+   "fieldtype": "Data",
+   "label": "Referring Practitioner",
+   "translatable": 1
+  },
+  {
+   "fieldname": "referring_hospital",
+   "fieldtype": "Data",
+   "label": "Referring Hospital",
+   "translatable": 1
+  },
+  {
+   "fieldname": "column_break_kd8ex",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "referred_to_practitioner",
+   "fieldtype": "Link",
+   "label": "Referred to Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fetch_from": "referred_to_practitioner.department",
+   "fieldname": "referred_to_department",
+   "fieldtype": "Link",
+   "label": "Referred to Department",
+   "options": "Medical Department"
   }
  ],
  "icon": "fa fa-user",
@@ -619,66 +801,17 @@
   }
  ],
  "max_attachments": 50,
- "modified": "2025-11-08 19:44:06.190579",
+ "modified": "2025-11-09 10:33:47.103148",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Physician",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Laboratory User",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Nursing User",
-   "share": 1,
-   "write": 1
-  }
- ],
+ "permissions": [],
  "quick_entry": 1,
  "restrict_to_domain": "Healthcare",
  "row_format": "Dynamic",
- "search_fields": "patient_name,mobile,email,phone,uid",
+ "search_fields": "patient_name,mobile,email,phone,uid, sex, dob,customer",
  "show_name_in_global_search": 1,
  "sort_field": "creation",
  "sort_order": "ASC",

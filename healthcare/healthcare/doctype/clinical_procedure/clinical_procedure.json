@@ -18,6 +18,7 @@
   "patient_sex",
   "patient_age",
   "inpatient_record",
+  "emergency_record",
   "notes",
   "column_break_7",
   "status",
@@ -76,7 +77,8 @@
    "in_standard_filter": 1,
    "label": "Patient",
    "options": "Patient",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "patient_age",
@@ -124,7 +126,8 @@
    "in_list_view": 1,
    "label": "Procedure Template",
    "options": "Clinical Procedure Template",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "service_unit",
@@ -313,6 +316,13 @@
    "options": "Service Request",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fetch_from": "patient.emergency_record",
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record"
   }
  ],
  "is_submittable": 1,
@@ -322,7 +332,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-12-25 09:36:38.342353",
+ "modified": "2025-11-09 10:53:50.923141",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",

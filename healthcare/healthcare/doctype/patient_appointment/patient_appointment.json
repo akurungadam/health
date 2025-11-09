@@ -23,6 +23,7 @@
   "patient",
   "patient_name",
   "inpatient_record",
+  "emergency_record",
   "column_break_4pp7",
   "patient_sex",
   "patient_age",
@@ -101,6 +102,7 @@
    "label": "Appointment Type",
    "options": "Appointment Type",
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -556,6 +558,13 @@
    "read_only": 1,
    "report_hide": 1,
    "search_index": 1
+  },
+  {
+   "fetch_from": "patient.emergency_record",
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record"
   }
  ],
  "grid_page_length": 50,
@@ -576,7 +585,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-12-25 09:36:33.925751",
+ "modified": "2025-11-09 10:11:07.788073",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Appointment",

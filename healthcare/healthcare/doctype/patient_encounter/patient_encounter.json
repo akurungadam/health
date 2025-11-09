@@ -19,6 +19,7 @@
   "patient_age",
   "inpatient_record",
   "inpatient_status",
+  "emergency_record",
   "column_break_6",
   "company",
   "status",
@@ -471,6 +472,13 @@
    "options": "encounter_doctype",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fetch_from": "patient.emergency_record",
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record"
   }
  ],
  "grid_page_length": 50,
@@ -522,7 +530,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-11-06 12:59:40.350290",
+ "modified": "2025-11-09 09:58:23.055554",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Encounter",
