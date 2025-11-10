@@ -119,6 +119,7 @@ class InpatientRecord(Document):
 	def admit(self, service_unit, check_in, expected_discharge=None, currency=None, price_list=None):
 		admit_patient(self, service_unit, check_in, expected_discharge, currency, price_list)
 		create_orders_from_treatment_counselling(self)
+		close_emergency_record(self)
 
 	@frappe.whitelist()
 	def discharge(self):
@@ -958,3 +959,12 @@ def get_order_details(doc, template_doc, line_item, ip_name, medication_request=
 	order.update({"order_description": description})
 
 	return order
+
+
+def close_emergency_record(doc):
+	er = frappe.get_doc("Emergency Record", doc.emergency_record)
+	er.disposition = "Admit"
+	er.status = "Completed"
+	er.save(ignore_permissions=1)
+	# update patient as well
+	frappe.db.set_value("Patient", doc.patient, "emergency_record", "")
