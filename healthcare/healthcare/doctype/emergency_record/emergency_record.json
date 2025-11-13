@@ -10,14 +10,16 @@
   "patient",
   "patient_details",
   "gender",
-  "mode_of_arrival",
-  "arrival_datetime",
   "column_break_kplp",
   "company",
   "status",
   "naming_series",
-  "amended_from",
   "disposition",
+  "amended_from",
+  "section_break_lcyt",
+  "mode_of_arrival",
+  "column_break_zjhs",
+  "arrival_datetime",
   "triage_section",
   "triage_level",
   "triage_color",
@@ -29,7 +31,9 @@
   "column_break_nxqq",
   "current_bed",
   "section_break_rqok",
-  "observations_html",
+  "chief_complaints",
+  "column_break_uvch",
+  "diagnosis",
   "orders_tab",
   "order_history_html",
   "notes_tab",
@@ -45,6 +49,7 @@
   "mlc_status",
   "details_section",
   "mlc_details",
+  "contact_tab",
   "tab_dashboard"
  ],
  "fields": [
@@ -91,13 +96,14 @@
    "options": "Company"
   },
   {
-   "depends_on": "eval: doc.status == \"Completed\"",
+   "allow_on_submit": 1,
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Arrived\nTriage\nObservation\nResus\nFast Track\nIsolation\nCompleted"
+   "options": "Arrived\nTriage\nObservation\nResus\nFast Track\nIsolation\nCompleted",
+   "read_only": 1
   },
   {
    "default": "ER-",
@@ -171,11 +177,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "observations_html",
-   "fieldtype": "HTML",
-   "label": "Observations"
-  },
-  {
    "fieldname": "mlc_tab",
    "fieldtype": "Tab Break",
    "label": "MLC"
@@ -237,10 +238,10 @@
    "show_dashboard": 1
   },
   {
+   "fetch_from": "triage_level.color",
    "fieldname": "triage_color",
    "fieldtype": "Color",
-   "in_list_view": 1,
-   "label": "Triage Color"
+   "label": "Acuity Color"
   },
   {
    "fieldname": "orders_tab",
@@ -250,7 +251,7 @@
   {
    "fieldname": "order_history_html",
    "fieldtype": "HTML",
-   "label": "Order History HTML"
+   "label": "Orders"
   },
   {
    "fieldname": "notes_tab",
@@ -273,6 +274,36 @@
    "fieldtype": "Link",
    "label": "Gender",
    "options": "Gender"
+  },
+  {
+   "fieldname": "section_break_lcyt",
+   "fieldtype": "Section Break",
+   "label": "Arrival"
+  },
+  {
+   "fieldname": "column_break_zjhs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "chief_complaints",
+   "fieldtype": "Table MultiSelect",
+   "label": "Chief Complaints",
+   "options": "Patient Encounter Symptom"
+  },
+  {
+   "fieldname": "column_break_uvch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "diagnosis",
+   "fieldtype": "Table MultiSelect",
+   "label": "Diagnosis",
+   "options": "Patient Encounter Diagnosis"
+  },
+  {
+   "fieldname": "contact_tab",
+   "fieldtype": "Tab Break",
+   "label": "Contact"
   }
  ],
  "grid_page_length": 50,
@@ -281,22 +312,12 @@
  "links": [
   {
    "group": "Orders",
-   "link_doctype": "Medication Request",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "group": "Orders",
    "link_doctype": "Service Request",
    "link_fieldname": "emergency_record"
   },
   {
-   "group": "Consultations",
-   "link_doctype": "Patient Appointment",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "group": "Consultations",
-   "link_doctype": "Patient Encounter",
+   "group": "Orders",
+   "link_doctype": "Medication Request",
    "link_fieldname": "emergency_record"
   },
   {
@@ -306,12 +327,12 @@
   },
   {
    "group": "Investigations",
-   "link_doctype": "Imaging Appointment",
+   "link_doctype": "Imaging Study",
    "link_fieldname": "emergency_record"
   },
   {
    "group": "Investigations",
-   "link_doctype": "Imaging Study",
+   "link_doctype": "Imaging Appointment",
    "link_fieldname": "emergency_record"
   },
   {
@@ -320,12 +341,22 @@
    "link_fieldname": "emergency_record"
   },
   {
-   "group": "Procedures",
+   "group": "Consultation",
+   "link_doctype": "Patient Appointment",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "group": "Consultation",
+   "link_doctype": "Patient Encounter",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "group": "Procedure",
    "link_doctype": "Clinical Procedure",
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-09 15:16:04.461669",
+ "modified": "2025-11-13 11:05:49.662503",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
