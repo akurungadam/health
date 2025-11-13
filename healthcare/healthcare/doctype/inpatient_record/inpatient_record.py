@@ -399,7 +399,7 @@ class InpatientRecord(Document):
 		clinical_note_doc.reference_name = self.name
 		clinical_note_doc.note = note
 		clinical_note_doc.clinical_note_type = note_type
-		clinical_note_doc.practitioner = self.practitioner
+		clinical_note_doc.practitioner = self.primary_practitioner
 		clinical_note_doc.insert()
 
 	@frappe.whitelist()
