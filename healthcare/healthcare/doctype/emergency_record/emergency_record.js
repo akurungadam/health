@@ -13,6 +13,12 @@ frappe.ui.form.on("Emergency Record", {
 				schedule_inpatient(frm);
 			});
 		}
+
+		if (!frm.is_new()) {
+			frappe.contacts.render_address_and_contact(frm);
+		} else {
+			frappe.contacts.clear_address_and_contact(frm);
+		}
 	},
 
     triage_level: function(frm) {

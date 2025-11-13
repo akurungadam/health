@@ -38,6 +38,11 @@
   "order_history_html",
   "notes_tab",
   "clinical_notes",
+  "address_and_contact_tab",
+  "address_and_contact_section",
+  "address_html",
+  "column_break_zzbq",
+  "contact_html",
   "mlc_tab",
   "section_break_dhnj",
   "is_medico_legal_case",
@@ -49,7 +54,6 @@
   "mlc_status",
   "details_section",
   "mlc_details",
-  "contact_tab",
   "tab_dashboard"
  ],
  "fields": [
@@ -277,6 +281,30 @@
    "options": "Gender"
   },
   {
+   "fieldname": "address_and_contact_tab",
+   "fieldtype": "Tab Break",
+   "label": "Address & Contact"
+  },
+  {
+   "fieldname": "address_and_contact_section",
+   "fieldtype": "Section Break",
+   "label": "Address and Contact"
+  },
+  {
+   "fieldname": "address_html",
+   "fieldtype": "HTML",
+   "label": "Address HTML"
+  },
+  {
+   "fieldname": "column_break_zzbq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_html",
+   "fieldtype": "HTML",
+   "label": "Contact HTML"
+  },
+  {
    "fieldname": "section_break_lcyt",
    "fieldtype": "Section Break",
    "label": "Arrival"
@@ -300,11 +328,6 @@
    "fieldtype": "Table MultiSelect",
    "label": "Diagnosis",
    "options": "Patient Encounter Diagnosis"
-  },
-  {
-   "fieldname": "contact_tab",
-   "fieldtype": "Tab Break",
-   "label": "Contact"
   }
  ],
  "grid_page_length": 50,
@@ -357,7 +380,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-13 11:26:27.200665",
+ "modified": "2025-11-13 17:59:22.166652",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
