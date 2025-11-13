@@ -116,25 +116,30 @@ frappe.ui.form.on("Inpatient Record", {
 					admit_patient_dialog(frm);
 				});
 			} else if (frm.doc.status == "Discharge Scheduled") {
-				frappe.db
-					.get_value(
-						"Discharge Summary",
-						{ docstatus: ["<", 2], inpatient_record: frm.doc.name },
-						"name",
-					)
-					.then(r => {
-						if (!r.message.name) {
-							frm.add_custom_button(
-								__("Discharge Summary"),
-								function () {
-									make_discharge_summary(frm);
-								},
-								"Create",
-							);
-						}
+				frappe.db.get_value("Discharge Summary", {"docstatus": ["<", 2], "inpatient_record": frm.doc.name}, "name")
+				.then(r => {
+					if (!r.message.name) {
+						frm.add_custom_button(__("Discharge Summary"), function() {
+							make_discharge_summary(frm);
+						}, "Create");
+					}
+				})
+				frm.add_custom_button(__("Discharge"), function() {
+					frappe.call ({
+						method: "healthcare.healthcare.doctype.discharge_summary.discharge_summary.has_discharge_summary",
+						args: {
+							inpatient_record: frm.doc.name
+						},
+						callback: function(r) {
+							if(r){
+								frappe.confirm('Are you sure you want to dischage?',
+									() => {
+										discharge_patient(frm);
+									},
+								)
+							}
+						},
 					});
-				frm.add_custom_button(__("Discharge"), function () {
-					discharge_patient(frm);
 				});
 				if (frm.doc.insurance_policy) {
 					frm.add_custom_button(__("Create Insurance Coverage"), function () {
