@@ -378,9 +378,14 @@
    "group": "Procedure",
    "link_doctype": "Clinical Procedure",
    "link_fieldname": "emergency_record"
+  },
+  {
+   "group": "Admissions",
+   "link_doctype": "Inpatient Record",
+   "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-13 17:59:22.166652",
+ "modified": "2025-11-13 19:28:12.626941",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
