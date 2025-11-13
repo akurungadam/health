@@ -27,14 +27,10 @@
   "abha_address",
   "abha_number",
   "uid",
-  "custom_aadhaar_number",
-  "custom_passport_number",
   "inpatient_record",
   "inpatient_status",
   "emergency_record",
   "report_preference",
-  "custom_source",
-  "custom_employee",
   "mobile",
   "phone",
   "adhar_card",
@@ -543,35 +539,6 @@
    "label": "ABHA Number",
    "read_only": 1,
    "translatable": 1
-  },
-  {
-   "fieldname": "custom_aadhaar_number",
-   "fieldtype": "Data",
-   "in_standard_filter": 1,
-   "label": "Aadhaar Number",
-   "unique": 1
-  },
-  {
-   "fieldname": "custom_passport_number",
-   "fieldtype": "Data",
-   "in_standard_filter": 1,
-   "label": "Passport Number",
-   "unique": 1
-  },
-  {
-   "fieldname": "custom_source",
-   "fieldtype": "Select",
-   "label": "Source",
-   "options": "\nEmployee\nSocial Media\nFriends or Relative"
-  },
-  {
-   "depends_on": "eval: doc.custom_source == \"Employee\"",
-   "fieldname": "custom_employee",
-   "fieldtype": "Link",
-   "ignore_user_permissions": 1,
-   "label": "Employee",
-   "mandatory_depends_on": "eval: doc.custom_source == \"Employee\"",
-   "options": "Employee"
   },
   {
    "fieldname": "adhar_card",
