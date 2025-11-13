@@ -597,19 +597,37 @@
  "index_web_pages_for_search": 1,
  "links": [
   {
+   "group": "Nursing",
    "link_doctype": "Nursing Task",
    "link_fieldname": "reference_name"
   },
   {
+   "group": "Financials",
    "link_doctype": "Treatment Counselling",
    "link_fieldname": "inpatient_record"
   },
   {
+   "group": "Consultations",
+   "link_doctype": "Patient Encounter",
+   "link_fieldname": "inpatient_record"
+  },
+  {
+   "group": "Medication",
+   "link_doctype": "Inpatient Medication Order",
+   "link_fieldname": "inpatient_record"
+  },
+  {
+   "group": "Medication",
+   "link_doctype": "Inpatient Medication Entry",
+   "link_fieldname": "inpatient_record"
+  },
+  {
+   "group": "Discharge",
    "link_doctype": "Discharge Summary",
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-09 14:43:35.285867",
+ "modified": "2025-11-10 13:13:13.675611",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",

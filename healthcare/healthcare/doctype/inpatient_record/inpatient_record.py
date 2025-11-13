@@ -966,5 +966,3 @@ def close_emergency_record(doc):
 	er.disposition = "Admit"
 	er.status = "Completed"
 	er.save(ignore_permissions=1)
-	# update patient as well
-	frappe.db.set_value("Patient", doc.patient, "emergency_record", "")
