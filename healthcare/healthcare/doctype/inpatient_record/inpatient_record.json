@@ -37,19 +37,23 @@
   "emergency_record",
   "admission_practitioner",
   "medical_department",
-  "admission_ordered_for",
   "admission_service_unit_type",
   "admission_nursing_checklist_template",
-  "discharge_nursing_checklist_template",
-  "expected_length_of_stay",
   "cb_admission",
   "primary_practitioner",
   "secondary_practitioner",
+  "admission_ordered_for",
+  "expected_length_of_stay",
+  "discharge_nursing_checklist_template",
   "admission_instruction",
   "encounter_details_section",
   "chief_complaint",
   "column_break_29",
   "diagnosis",
+  "orders_tab",
+  "order_history_html",
+  "notes_tab",
+  "clinical_notes",
   "prescriptions_tab",
   "medication_section",
   "drug_prescription",
@@ -530,6 +534,7 @@
   {
    "fieldname": "prescriptions_tab",
    "fieldtype": "Tab Break",
+   "hidden": 1,
    "label": "Prescriptions"
   },
   {
@@ -592,6 +597,28 @@
    "label": "Emergency Record",
    "options": "Emergency Record",
    "search_index": 1
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "orders_tab",
+   "fieldtype": "Tab Break",
+   "label": "Orders"
+  },
+  {
+   "fieldname": "order_history_html",
+   "fieldtype": "HTML",
+   "label": "Order History HTML"
+  },
+  {
+   "depends_on": "eval:!doc.__islocal",
+   "fieldname": "notes_tab",
+   "fieldtype": "Tab Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "clinical_notes",
+   "fieldtype": "HTML",
+   "label": "Clinical Notes"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -627,7 +654,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-10 13:13:13.675611",
+ "modified": "2025-11-13 16:55:36.803493",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",

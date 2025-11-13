@@ -17,6 +17,7 @@ frappe.ui.form.on("Inpatient Record", {
 			}
 		});
 	},
+
 	refresh: function (frm) {
 		frm.set_query("admission_service_unit_type", function () {
 			return {
@@ -169,6 +170,8 @@ frappe.ui.form.on("Inpatient Record", {
 			},
 			__("Create"),
 		);
+		show_clinical_notes(frm);
+		show_orders(frm);
 	},
 
 	onload: function (frm) {
@@ -179,6 +182,50 @@ frappe.ui.form.on("Inpatient Record", {
 		transfer_patient_dialog(frm);
 	},
 });
+
+var show_clinical_notes = async function(frm) {
+	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+		const clinical_notes = new healthcare.ClinicalNotes({
+			frm: frm,
+			notes_wrapper: $(frm.fields_dict.clinical_notes.wrapper),
+		});
+		clinical_notes.refresh();
+	}
+}
+
+var show_orders = async function(frm) {
+	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+		const orders = new healthcare.Orders({
+			frm: frm,
+			open_activities_wrapper: $(frm.fields_dict.order_history_html.wrapper),
+			form_wrapper: $(frm.wrapper),
+			create_orders: true,
+		});
+		orders.refresh();
+	}
+}
+
+var show_clinical_notes = async function(frm) {
+	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+		const clinical_notes = new healthcare.ClinicalNotes({
+			frm: frm,
+			notes_wrapper: $(frm.fields_dict.clinical_notes.wrapper),
+		});
+		clinical_notes.refresh();
+	}
+}
+
+var show_orders = async function(frm) {
+	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+		const orders = new healthcare.Orders({
+			frm: frm,
+			open_activities_wrapper: $(frm.fields_dict.order_history_html.wrapper),
+			form_wrapper: $(frm.wrapper),
+			create_orders: true,
+		});
+		orders.refresh();
+	}
+}
 
 let make_discharge_summary = function (frm) {
 	frappe.model.open_mapped_doc({
