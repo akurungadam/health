@@ -165,6 +165,7 @@
   {
    "fieldname": "current_bed",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Current Bed",
    "options": "Healthcare Service Unit"
   },
@@ -356,7 +357,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-13 11:05:49.662503",
+ "modified": "2025-11-13 11:26:27.200665",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
