@@ -395,7 +395,7 @@ class InpatientRecord(Document):
 	def add_clinical_note(self, note, note_type=None):
 		clinical_note_doc = frappe.new_doc("Clinical Note")
 		clinical_note_doc.patient = self.patient
-		clinical_note_doc.reference_doc = "Emergency Record"
+		clinical_note_doc.reference_doc = "Inpatient Record"
 		clinical_note_doc.reference_name = self.name
 		clinical_note_doc.note = note
 		clinical_note_doc.clinical_note_type = note_type
