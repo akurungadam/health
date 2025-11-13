@@ -26,7 +26,7 @@ var show_orders = function (frm) {
 		frm: frm,
 		open_activities_wrapper: $(frm.fields_dict.orders_html.wrapper),
 		form_wrapper: $(frm.wrapper),
-		show_encounter: true,
+		create_orders: true,
 	});
 	orders.refresh();
 };
