@@ -27,7 +27,8 @@ frappe.ui.form.on("Inpatient Medication Entry", {
 			return {
 				filters: {
 					company: frm.doc.company,
-				},
+					is_group: 0
+				}
 			};
 		});
 
