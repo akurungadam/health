@@ -170,6 +170,12 @@ class EmergencyRecord(Document):
 		inpatient_record.phone = patient.phone
 		inpatient_record.scheduled_date = frappe.utils.today()
 
+		if self.chief_complaints:
+			self.set_ip_child_records(inpatient_record, "chief_complaint", self.chief_complaints)
+
+		if self.diagnosis:
+			self.set_ip_child_records(inpatient_record, "diagnosis", self.diagnosis)
+
 		inpatient_record.status = "Admission Scheduled"
 		inpatient_record.save(ignore_permissions=True)
 		return inpatient_record.name
@@ -177,3 +183,9 @@ class EmergencyRecord(Document):
 	def set_details_from_ip_order(self, inpatient_record, ip_order):
 		for key in ip_order:
 			inpatient_record.set(key, ip_order[key])
+
+	def set_ip_child_records(self, inpatient_record, inpatient_record_child, er_child):
+		for item in er_child:
+			table = inpatient_record.append(inpatient_record_child)
+			for df in table.meta.get("fields"):
+				table.set(df.fieldname, item.get(df.fieldname))
