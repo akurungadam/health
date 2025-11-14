@@ -199,7 +199,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Admission Scheduled\nAdmitted\nDischarge Scheduled\nDischarged\nCancelled",
+   "options": "Admission Scheduled\nAdmitted\nDischarge Scheduled\nReady for Discharge\nDischarged\nCancelled",
    "read_only": 1
   },
   {
@@ -683,7 +683,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-14 13:00:04.601086",
+ "modified": "2025-11-14 13:55:31.649103",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",

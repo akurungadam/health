@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import get_link_to_form
 
+from healthcare.healthcare.utils import get_pending_invoices
+
 
 class DischargeSummary(Document):
 	@frappe.whitelist()
@@ -47,8 +49,22 @@ class DischargeSummary(Document):
 	def on_submit(self):
 		self.db_set("status", "Approved")
 
+		# update ip record status
+		if self.inpatient_record:
+			ip_doc = frappe.get_doc("Inpatient Record", self.inpatient_record)
+			pending_invoices = get_pending_invoices(ip_doc)
+
+			if not pending_invoices:
+				ip_doc.status = "Ready for Discharge"
+				ip_doc.save()
+
 	def on_cancel(self):
 		self.db_set("status", "Cancelled")
+		if self.inpatient_record:
+			ip_doc = frappe.get_doc("Inpatient Record", self.inpatient_record)
+			if ip_doc.status == "Ready for Discharge":
+				ip_doc.status = "Discharge Scheduled"
+				ip_doc.save()
 
 	def validate_encounter_impression(self):
 		if frappe.db.exists("Patient Encounter", {"inpatient_record": self.inpatient_record}):

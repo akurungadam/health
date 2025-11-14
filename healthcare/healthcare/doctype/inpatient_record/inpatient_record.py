@@ -33,6 +33,7 @@ from healthcare.healthcare.doctype.patient_insurance_coverage.patient_insurance_
 from healthcare.healthcare.utils import (
 	get_appointment_billing_item_and_rate,
 	validate_nursing_tasks,
+	get_pending_invoices,
 )
 
 
@@ -112,6 +113,11 @@ class InpatientRecord(Document):
 		self.validate_already_scheduled_or_admitted()
 		if self.status in ["Discharged", "Cancelled"]:
 			frappe.db.set_value("Patient", self.patient, {"inpatient_status": None, "inpatient_record": None})
+
+		# update ip record status
+		if self.status == "Discharge Scheduled":
+			if not get_pending_invoices(self) and frappe.db.exists("Discharge Summary", {"docstatus": 1, "inpatient_record": self.name}):
+				self.status = "Ready for Discharge"
 
 		set_item_rate(self)
 		set_total(self)

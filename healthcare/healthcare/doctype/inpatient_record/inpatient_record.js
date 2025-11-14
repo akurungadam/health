@@ -114,8 +114,8 @@ frappe.ui.form.on("Inpatient Record", {
 				});
 				frm.add_custom_button(__("Admit"), function () {
 					admit_patient_dialog(frm);
-				});
-			} else if (frm.doc.status == "Discharge Scheduled") {
+				} );
+			} else if (["Discharge Scheduled", "Ready for Discharge"].includes(frm.doc.status)) {
 				frappe.db.get_value("Discharge Summary", {"docstatus": ["<", 2], "inpatient_record": frm.doc.name}, "name")
 				.then(r => {
 					if (!r.message.name) {

@@ -957,6 +957,7 @@ def manage_invoice_submit_cancel(doc, method):
 
 		# handle insurance
 		post_transfer_journal_entry_and_update_coverage(doc)
+		update_inpatient_record(doc.patient)
 		doc.reload()
 
 	elif method == "on_cancel":
@@ -977,6 +978,124 @@ def manage_invoice_submit_cancel(doc, method):
 					)
 		# handle insurance
 		update_insurance_coverage(doc)
+		update_inpatient_record(doc.patient)
+
+
+def update_inpatient_record(patient):
+	inpatient_record = frappe.db.get_value("Patient", patient, "inpatient_record")
+
+	if not inpatient_record:
+		return
+
+	ip_doc = frappe.get_doc("Inpatient Record", inpatient_record)
+	pending_invoices = get_pending_invoices(ip_doc)
+
+	if ip_doc.status in ["Discharge Scheduled", "Ready for Discharge"]:
+		if not pending_invoices and frappe.db.exists("Discharge Summary", {"docstatus": 1, "inpatient_record": inpatient_record}):
+			ip_doc.status = "Ready for Discharge"
+		else:
+			ip_doc.status = "Discharge Scheduled"
+		ip_doc.save()
+
+
+def get_pending_invoices(inpatient_record):
+	pending_invoices = {}
+	if not frappe.db.get_single_value("Healthcare Settings", "automatically_generate_billable"):
+		if inpatient_record.inpatient_occupancies:
+			service_unit_names = False
+			for inpatient_occupancy in inpatient_record.inpatient_occupancies:
+				if not inpatient_occupancy.invoiced:
+					if is_service_unit_billable(inpatient_occupancy.service_unit):
+						if service_unit_names:
+							service_unit_names += ", " + inpatient_occupancy.service_unit
+						else:
+							service_unit_names = inpatient_occupancy.service_unit
+			if service_unit_names:
+				pending_invoices["Inpatient Occupancy"] = service_unit_names
+	else:
+		if inpatient_record.items:
+			service_unit_names = False
+			for item in inpatient_record.items:
+				if not item.invoiced:
+					if service_unit_names:
+						service_unit_names += ", " + item.item_code
+					else:
+						service_unit_names = item.item_code
+			if service_unit_names:
+				pending_invoices["Items"] = service_unit_names
+
+	docs = ["Patient Appointment", "Patient Encounter", "Lab Test", "Clinical Procedure"]
+
+	for doc in docs:
+		doc_name_list = get_unbilled_inpatient_docs(doc, inpatient_record)
+		if doc_name_list:
+			pending_invoices = get_pending_doc(doc, doc_name_list, pending_invoices)
+
+	return pending_invoices
+
+
+def get_pending_doc(doc, doc_name_list, pending_invoices):
+	if doc_name_list:
+		doc_ids = False
+		for doc_name in doc_name_list:
+			doc_link = get_link_to_form(doc, doc_name.name)
+			if doc_ids:
+				doc_ids += ", " + doc_link
+			else:
+				doc_ids = doc_link
+		if doc_ids:
+			pending_invoices[doc] = doc_ids
+
+	return pending_invoices
+
+
+def get_unbilled_inpatient_docs(doc, inpatient_record):
+	filters = {
+		"patient": inpatient_record.patient,
+		"inpatient_record": inpatient_record.name,
+		"docstatus": 1,
+	}
+	if doc in ["Service Request", "Medication Request"]:
+		filters.update(
+			{
+				"billing_status": "Pending",
+			}
+		)
+	else:
+		if doc == "Patient Encounter":
+			filters.update(
+				{
+					"appointment": "",
+				}
+			)
+		else:
+			del filters["docstatus"]
+		filters.update(
+			{
+				"invoiced": 0,
+				"status": ["!=", "Cancelled"]
+			}
+		)
+	if doc in ["Lab Test", "Clinical Procedure"]:
+		filters.update(
+			{
+				"service_request": "",
+			}
+		)
+	return frappe.db.get_list(doc, filters=filters)
+
+
+def is_service_unit_billable(service_unit):
+	service_unit_doc = frappe.qb.DocType("Healthcare Service Unit")
+	service_unit_type = frappe.qb.DocType("Healthcare Service Unit Type")
+	result = (
+		frappe.qb.from_(service_unit_doc)
+		.left_join(service_unit_type)
+		.on(service_unit_doc.service_unit_type == service_unit_type.name)
+		.select(service_unit_type.is_billable)
+		.where(service_unit_doc.name == service_unit)
+	).run(as_dict=1)
+	return result[0].get("is_billable", 0)
 
 
 def update_insurance_coverage(sales_invoice):
