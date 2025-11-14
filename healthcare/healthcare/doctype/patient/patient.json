@@ -19,7 +19,6 @@
   "sex",
   "blood_group",
   "dob",
-  "patient_age",
   "age_html",
   "image",
   "column_break_14",
@@ -51,17 +50,8 @@
   "patient_details",
   "abha_card",
   "consent_for_aadhaar_use",
-  "invoiced",
-  "payment_entry_created",
   "dashboard_tab",
   "address_and_contact_tab",
-  "custom_address",
-  "address_line1",
-  "state",
-  "zip_code",
-  "custom_column_break_nic4m",
-  "address_line2",
-  "city",
   "address_contacts",
   "address_html",
   "column_break_22",
@@ -522,11 +512,6 @@
    "options": "Emergency Record"
   },
   {
-   "fieldname": "patient_age",
-   "fieldtype": "Int",
-   "label": "Patient Age"
-  },
-  {
    "fieldname": "abha_address",
    "fieldtype": "Data",
    "label": "PHR Address",
@@ -562,56 +547,6 @@
    "fieldtype": "Attach",
    "hidden": 1,
    "label": "Consent For Aadhaar Use"
-  },
-  {
-   "default": "0",
-   "fieldname": "invoiced",
-   "fieldtype": "Check",
-   "label": "Registration Paid",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "payment_entry_created",
-   "fieldtype": "Check",
-   "label": " Paid",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "custom_address",
-   "fieldtype": "Section Break",
-   "label": "Address"
-  },
-  {
-   "fieldname": "address_line1",
-   "fieldtype": "Data",
-   "label": "Address Line1"
-  },
-  {
-   "fieldname": "state",
-   "fieldtype": "Data",
-   "label": "State"
-  },
-  {
-   "fieldname": "zip_code",
-   "fieldtype": "Data",
-   "label": "ZIP Code"
-  },
-  {
-   "fieldname": "custom_column_break_nic4m",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "address_line2",
-   "fieldtype": "Data",
-   "label": "Address Line2"
-  },
-  {
-   "fieldname": "city",
-   "fieldtype": "Data",
-   "label": "City"
   },
   {
    "fieldname": "referral",
