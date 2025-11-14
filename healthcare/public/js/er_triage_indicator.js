@@ -28,6 +28,7 @@
   function resolveER(frm, hintedValue, ctrl) {
     if (hintedValue) return hintedValue;
     if (frm?.doc?.emergency_record) return frm.doc.emergency_record;
+    if (frm?.doc?.doctype == "Emergency Record") return frm.doc.name;
     if (frm?.fields_dict) {
       for (const k in frm.fields_dict) {
         const f = frm.fields_dict[k];
