@@ -50,6 +50,11 @@
   "chief_complaint",
   "column_break_29",
   "diagnosis",
+  "address_and_contact_tab",
+  "address_and_contact_section",
+  "address_html",
+  "column_break_pynj",
+  "contact_html",
   "orders_tab",
   "order_history_html",
   "notes_tab",
@@ -619,6 +624,30 @@
    "fieldname": "clinical_notes",
    "fieldtype": "HTML",
    "label": "Clinical Notes"
+  },
+  {
+   "fieldname": "address_and_contact_tab",
+   "fieldtype": "Tab Break",
+   "label": "Address & Contacts"
+  },
+  {
+   "fieldname": "address_html",
+   "fieldtype": "HTML",
+   "label": "Address HTML"
+  },
+  {
+   "fieldname": "column_break_pynj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_html",
+   "fieldtype": "HTML",
+   "label": "Contact HTML"
+  },
+  {
+   "fieldname": "address_and_contact_section",
+   "fieldtype": "Section Break",
+   "label": "Address and Contact"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -654,7 +683,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-13 16:55:36.803493",
+ "modified": "2025-11-14 13:00:04.601086",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",

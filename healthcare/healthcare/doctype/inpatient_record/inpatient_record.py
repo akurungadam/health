@@ -7,6 +7,7 @@ from math import floor
 
 import frappe
 from frappe import _
+from frappe.contacts.address_and_contact import load_address_and_contact
 from frappe.desk.reportview import get_match_cond
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
@@ -36,6 +37,10 @@ from healthcare.healthcare.utils import (
 
 
 class InpatientRecord(Document):
+	def onload(self):
+		"""Load address and contacts in `__onload`"""
+		load_address_and_contact(self)
+
 	def after_insert(self):
 		frappe.db.set_value("Patient", self.patient, "inpatient_record", self.name)
 		frappe.db.set_value("Patient", self.patient, "inpatient_status", self.status)
@@ -72,6 +77,35 @@ class InpatientRecord(Document):
 			)
 
 		insert_pending_service_request(self)
+
+		if self.emergency_record:
+			# update ER address & contact
+			address_and_contacts = frappe.db.get_all(
+				"Dynamic Link",
+				{
+					"parentfield": "links",
+					"parenttype": ["in", ["Contact", "Address"]],
+					"link_doctype": "Emergency Record",
+					"link_name": self.emergency_record,
+				},
+				["parent", "parenttype"],
+			)
+
+			if address_and_contacts:
+				for item in address_and_contacts:
+					if not frappe.db.exists(
+						"Dynamic Link",
+						{
+							"parentfield": "links",
+							"parenttype": item.get("parenttype"),
+							"link_doctype": "Inpatient Record",
+							"link_name": self.name,
+							"parent": item.get("parent"),
+						},
+					):
+						parent_doc = frappe.get_doc(item.get("parenttype"), item.get("parent"))
+						parent_doc.append("links", {"link_doctype": "Inpatient Record", "link_name": self.name})
+						parent_doc.save()
 
 	def validate(self):
 		self.validate_dates()

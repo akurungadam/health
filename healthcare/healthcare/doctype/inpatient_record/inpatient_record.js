@@ -177,6 +177,11 @@ frappe.ui.form.on("Inpatient Record", {
 		);
 		show_clinical_notes(frm);
 		show_orders(frm);
+		if (!frm.is_new()) {
+			frappe.contacts.render_address_and_contact(frm);
+		} else {
+			frappe.contacts.clear_address_and_contact(frm);
+		}
 	},
 
 	onload: function (frm) {
