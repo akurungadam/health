@@ -32,6 +32,16 @@ class EmergencyRecord(Document):
 			self.db_set("patient", patient.name)
 			self.notify_update()
 
+	def before_save(self):
+		if self.status == "Completed":
+			self.triage_level = "CLOSED-ESI"
+			self.triage_color = "#B9B9B9"
+			self.docstatus = 1
+
+			# update patient as well
+			if self.patient:
+				frappe.db.set_value("Patient", self.patient, "emergency_record", "")
+
 	def get_order_details(self, template_doc, line_item, medication_request=False):
 		qty = 1
 
@@ -140,11 +150,12 @@ class EmergencyRecord(Document):
 			admission_order = json.loads(admission_order)
 
 		ip_record = self.create_inpatient_record(admission_order)
-		self.db_set({"disposition": "Admit", "triage_level": "CLOSED-ESI", "triage_color": "#B9B9B9"})
-		frappe.db.set_value("Patient", self.patient, "emergency_record", "")
 
 		self.submit()
-		frappe.msgprint(f"Inpatient Record {ip_record} created", alert=1)
+		frappe.msgprint(
+			f"Inpatient Record {frappe.utils.get_link_to_form('Inpatient Record', ip_record)} created",
+			alert=1,
+		)
 
 	def create_inpatient_record(self, admission_order):
 		if isinstance(admission_order, str):
