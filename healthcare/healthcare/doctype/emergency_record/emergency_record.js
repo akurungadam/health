@@ -39,7 +39,7 @@ frappe.ui.form.on("Emergency Record", {
 });
 
 var show_clinical_notes = async function(frm) {
-	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+	if (!frm.is_new() && frm.doc.patient) {
 		const clinical_notes = new healthcare.ClinicalNotes({
 			frm: frm,
 			notes_wrapper: $(frm.fields_dict.clinical_notes.wrapper),
@@ -49,7 +49,7 @@ var show_clinical_notes = async function(frm) {
 }
 
 var show_orders = async function(frm) {
-	if (frm.doc.docstatus == 0 && frm.doc.patient) {
+	if (!frm.is_new() && frm.doc.patient) {
 		const orders = new healthcare.Orders({
 			frm: frm,
 			open_activities_wrapper: $(frm.fields_dict.order_history_html.wrapper),
