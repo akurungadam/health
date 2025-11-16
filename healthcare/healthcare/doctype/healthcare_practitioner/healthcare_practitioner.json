@@ -21,6 +21,7 @@
   "mobile_phone",
   "residence_phone",
   "office_phone",
+  "color",
   "employee_and_user_details_section",
   "practitioner_type",
   "employee",
@@ -389,10 +390,10 @@
    "mandatory_depends_on": "eval:doc.enable_free_follow_ups == 1"
   },
   {
-   "default": "0",
-   "fieldname": "show_in_portal",
-   "fieldtype": "Check",
-   "label": "Show in Portal"
+   "description": "Used on OT Scheduling Calendar",
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
   }
  ],
  "grid_page_length": 50,

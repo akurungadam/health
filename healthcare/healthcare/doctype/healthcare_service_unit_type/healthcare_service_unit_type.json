@@ -13,6 +13,7 @@
   "allow_appointments",
   "overlap_appointments",
   "inpatient_occupancy",
+  "is_ot",
   "is_billable",
   "is_modality",
   "item_details",
@@ -208,7 +209,7 @@
   },
   {
    "default": "0",
-   "depends_on": "eval:doc.allow_appointments == 1 && doc.inpatient_occupany != 1",
+   "depends_on": "eval:doc.allow_appointments == 1 && doc.inpatient_occupancy != 1",
    "fieldname": "is_modality",
    "fieldtype": "Check",
    "label": "Is Modality"
@@ -220,7 +221,7 @@
    "link_fieldname": "service_unit_type"
   }
  ],
- "modified": "2025-12-25 09:36:31.415367",
+ "modified": "2025-09-25 15:05:43.831015",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Service Unit Type",

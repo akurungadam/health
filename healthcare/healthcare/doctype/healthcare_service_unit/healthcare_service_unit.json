@@ -20,6 +20,7 @@
   "is_modality",
   "ae_title",
   "ae_status",
+  "is_ot",
   "column_break_9",
   "company",
   "warehouse",
@@ -274,6 +275,11 @@
    "label": "AE Status",
    "no_copy": 1,
    "read_only": 1
+  },
+  {"fetch_from": "service_unit_type.is_ot",
+   "fieldname": "is_ot",
+   "fieldtype": "Check",
+   "label": "Is OT"
   }
  ],
  "is_tree": 1,
@@ -293,7 +299,7 @@
    "table_fieldname": "practitioner_schedules"
   }
  ],
- "modified": "2025-09-26 15:03:07.339676",
+ "modified": "2025-09-26 15:04:07.339676",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Service Unit",

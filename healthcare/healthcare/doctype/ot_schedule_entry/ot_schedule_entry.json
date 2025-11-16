@@ -1,0 +1,235 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-17 10:44:53.585026",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "service_request",
+  "patient",
+  "patient_name",
+  "age",
+  "gender",
+  "patient_contact",
+  "template",
+  "service_unit_type",
+  "service_unit",
+  "fasting_required",
+  "column_break_pecl",
+  "status",
+  "priority",
+  "primary_practitioner",
+  "primary_practitioner_name",
+  "primary_pact_contact",
+  "secondary_practitioner",
+  "secondary_practitioner_name",
+  "secondary_pact_contact",
+  "section_break_wlhg",
+  "planned_start",
+  "planned_end",
+  "duration",
+  "column_break_heqj",
+  "color",
+  "notes",
+  "procedure"
+ ],
+ "fields": [
+  {
+   "fieldname": "procedure",
+   "fieldtype": "Link",
+   "label": "Procedure",
+   "options": "Clinical Procedure",
+   "search_index": 1
+  },
+  {
+   "fetch_from": "service_request.template_dn",
+   "fieldname": "template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Template",
+   "options": "Clinical Procedure Template",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fetch_from": "service_request.patient",
+   "fieldname": "patient",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Patient",
+   "options": "Patient",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "service_request",
+   "fieldtype": "Link",
+   "label": "Service Request",
+   "options": "Service Request",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "primary_practitioner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Primary Practitioner",
+   "options": "Healthcare Practitioner",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "secondary_practitioner",
+   "fieldtype": "Link",
+   "label": "Secondary Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fieldname": "service_unit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Service Unit",
+   "options": "Healthcare Service Unit",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_pecl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "fasting_required",
+   "fieldtype": "Check",
+   "label": "Fasting Required"
+  },
+  {
+   "fieldname": "section_break_wlhg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Planned Start",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "planned_end",
+   "fieldtype": "Datetime",
+   "label": "Planned End",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Planned",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nPlanned\nIn Progress\nCompleted\nCancelled",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "\nEmergency\nNormal",
+   "search_index": 1
+  },
+  {
+   "description": "In minutes",
+   "fieldname": "duration",
+   "fieldtype": "Float",
+   "label": "Duration"
+  },
+  {
+   "fieldname": "column_break_heqj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "primary_practitioner.color",
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Color"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "primary_practitioner_name",
+   "fieldtype": "Data",
+   "label": "Primary Practitioner Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "secondary_practitioner_name",
+   "fieldtype": "Data",
+   "label": "Secondary Practitioner Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "patient_name",
+   "fieldtype": "Data",
+   "label": "Patient Name"
+  },
+  {
+   "fieldname": "age",
+   "fieldtype": "Data",
+   "label": "Age"
+  },
+  {
+   "fieldname": "gender",
+   "fieldtype": "Link",
+   "label": "Gender",
+   "options": "Gender"
+  },
+  {
+   "fieldname": "patient_contact",
+   "fieldtype": "Data",
+   "label": "Patient Contact Number",
+   "options": "Phone",
+   "search_index": 1
+  },
+  {
+   "fieldname": "primary_pact_contact",
+   "fieldtype": "Data",
+   "label": "Primary Practitioner Contact Number",
+   "options": "Phone",
+   "search_index": 1
+  },
+  {
+   "fieldname": "secondary_pact_contact",
+   "fieldtype": "Data",
+   "label": "Secondary Practitioner Contact Number",
+   "options": "Phone",
+   "search_index": 1
+  },
+  {
+   "fetch_from": "service_request.healthcare_service_unit_type",
+   "fieldname": "service_unit_type",
+   "fieldtype": "Link",
+   "label": "Service Unit Type",
+   "options": "Healthcare Service Unit Type",
+   "search_index": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-20 19:45:29.906536",
+ "modified_by": "Administrator",
+ "module": "Healthcare",
+ "name": "OT Schedule Entry",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

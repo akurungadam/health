@@ -7,11 +7,14 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
-  "title",
   "appointment",
   "procedure_template",
+  "fasting_required",
+  "duration",
   "column_break_30",
   "company",
+  "status",
+  "title",
   "section_break_6",
   "patient",
   "patient_name",
@@ -21,14 +24,27 @@
   "emergency_record",
   "notes",
   "column_break_7",
-  "status",
   "practitioner",
   "practitioner_name",
+  "secodary_practitioner",
+  "secondary_practitioner_name",
   "medical_department",
-  "service_unit",
+  "section_break_arcg",
   "start_date",
   "start_time",
+  "end_time",
+  "column_break_lxnj",
+  "service_unit",
+  "notes",
+  "sb_refs",
+  "column_break_34",
+  "service_request",
+  "prescription",
+  "invoiced",
+  "column_break_exwb",
   "sample",
+  "amended_from",
+  "tab_break_jich",
   "consumables_section",
   "consume_stock",
   "warehouse",
@@ -39,14 +55,9 @@
   "consumable_total_amount",
   "column_break_27",
   "consumption_details",
+  "tab_break_xsos",
   "medical_coding_section",
-  "codification_table",
-  "sb_refs",
-  "column_break_34",
-  "service_request",
-  "invoiced",
-  "prescription",
-  "amended_from"
+  "codification_table"
  ],
  "fields": [
   {
@@ -103,6 +114,7 @@
    "read_only": 1
   },
   {
+   "fetch_from": "practitioner.department",
    "fieldname": "medical_department",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -113,7 +125,7 @@
    "fieldname": "practitioner",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "Healthcare Practitioner",
+   "label": "Primary Practitioner",
    "options": "Healthcare Practitioner"
   },
   {
@@ -277,6 +289,7 @@
    "read_only": 1
   },
   {
+   "fetch_from": "practitioner.practitioner_name",
    "fieldname": "practitioner_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -323,6 +336,62 @@
    "fieldtype": "Link",
    "label": "Emergency Record",
    "options": "Emergency Record"
+  },
+  {
+   "default": "0",
+   "fetch_from": "procedure_template.fasting_required",
+   "fieldname": "fasting_required",
+   "fieldtype": "Check",
+   "label": "Fasting Required"
+  },
+  {
+   "fieldname": "tab_break_jich",
+   "fieldtype": "Tab Break",
+   "label": "Consumables"
+  },
+  {
+   "fieldname": "tab_break_xsos",
+   "fieldtype": "Tab Break",
+   "label": "Codification"
+  },
+  {
+   "fieldname": "column_break_exwb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "procedure_template.duration",
+   "fetch_if_empty": 1,
+   "fieldname": "duration",
+   "fieldtype": "Float",
+   "label": "Duration"
+  },
+  {
+   "fieldname": "secodary_practitioner",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Secodary Practitioner",
+   "options": "Healthcare Practitioner"
+  },
+  {
+   "fetch_from": "secodary_practitioner.practitioner_name",
+   "fieldname": "secondary_practitioner_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Secondary Practitioner Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_arcg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_lxnj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Datetime",
+   "label": "End Time"
   }
  ],
  "is_submittable": 1,
@@ -332,7 +401,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-11-09 10:53:50.923141",
+ "modified": "2025-09-17 11:25:08.810471",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",

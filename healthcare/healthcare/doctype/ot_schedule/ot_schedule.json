@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-17 10:30:08.908337",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "overview_section",
+  "schedule_date",
+  "ot_type",
+  "column_break_vwtq",
+  "status",
+  "naming_series",
+  "section_break_cvww",
+  "entries",
+  "section_break_ostf",
+  "entries_html"
+ ],
+ "fields": [
+  {
+   "default": "Today",
+   "fieldname": "schedule_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Schedule Date",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.mode===\"OT Type\"",
+   "fieldname": "ot_type",
+   "fieldtype": "Link",
+   "label": "OT Type (Service Unit Type)",
+   "options": "Healthcare Service Unit Type"
+  },
+  {
+   "fieldname": "column_break_vwtq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "\nDraft\nLocked",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_cvww",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
+  },
+  {
+   "fieldname": "entries",
+   "fieldtype": "Table",
+   "label": "Schedule Entries",
+   "options": "OT Schedule Entry"
+  },
+  {
+   "fieldname": "overview_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_ostf",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "entries_html",
+   "fieldtype": "HTML",
+   "label": "OT Entries"
+  },
+  {
+   "default": "OT-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "OT-"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-09-20 19:43:46.964801",
+ "modified_by": "Administrator",
+ "module": "Healthcare",
+ "name": "OT Schedule",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ot-calendar",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "frappe-ui": "^0.1.199",
+    "vue": "^3.4.0",
+    "vue-cal": "^4.0.0"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.68",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "unplugin-icons": "^22.3.0",
+    "unplugin-vue-components": "^29.0.0",
+    "vite": "^5.4.0"
+  }
+}
