@@ -42,6 +42,16 @@ class EmergencyRecord(Document):
 			if self.patient:
 				frappe.db.set_value("Patient", self.patient, "emergency_record", "")
 
+	def on_update_after_submit(self):
+		if self.status == "Completed":
+			self.triage_level = "CLOSED-ESI"
+			self.triage_color = "#B9B9B9"
+			self.db_update()
+
+			# update patient as well
+			if self.patient:
+				frappe.db.set_value("Patient", self.patient, "emergency_record", "")
+
 	def get_order_details(self, template_doc, line_item, medication_request=False):
 		qty = 1
 

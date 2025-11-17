@@ -126,6 +126,7 @@
    "search_index": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "disposition",
    "fieldtype": "Select",
    "label": "Disposition",
@@ -385,7 +386,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-13 19:28:12.626941",
+ "modified": "2025-11-17 16:55:15.119684",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
