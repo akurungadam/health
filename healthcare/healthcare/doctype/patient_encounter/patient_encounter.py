@@ -642,16 +642,25 @@ def handle_encounter_events(doc, method=None):
 
 
 def create_encounter(doc):
-	frappe.get_doc(
-		{
-			"doctype": "Patient Encounter",
-			"encounter_doctype": doc.doctype,
-			"encounter": doc.name,
-			"patient": doc.patient,
-			"practitioner": doc.practitioner,
-			"encounter_date": doc.encounter_date,
-			"encounter_time": doc.encounter_time,
-			"appointment_type": doc.appointment_type,
-			"appointment": doc.appointment,
-		}
-	).insert(ignore_permissions=True).submit()
+	try:
+		frappe.get_doc(
+			{
+				"doctype": "Patient Encounter",
+				"encounter_doctype": doc.doctype,
+				"encounter": doc.name,
+				"patient": doc.patient,
+				"practitioner": doc.practitioner,
+				"encounter_date": doc.encounter_date,
+				"encounter_time": doc.encounter_time,
+				"appointment_type": doc.appointment_type,
+				"appointment": doc.appointment,
+			}
+		).insert(ignore_permissions=True).submit()
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Error creating Encounter while submitting {doc.doctype}",
+		)
+		frappe.throw(
+			f"Error creating Patient Encounter while submitting {doc.doctype}, check Error Log for more details"
+		)
