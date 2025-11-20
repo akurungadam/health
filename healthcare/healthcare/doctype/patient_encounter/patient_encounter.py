@@ -48,6 +48,15 @@ class PatientEncounter(Document):
 				order_doc.cancel()
 
 	def on_cancel(self):
+		if self.encounter_doctype and self.encounter:
+			custom_encounter = frappe.get_doc(self.encounter_doctype, self.encounter)
+			if custom_encounter.docstatus != 2:
+				frappe.throw(
+					_(
+						f"Cannot cancel as Custom Encounter {get_link_to_form(self.encounter_doctype, self.encounter)} is not Cancelled"
+					)
+				)
+
 		self.db_set("status", "Cancelled")
 
 		if self.appointment:
