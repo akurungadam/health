@@ -5,9 +5,15 @@
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import nowdate, nowtime
 
+from healthcare.healthcare.doctype.medical_department.test_medical_department import (
+	create_custom_encounter_doctype,
+	delete_department_if_exists,
+)
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment_type,
+	create_healthcare_docs,
 )
 from healthcare.healthcare.doctype.patient_encounter.patient_encounter import PatientEncounter
 
@@ -73,6 +79,10 @@ class TestPatientEncounter(IntegrationTestCase):
 				}
 			)
 
+	def tearDown(self):
+		frappe.db.sql("DELETE FROM `tabDocType` where name = 'Test Custom Encounter DocType'")
+		frappe.db.sql("DELETE FROM `tabMedical Department` where name = '_Test Medical Department'")
+
 	def test_treatment_plan_template_filter(self):
 		encounter = frappe.get_doc(
 			{
@@ -95,3 +105,83 @@ class TestPatientEncounter(IntegrationTestCase):
 		).insert()
 		plans = PatientEncounter.get_applicable_treatment_plans(encounter.as_dict())
 		self.assertEqual(plans[0]["name"], self.care_plan_female.template_name)
+
+	def test_encounter_created_on_custom_encounter(self):
+		# create enc doctype
+		custom_encounter_dt = create_custom_encounter_doctype()
+
+		# create medical department with link
+		delete_department_if_exists()
+		frappe.get_doc(
+			{
+				"doctype": "Medical Department",
+				"department": "_Test Medical Department",
+				"encounter_doctype": custom_encounter_dt.name,
+			}
+		).insert()
+
+		# should create encounter
+		patient, practitioner = create_healthcare_docs()
+		encounter = (
+			frappe.get_doc(
+				{
+					"doctype": custom_encounter_dt.name,
+					"patient": patient,
+					"practitioner": practitioner,
+					"encounter_date": nowdate(),
+					"encounter_time": nowtime(),
+					"appointment_type": create_appointment_type().name,
+				}
+			)
+			.insert()
+			.submit()
+		)
+		self.assertTrue(
+			frappe.db.exists(
+				{
+					"doctype": "Patient Encounter",
+					"encounter_doctype": custom_encounter_dt.name,
+					"encounter": encounter.name,
+				}
+			)
+		)
+
+	def test_encounter_cannot_cancel_if_custom_encounter(self):
+		# create enc doctype
+		custom_encounter_dt = create_custom_encounter_doctype()
+
+		# create medical department with link
+		delete_department_if_exists()
+		frappe.get_doc(
+			{
+				"doctype": "Medical Department",
+				"department": "_Test Medical Department",
+				"encounter_doctype": custom_encounter_dt.name,
+			}
+		).insert()
+
+		# should create encounter
+		patient, practitioner = create_healthcare_docs()
+		encounter = (
+			frappe.get_doc(
+				{
+					"doctype": custom_encounter_dt.name,
+					"patient": patient,
+					"practitioner": practitioner,
+					"encounter_date": nowdate(),
+					"encounter_time": nowtime(),
+					"appointment_type": create_appointment_type().name,
+				}
+			)
+			.insert()
+			.submit()
+		)
+		encounter = frappe.get_doc(
+			{
+				"doctype": "Patient Encounter",
+				"encounter_doctype": custom_encounter_dt.name,
+				"encounter": encounter.name,
+			}
+		)
+
+		self.assertRaises(frappe.ValidationError, encounter.cancel)
