@@ -12,7 +12,7 @@
  "field_order": [
   "department",
   "patient_care_type",
-  "custom_doctype_for_encounter",
+  "encounter_doctype",
   "column_break_oagd",
   "show_in_portal",
   "portal_image"
@@ -51,7 +51,7 @@
   },
   {
    "allow_in_quick_entry": 1,
-   "description": "Doctype should be submittable and should have fields - patient, practitioner. appointment, appointment_type, encounter_date and encounter_time",
+   "description": "Doctype should be submittable and should have fields - patient, practitioner, appointment, appointment_type, encounter_date and encounter_time",
    "fieldname": "encounter_doctype",
    "fieldtype": "Link",
    "label": "Encounter DocType",
@@ -61,18 +61,10 @@
   {
    "fieldname": "column_break_oagd",
    "fieldtype": "Column Break"
-  },
-  {
-   "allow_in_quick_entry": 1,
-   "fieldname": "custom_doctype_for_encounter",
-   "fieldtype": "Link",
-   "label": "Custom DocType for Encounter",
-   "link_filters": "[[\"DocType\",\"module\",\"=\",\"Healthcare\"]]",
-   "options": "DocType"
   }
  ],
  "links": [],
- "modified": "2025-11-06 13:15:38.220630",
+ "modified": "2025-11-21 12:26:30.069267",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Medical Department",
