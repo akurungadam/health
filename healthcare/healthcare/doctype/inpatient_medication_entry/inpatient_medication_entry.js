@@ -23,6 +23,28 @@ frappe.ui.form.on("Inpatient Medication Entry", {
 			};
 		});
 
+		frm.set_query('batch', 'medication_orders', (doc, cdt, cdn) => {
+			let item = locals[cdt][cdn];
+			let filters = {'item_code': item.drug_code};
+			if (frm.doc.warehouse) filters['warehouse'] = frm.doc.warehouse;
+
+			return {
+				query : 'erpnext.controllers.queries.get_batch_no',
+				filters: filters
+			};
+		});
+
+		frm.set_query('batch', 'medication_orders', (doc, cdt, cdn) => {
+			let item = locals[cdt][cdn];
+			let filters = {'item_code': item.drug_code};
+			if (frm.doc.warehouse) filters['warehouse'] = frm.doc.warehouse;
+
+			return {
+				query : 'erpnext.controllers.queries.get_batch_no',
+				filters: filters
+			};
+		});
+
 		frm.set_query("warehouse", () => {
 			return {
 				filters: {

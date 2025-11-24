@@ -47,6 +47,7 @@ class InpatientMedicationEntry(Document):
 					"dosage_form": data.dosage_form,
 					"against_imo": data.parent,
 					"against_imoe": data.name,
+					"has_batch_no": frappe.db.get_value("Item", data.drug_code, "has_batch_no"),
 				},
 			)
 
@@ -194,6 +195,9 @@ class InpatientMedicationEntry(Document):
 			# references
 			se_child.patient = entry.patient
 			se_child.inpatient_medication_entry_child = entry.name
+			if entry.batch:
+				se_child.use_serial_batch_fields = 1
+				se_child.batch_no = entry.batch
 
 		stock_entry.submit()
 		return stock_entry.name
