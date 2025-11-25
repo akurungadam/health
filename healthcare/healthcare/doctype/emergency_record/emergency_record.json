@@ -130,7 +130,7 @@
    "fieldname": "disposition",
    "fieldtype": "Select",
    "label": "Disposition",
-   "options": "\nDischarge\nAdmit\nTransfer\nLWBS\nDeath"
+   "options": "\nDischarge\nAdmit\nTransfer\nLWBS\nDAMA\nDeath"
   },
   {
    "fieldname": "triage_section",
@@ -386,7 +386,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2025-11-17 16:55:15.119684",
+ "modified": "2025-11-25 17:08:16.531450",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
