@@ -13,6 +13,7 @@
   "naming_series",
   "observation_template",
   "observation_category",
+  "appointment",
   "column_break_7xu5",
   "company",
   "posting_date",
@@ -644,12 +645,18 @@
    "fieldtype": "Link",
    "label": "Emergency Record",
    "options": "Emergency Record"
+  },
+  {
+   "fieldname": "appointment",
+   "fieldtype": "Link",
+   "label": "Appointment",
+   "options": "Patient Appointment"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-11-09 18:08:09.170122",
+ "modified": "2025-11-25 10:40:03.254372",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Observation",
