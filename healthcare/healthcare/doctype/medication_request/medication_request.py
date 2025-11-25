@@ -18,10 +18,30 @@ class MedicationRequest(ServiceRequestController):
 		self.title = f"{self.patient_name} - {self.medication or self.medication_item}"
 
 	def before_insert(self):
+		self.set_medication_qty()
+		self.calculate_total_dispensable_quantity()
+
 		if self.amended_from:
 			frappe.db.set_value(
 				"Medication Request", self.amended_from, "status", "stopped-Medication Request Status"
 			)
+
+	def set_medication_qty(self):
+		if not self.doctype == "Medication Request":
+			return
+
+		quantity = 0
+
+		if self.dosage:
+			dosage = frappe.get_doc("Prescription Dosage", self.dosage)
+			for item in dosage.dosage_strength:
+				quantity += item.strength
+			if self.period:
+				period = frappe.get_doc("Prescription Duration", self.period)
+				if period.get_days():
+					quantity = quantity * period.get_days()
+
+			self.quantity = quantity or 1
 
 	def set_order_details(self):
 		if self.medication:
