@@ -45,6 +45,7 @@ class DischargeSummary(Document):
 
 	def validate(self):
 		self.validate_encounter_impression()
+		self.render_templates()
 
 	def on_submit(self):
 		self.db_set("status", "Approved")
@@ -150,6 +151,23 @@ class DischargeSummary(Document):
 
 		order.update({"order_description": description})
 		return order
+
+	def render_templates(self):
+		template_field_map = {
+			"physical_examination_template": "physical_examination",
+			"treatment_template": "treatment_done",
+			"advice_on_discharge_template": "advice_on_discharge",
+			"diet_template": "diet_adviced",
+			"instructions_template": "instructions",
+		}
+
+		for template_field, target_field in template_field_map.items():
+			template_name = self.get(template_field)
+			if template_name and not self.get(target_field):
+				terms_and_conditions = frappe.get_doc("Terms and Conditions", template_name)
+
+				if terms_and_conditions.terms:
+					self.set(target_field, frappe.render_template(terms_and_conditions.terms, self.as_dict()))
 
 
 @frappe.whitelist()

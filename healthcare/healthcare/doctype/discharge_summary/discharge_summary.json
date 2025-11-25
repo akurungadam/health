@@ -35,12 +35,17 @@
   "order_details_tab",
   "orders_html",
   "discharge_details_tab",
+  "physical_examination_template",
   "physical_examination",
+  "treatment_template",
   "treatment_done",
+  "advice_on_discharge_template",
   "advice_on_discharge",
+  "diet_template",
   "diet_adviced",
-  "current_issues",
+  "instructions_template",
   "instructions",
+  "current_issues",
   "amended_from"
  ],
  "fields": [
@@ -212,7 +217,6 @@
    "label": "Current Issues"
   },
   {
-   "description": "About when and how to obtain urgent work care",
    "fieldname": "instructions",
    "fieldtype": "Text Editor",
    "label": "Instructions"
@@ -251,6 +255,7 @@
   },
   {
    "fetch_from": "inpatient_record.discharge_practitioner",
+   "fetch_if_empty": 1,
    "fieldname": "discharge_practitioner",
    "fieldtype": "Link",
    "label": "Discharging Practitioner",
@@ -280,12 +285,43 @@
    "fieldtype": "Datetime",
    "label": "Admitted Datetime",
    "read_only": 1
+  },
+  {
+   "fieldname": "physical_examination_template",
+   "fieldtype": "Link",
+   "label": "Physical Examination Template",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "treatment_template",
+   "fieldtype": "Link",
+   "label": "Treatment Template",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "advice_on_discharge_template",
+   "fieldtype": "Link",
+   "label": "Advice on Discharge Template",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "diet_template",
+   "fieldtype": "Link",
+   "label": "Diet Template",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "instructions_template",
+   "fieldtype": "Link",
+   "label": "Instructions Template",
+   "options": "Terms and Conditions"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-12-25 09:36:29.089484",
+ "modified": "2025-11-25 16:39:15.010234",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Discharge Summary",
