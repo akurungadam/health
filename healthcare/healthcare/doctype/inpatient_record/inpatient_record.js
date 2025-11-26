@@ -108,6 +108,10 @@ frappe.ui.form.on("Inpatient Record", {
 						__("Transfer"),
 					);
 				}
+
+				frm.add_custom_button(__("Add Stock Consumables"), () => {
+					frm.trigger("open_consumables_dialog");
+				});
 			} else if (frm.doc.status == "Admission Scheduled") {
 				frm.add_custom_button(__("Cancel Admission"), function () {
 					cancel_ip_order(frm);
@@ -191,6 +195,127 @@ frappe.ui.form.on("Inpatient Record", {
 	btn_transfer: function (frm) {
 		transfer_patient_dialog(frm);
 	},
+
+	open_consumables_dialog: function (frm) {
+		frappe.call({
+			method: "healthcare.healthcare.doctype.inpatient_record.inpatient_record.get_stock_consumables",
+			args: { inpatient_record: frm.doc.name },
+			callback: function (r) {
+				if (!r.message) return;
+
+				const items = r.message;
+				this.data = items;
+				const dialog = new frappe.ui.Dialog({
+					title: __("Stock Consumables"),
+					size: "extra-large",
+					fields: [
+						{
+							fieldname: "items",
+							fieldtype: "Table",
+							data: this.data,
+							get_data: () => {
+								return this.data;
+							},
+							cannot_add_rows: false,
+							in_place_edit: true,
+							fields: [
+								{
+									fieldname: "item_code",
+									fieldtype: "Link",
+									label: "Item Code",
+									options: "Item",
+									in_list_view: 1,
+									reqd: 1,
+									get_query() {
+										return {
+											filters: {
+												is_stock_item: 1,
+												disabled: 0,
+											},
+										};
+									},
+									onchange: async function () {
+										const item_code = this.get_value();
+										if (!item_code) return;
+
+										let rate_resp = await frappe.call({
+											method: "healthcare.healthcare.doctype.inpatient_record.inpatient_record.get_item_rate",
+											args: { item: item_code }
+										});
+										this.grid_row.on_grid_fields_dict.rate.set_value(rate_resp.message.rate);
+										this.grid_row.on_grid_fields_dict.uom.set_value(rate_resp.message.uom);
+										this.grid_row.on_grid_fields_dict.qty.set_value(1);
+										this.grid_row.on_grid_fields_dict.amount.set_value(rate_resp.message.rate);
+									},
+								},
+								{
+									fieldname: "qty",
+									fieldtype: "Float",
+									label: "Qty",
+									in_list_view: 1,
+									reqd: 1,
+									onchange: async function () {
+										const qty = this.get_value();
+										const rate = this.grid_row.on_grid_fields_dict.rate.get_value();
+
+										this.grid_row.on_grid_fields_dict.amount.set_value((qty || 1) * (rate || 0));
+									},
+								},
+								{ fieldname: "uom", fieldtype: "Data", label: "UOM", read_only: 1, in_list_view: 1 },
+								{ fieldname: "rate", fieldtype: "Currency", label: "Rate", read_only: 1, in_list_view: 1 },
+								{ fieldname: "amount", fieldtype: "Currency", label: "Amount", read_only: 1, in_list_view: 1 },
+								{
+									fieldname: "warehouse",
+									fieldtype: "Link",
+									label: "Warehouse",
+									options: "Warehouse",
+									reqd: 1,
+									in_list_view: 1,
+									get_query() {
+										return {
+											filters: {
+												company: frm.doc.company,
+												is_group: 0,
+											},
+										};
+									},
+								}
+							]
+						}
+					],
+					primary_action_label: __("Submit"),
+					primary_action(values) {
+						frappe.call({
+							method: "healthcare.healthcare.doctype.inpatient_record.inpatient_record.create_stock_entry",
+							args: {
+								inpatient_record: frm.doc.name,
+								items: values.items
+							},
+							callback: function (r) {
+								if (r.message) {
+									frappe.show_alert({
+										message:__("Consumables added successfully"),
+										indicator:"green"
+									}, 5);
+									frm.reload_doc();
+									dialog.hide();
+								} else {
+									frappe.show_alert({
+										message:__("Please add items to submit"),
+										indicator:"red"
+									}, 5);
+								}
+							}
+						});
+					}
+				});
+
+				this.data = dialog.fields_dict.items.df.data;
+				dialog.fields_dict.items.grid.refresh();
+				dialog.show();
+			}
+		});
+	}
 });
 
 var show_clinical_notes = async function(frm) {

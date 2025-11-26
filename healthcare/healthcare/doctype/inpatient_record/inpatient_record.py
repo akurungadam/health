@@ -32,8 +32,8 @@ from healthcare.healthcare.doctype.patient_insurance_coverage.patient_insurance_
 )
 from healthcare.healthcare.utils import (
 	get_appointment_billing_item_and_rate,
-	validate_nursing_tasks,
 	get_pending_invoices,
+	validate_nursing_tasks,
 )
 
 
@@ -116,7 +116,9 @@ class InpatientRecord(Document):
 
 		# update ip record status
 		if self.status == "Discharge Scheduled":
-			if not get_pending_invoices(self) and frappe.db.exists("Discharge Summary", {"docstatus": 1, "inpatient_record": self.name}):
+			if not get_pending_invoices(self) and frappe.db.exists(
+				"Discharge Summary", {"docstatus": 1, "inpatient_record": self.name}
+			):
 				self.status = "Ready for Discharge"
 
 		set_item_rate(self)
@@ -191,6 +193,7 @@ class InpatientRecord(Document):
 					io.left,
 					io.parent,
 					io.name,
+					(sut.name).as_("unit_type"),
 					sut.item,
 					sut.uom,
 					sut.rate,
@@ -213,15 +216,60 @@ class InpatientRecord(Document):
 
 				if item not in item_hours:
 					record["total_hours"] = 0
+					record["occupancy_names"] = set()
 					item_hours[item] = record
 
 				item_hours[item]["total_hours"] += hours_diff
+				item_hours[item]["occupancy_names"].add(record.get("name"))
+
+				# add items for the service unit type consumables
+				unit_type_name = record.get("unit_type")
+				consumables = frappe.db.get_all(
+					"Service Unit Type Item",
+					filters={
+						"parent": unit_type_name,
+						"parentfield": "items",
+						"parenttype": "Healthcare Service Unit Type",
+					},
+					fields=["item_code", "charge", "is_stock_item"],
+				)
+
+				if consumables:
+					for cons in consumables:
+						cons_code = cons.get("item_code")
+						if cons_code not in item_hours:
+							cons_uom = record.get("uom")
+							if not cons_uom:
+								cons_uom = frappe.db.get_value("Item", cons_code, "stock_uom")
+
+							if not cons.get("is_stock_item"):
+								item_hours[cons_code] = {
+									"item": cons_code,
+									"uom": cons_uom,
+									"rate": cons.get("charge") or 0,
+									"no_of_hours": record.get("no_of_hours") or 1,
+									"minimum_billable_qty": 1,
+									"total_hours": 0,
+									"occupancy_names": set(),
+									"is_consumable": True,
+									"is_stock_item": bool(cons.get("is_stock_item")),
+								}
+
+						# For consumables we increment total_hours by the occupancy hours, same as parent
+						if not cons.get("is_stock_item"):
+							item_hours[cons_code]["total_hours"] += hours_diff
+							item_hours[cons_code]["occupancy_names"].add(record.get("name"))
 
 			ip_records = list(item_hours.values())
 
 			price_list, price_list_currency = frappe.db.get_values(
 				"Price List", {"selling": 1}, ["name", "currency"]
 			)[0]
+
+			if not self.price_list and not price_list:
+				frappe.throw(
+					_("Selling Price List not found. Please configure a valid Price List in the document.")
+				)
 
 			for inpatient in ip_records:
 				item_name, stock_uom = frappe.db.get_value(
@@ -255,14 +303,16 @@ class InpatientRecord(Document):
 					}
 				)
 				item_details = get_item_details(ctx)
+				final_rate = item_details.get("price_list_rate") or inpatient.get("rate") or 0
 
-				if not item_details.get("price_list_rate") or int(item_details.get("price_list_rate")) == 0:
+				if not final_rate or int(float(final_rate)) == 0:
 					frappe.throw(
 						_(
 							f"The Item Price for '{get_link_to_form('Item', inpatient.get('item'))}' is missing or set to zero for Price List'{get_link_to_form('Price List', self.price_list or price_list)}'. Please verify the Item Price master."
 						)
 					)
 
+				total_hours = inpatient.get("total_hours") or 0
 				minimum_billable_qty = inpatient.get("minimum_billable_qty")
 				total_qty = (
 					(inpatient.get("total_hours") / inpatient.get("no_of_hours"))
@@ -278,9 +328,9 @@ class InpatientRecord(Document):
 					se_child.item_code = inpatient.get("item")
 					se_child.item_name = item_name
 					se_child.stock_uom = stock_uom
-					se_child.uom = inpatient.get("uom")
+					se_child.uom = inpatient.get("uom") or stock_uom
 					se_child.quantity = quantity
-					se_child.rate = item_details.get("price_list_rate")
+					se_child.rate = final_rate
 				else:
 					if item_row.get("invoiced"):
 						# Add new row if invoiced and additional quantity exists
@@ -291,7 +341,7 @@ class InpatientRecord(Document):
 							se_child.stock_uom = stock_uom
 							se_child.uom = inpatient.get("uom")
 							se_child.quantity = quantity - item_row.get("quantity")
-							se_child.rate = item_details.get("price_list_rate")
+							se_child.rate = final_rate
 					else:
 						# Update existing non-invoiced item row
 						if quantity != item_row.get("quantity"):
@@ -299,12 +349,17 @@ class InpatientRecord(Document):
 								if item.name == item_row.get("name"):
 									item.uom = inpatient.get("uom")
 									item.quantity = quantity
-									item.rate = item_details.get("price_list_rate")
+									item.rate = final_rate
 
 			# Update inpatient occupancy billing time
-			for test in self.inpatient_occupancies:
-				if test.name == inpatient.get("name"):
-					test.scheduled_billing_time = now()
+			occupancy_names_to_update = set()
+			for rec in ip_records:
+				occs = rec.get("occupancy_names") or set()
+				occupancy_names_to_update.update(occs)
+
+			for occ in self.inpatient_occupancies:
+				if occ.name in occupancy_names_to_update:
+					occ.scheduled_billing_time = now()
 
 			self.save()
 
@@ -866,25 +921,45 @@ def create_treatment_counselling(ip_order):
 
 
 @frappe.whitelist()
-def create_stock_entry(items, inpatient_record):
+def create_stock_entry(inpatient_record, items):
 	items = json.loads(items)
+
+	if not items or not len(items):
+		return
+
 	ip_record_doc = frappe.get_doc("Inpatient Record", inpatient_record)
 	stock_entry = frappe.new_doc("Stock Entry")
 
 	stock_entry.stock_entry_type = "Material Issue"
-	stock_entry.to_warehouse = ip_record_doc.warehouse
+	stock_entry.from_warehouse = items[0].get("warehouse")
 	stock_entry.company = ip_record_doc.company
 	expense_account = get_account(None, "expense_account", "Healthcare Settings", ip_record_doc.company)
 	for item in items:
 		se_child = stock_entry.append("items")
 		se_child.item_code = item.get("item_code")
 		se_child.uom = item.get("uom")
-		se_child.qty = item.get("quantity")
-		se_child.s_warehouse = ip_record_doc.warehouse
+		se_child.qty = item.get("qty")
+		se_child.basic_rate = item.get("rate")
+		se_child.s_warehouse = item.get("warehouse")
 		cost_center = frappe.get_cached_value("Company", ip_record_doc.company, "cost_center")
 		se_child.cost_center = cost_center
 		se_child.expense_account = expense_account
 	stock_entry.save().submit()
+
+	for row in items:
+		ip_record_doc.append(
+			"items",
+			{
+				"item_code": row["item_code"],
+				"uom": row.get("uom"),
+				"quantity": row["qty"],
+				"rate": row["rate"],
+				"amount": row["amount"],
+				"stock_entry": stock_entry.name,
+			},
+		)
+
+	ip_record_doc.save()
 
 	return stock_entry.name
 
@@ -1108,3 +1183,61 @@ def close_emergency_record(doc):
 	er.disposition = "Admit"
 	er.status = "Completed"
 	er.save(ignore_permissions=1)
+
+
+@frappe.whitelist()
+def get_stock_consumables(inpatient_record):
+	ip = frappe.get_doc("Inpatient Record", inpatient_record)
+
+	consumables = []
+
+	for occ in ip.inpatient_occupancies:
+		service_unit = frappe.db.get_value("Inpatient Occupancy", occ.name, "service_unit")
+		su_type, su_warehouse = frappe.db.get_value(
+			"Healthcare Service Unit", service_unit, ["service_unit_type", "warehouse"]
+		)
+
+		if not su_warehouse:
+			frappe.throw(
+				_(
+					f"Service Unit: {get_link_to_form('Healthcare Service Unit', service_unit)} warehouse not configured!"
+				)
+			)
+
+		items = frappe.db.get_all(
+			"Service Unit Type Item",
+			filters={"parent": su_type, "is_stock_item": 1},
+			fields=["item_code", "charge"],
+		)
+
+		for it in items:
+			# fetch uom + rate
+			item_uom = frappe.db.get_value("Item", it.item_code, "stock_uom")
+			rate = it.charge or get_item_price(it.item_code)
+
+			consumables.append(
+				{
+					"item_code": it.item_code,
+					"uom": item_uom,
+					"qty": 1,
+					"rate": rate,
+					"amount": rate,
+					"warehouse": su_warehouse,
+				}
+			)
+
+	return consumables
+
+
+def get_item_price(item_code):
+	price = frappe.db.get_value(
+		"Item Price", {"item_code": item_code, "selling": 1}, "price_list_rate"
+	)
+	return price or 0
+
+
+@frappe.whitelist()
+def get_item_rate(item):
+	uom = frappe.db.get_value("Item", item, "stock_uom")
+	rate = get_item_price(item)
+	return {"rate": rate, "uom": uom}

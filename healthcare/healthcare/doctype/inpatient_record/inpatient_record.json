@@ -360,6 +360,7 @@
    "depends_on": "eval:doc.status == 'Admitted';",
    "fieldname": "btn_transfer",
    "fieldtype": "Button",
+   "hidden": 1,
    "label": "Transfer"
   },
   {
@@ -683,7 +684,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-14 13:55:31.649103",
+ "modified": "2025-11-24 14:16:42.033329",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",
