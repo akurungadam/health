@@ -340,28 +340,6 @@ var show_orders = async function(frm) {
 	}
 }
 
-var show_clinical_notes = async function(frm) {
-	if (frm.doc.docstatus == 0 && frm.doc.patient) {
-		const clinical_notes = new healthcare.ClinicalNotes({
-			frm: frm,
-			notes_wrapper: $(frm.fields_dict.clinical_notes.wrapper),
-		});
-		clinical_notes.refresh();
-	}
-}
-
-var show_orders = async function(frm) {
-	if (frm.doc.docstatus == 0 && frm.doc.patient) {
-		const orders = new healthcare.Orders({
-			frm: frm,
-			open_activities_wrapper: $(frm.fields_dict.order_history_html.wrapper),
-			form_wrapper: $(frm.wrapper),
-			create_orders: true,
-		});
-		orders.refresh();
-	}
-}
-
 let make_discharge_summary = function (frm) {
 	frappe.model.open_mapped_doc({
 		method: "healthcare.healthcare.doctype.inpatient_record.inpatient_record.make_discharge_summary",
@@ -807,6 +785,20 @@ var schedule_discharge = function (frm) {
 				fieldtype: "Column Break",
 			},
 			{
+				fieldtype: "Select",
+				label: "Disposition",
+				fieldname: "disposition",
+				options: ["Discharge", "Transfer", "LWBS", "DAMA", "Death"],
+				default: "Discharge"
+			},
+			{
+				fieldtype: "Select",
+				label: "Disposition",
+				fieldname: "disposition",
+				options: ["Discharge", "Transfer", "LWBS", "DAMA", "Death"],
+				default: "Discharge"
+			},
+			{
 				fieldtype: "Small Text",
 				label: "Discharge Instructions",
 				fieldname: "discharge_instructions",
@@ -832,8 +824,9 @@ var schedule_discharge = function (frm) {
 				followup_date: dialog.get_value("followup_date"),
 				discharge_instructions: dialog.get_value("discharge_instructions"),
 				discharge_note: dialog.get_value("discharge_note"),
-			};
-			frappe.call({
+				disposition: dialog.get_value("disposition")
+			}
+			frappe.call ({
 				method: "healthcare.healthcare.doctype.inpatient_record.inpatient_record.schedule_discharge",
 				args: { discharge_order: discharge_order },
 				callback: function (data) {

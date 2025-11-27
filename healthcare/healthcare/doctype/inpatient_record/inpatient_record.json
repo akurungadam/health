@@ -88,6 +88,7 @@
   "discharge_encounter",
   "discharge_datetime",
   "cb_discharge",
+  "disposition",
   "discharge_instructions",
   "followup_date",
   "sb_discharge_note",
@@ -649,6 +650,12 @@
    "fieldname": "address_and_contact_section",
    "fieldtype": "Section Break",
    "label": "Address and Contact"
+  },
+  {
+   "fieldname": "disposition",
+   "fieldtype": "Select",
+   "label": "Disposition",
+   "options": "\nDischarge\nTransfer\nLWBS\nDAMA\nDeath"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -684,7 +691,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-24 14:16:42.033329",
+ "modified": "2025-11-27 10:32:24.031689",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",
