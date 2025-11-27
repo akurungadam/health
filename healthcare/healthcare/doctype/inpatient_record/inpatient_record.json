@@ -19,6 +19,7 @@
   "column_break_8",
   "company",
   "status",
+  "disposition",
   "scheduled_date",
   "admitted_datetime",
   "expected_discharge",
@@ -88,7 +89,6 @@
   "discharge_encounter",
   "discharge_datetime",
   "cb_discharge",
-  "disposition",
   "discharge_instructions",
   "followup_date",
   "sb_discharge_note",
@@ -691,7 +691,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-11-27 10:32:24.031689",
+ "modified": "2025-11-27 12:02:44.593868",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",

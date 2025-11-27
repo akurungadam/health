@@ -109,9 +109,9 @@ frappe.ui.form.on("Inpatient Record", {
 					);
 				}
 
-				frm.add_custom_button(__("Add Stock Consumables"), () => {
+				frm.add_custom_button(__("IP Consumables"), () => {
 					frm.trigger("open_consumables_dialog");
-				});
+				}, "Create");
 			} else if (frm.doc.status == "Admission Scheduled") {
 				frm.add_custom_button(__("Cancel Admission"), function () {
 					cancel_ip_order(frm);
