@@ -22,7 +22,6 @@
   "patient_age",
   "inpatient_record",
   "emergency_record",
-  "notes",
   "column_break_7",
   "practitioner",
   "practitioner_name",
@@ -183,8 +182,7 @@
   {
    "fieldname": "notes",
    "fieldtype": "Small Text",
-   "label": "Notes",
-   "set_only_once": 1
+   "label": "Notes"
   },
   {
    "fieldname": "company",
@@ -335,7 +333,8 @@
    "fieldname": "emergency_record",
    "fieldtype": "Link",
    "label": "Emergency Record",
-   "options": "Emergency Record"
+   "options": "Emergency Record",
+   "search_index": 1
   },
   {
    "default": "0",
@@ -401,7 +400,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2025-09-17 11:25:08.810471",
+ "modified": "2025-11-28 09:46:40.335144",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",
