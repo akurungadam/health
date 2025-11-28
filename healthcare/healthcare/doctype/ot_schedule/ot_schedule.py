@@ -334,9 +334,7 @@ def get_schedule_entries(schedule_name):
 		)
 	return {
 		"schedule_date": str(doc.schedule_date),
-		"mode": doc.mode,
 		"ot_type": doc.ot_type,
-		"allow_emergency_inserts": int(doc.allow_emergency_inserts or 0),
 		"entries": entries,
 	}
 
@@ -447,7 +445,7 @@ def get_day_events(schedule_name, date):
 			"planned_start",
 			"planned_end",
 			"duration",
-			"group_id",
+			# "group_id",
 			"color",
 			"notes",
 			"patient_name",
