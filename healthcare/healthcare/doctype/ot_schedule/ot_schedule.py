@@ -19,7 +19,8 @@ class OTSchedule(Document):
 			self.set_practitioner_details(entry)
 
 	def validate(self):
-		if (self.status or "").strip().lower() == "locked":
+		old_status = self.get_doc_before_save().status
+		if old_status == "Locked" and self.status == "Locked":
 			frappe.throw(_("This OT Schedule is Locked. Unlock to edit."))
 
 		if not self.schedule_date:
@@ -334,7 +335,9 @@ def get_schedule_entries(schedule_name):
 		)
 	return {
 		"schedule_date": str(doc.schedule_date),
+		# "mode": doc.mode,
 		"ot_type": doc.ot_type,
+		# "allow_emergency_inserts": int(doc.allow_emergency_inserts or 0),
 		"entries": entries,
 	}
 
