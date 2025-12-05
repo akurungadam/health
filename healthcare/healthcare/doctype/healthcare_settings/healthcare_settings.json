@@ -511,6 +511,14 @@
    "options": "Mode of Payment"
   },
   {
+   "depends_on": "eval:doc.collect_registration_fee == 1",
+   "fieldname": "registration_item",
+   "fieldtype": "Link",
+   "label": "Registration Item",
+   "mandatory_depends_on": "eval:doc.collect_registration_fee == 1",
+   "options": "Item"
+  },
+  {
    "description": "Tested with Orthanc only",
    "fieldname": "radiology_section",
    "fieldtype": "Section Break",
