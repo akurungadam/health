@@ -1,7 +1,10 @@
 import { io } from 'socket.io-client'
 import { socketio_port } from '../../../../sites/common_site_config.json'
-import { getCachedListResource } from 'frappe-ui/src/resources/listResource'
-import { getCachedResource } from 'frappe-ui/src/resources/resources'
+
+// Temporary stubs – prevent deep imports into frappe-ui internals
+// FIXME
+const getCachedResource = () => null
+const getCachedListResource = () => null
 
 export function initSocket() {
 	let host = window.location.hostname
@@ -14,15 +17,18 @@ export function initSocket() {
 		withCredentials: true,
 		reconnectionAttempts: 5,
 	})
+
 	socket.on('refetch_resource', (data) => {
 		if (data.cache_key) {
 			let resource =
 				getCachedResource(data.cache_key) ||
 				getCachedListResource(data.cache_key)
+
 			if (resource) {
 				resource.reload()
 			}
 		}
 	})
+
 	return socket
 }
