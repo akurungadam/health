@@ -1,13 +1,12 @@
-import frappeUIPreset from 'frappe-ui/src/tailwind/preset'
-const colors = require('tailwindcss/colors')
+// patient_portal/tailwind.config.js
 
-export default {
-  presets: [frappeUIPreset],
+/** @type {import('tailwindcss').Config} */
+const colors = require('tailwindcss/colors')
+module.exports = {
   content: [
-    "./index.html",
-		"./src/**/*.{vue,js,ts,jsx,tsx}",
-		"./node_modules/frappe-ui/src/components/**/*.{vue,js,ts,jsx,tsx}",
-		"../node_modules/frappe-ui/src/components/**/*.{vue,js,ts,jsx,tsx}",
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
+    './node_modules/frappe-ui/**/*.{js,ts,vue,jsx,tsx}',
   ],
   theme: {
     extend: {
