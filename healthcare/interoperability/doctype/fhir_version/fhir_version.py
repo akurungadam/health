@@ -11,7 +11,7 @@ from healthcare.interoperability.fhir_engine.fhir_package_importer import FHIRPa
 
 class FHIRVersion(Document):
 	@frappe.whitelist()
-	def import_structure_definitions(self):
+	def import_fhir_package(self):
 		if self.schema_file.endswith(".tgz") or self.schema_file.endswith(".tar.gz"):
 			enqueue(
 				"healthcare.interoperability.doctype.fhir_version.fhir_version.import_fhir_package_job",
