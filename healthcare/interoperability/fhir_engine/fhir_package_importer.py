@@ -31,9 +31,10 @@ class FHIRPackageImporter:
 	def import_package(self):
 		self._extract_archive()
 		self._validate_package_contents()
+		self._process_datatypes()
 		self._process_structure_definitions()
 
-	def import_datatypes_from_package(self):
+	def _process_datatypes(self):
 		"""
 		NOTE
 		1) If package/profiles-types.json exists, import datatypes from it.
@@ -332,7 +333,7 @@ class FHIRPackageImporter:
 						target_profiles.extend(t.get("targetProfile") or [])
 
 			is_choice_type = 1 if len(normalized_types) > 1 else 0
-			type_field = ",".join(normalized_types) if normalized_types else None
+			datatype = ",".join(normalized_types) if normalized_types else None
 
 			binding = e.get("binding") or {}
 			valueset_url = binding.get("valueSet")
@@ -342,7 +343,7 @@ class FHIRPackageImporter:
 				"element_name": path,
 				"min": e.get("min", 0),
 				"max": e.get("max"),
-				"fhir_datatype": type_field,
+				"datatype": datatype,
 				"short": e.get("short"),
 				"definition": e.get("definition"),
 			}
