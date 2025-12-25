@@ -1,0 +1,361 @@
+# Copyright (c) 2025, earthians Health Informatics Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import json
+import os
+import tarfile
+import tempfile
+from pathlib import Path
+
+import frappe
+from frappe.utils.file_manager import get_file_path
+
+FHIR_SYSTEM_TYPE_MAP = {
+	"http://hl7.org/fhirpath/System.String": "string",
+	"http://hl7.org/fhirpath/System.Boolean": "boolean",
+	"http://hl7.org/fhirpath/System.Integer": "integer",
+	"http://hl7.org/fhirpath/System.Decimal": "decimal",
+	"http://hl7.org/fhirpath/System.Date": "date",
+	"http://hl7.org/fhirpath/System.DateTime": "dateTime",
+}
+
+
+class FHIRPackageImporter:
+	def __init__(self, package_tarball, version_name, profile_name=None):
+		self.package_tarball = package_tarball
+		self.version_name = version_name
+		self.profile_name = profile_name
+		self.temp_dir = None
+		self.package_root = None
+
+	def import_package(self):
+		self._extract_archive()
+		self._validate_package_contents()
+		self._process_structure_definitions()
+
+	def import_datatypes_from_package(self):
+		"""
+		NOTE
+		1) If package/profiles-types.json exists, import datatypes from it.
+		2) Else, scan all StructureDefinition*.json under package/.
+		"""
+		if not self.temp_dir or not self.package_root:
+			self._extract_archive()
+			self._validate_package_contents()
+
+		bundle_path = self.package_root / "profiles-types.json"
+		if bundle_path.exists():
+			with open(bundle_path, "r", encoding="utf-8") as f:
+				data = json.load(f)
+			count = 0
+			for sd in self._iter_structure_definitions_from_container(data):
+				if self._is_datatype_sd(sd):
+					self._upsert_fhir_datatype(sd)
+					count += 1
+			frappe.msgprint(
+				f"Imported/updated {count} FHIR datatypes from profiles-types.json for {self.version_name}"
+			)
+			return
+
+		# fallback: scan all SD JSONs inside package/
+		json_files = list(self.package_root.rglob("*.json"))
+		count = 0
+		for path in json_files:
+			try:
+				with open(path, "r", encoding="utf-8") as f:
+					data = json.load(f)
+			except Exception as e:
+				frappe.log_error(f"Failed loading JSON from {path}: {e}")
+				continue
+
+			if data.get("resourceType") != "StructureDefinition":
+				continue
+			if not self._is_datatype_sd(data):
+				continue
+
+			try:
+				self._upsert_fhir_datatype(data)
+				count += 1
+			except Exception as e:
+				url = data.get("url") or str(path)
+				frappe.log_error(f"Failed to upsert FHIR Datatype from {url}: {e}")
+
+		frappe.msgprint(f"Imported/updated {count} FHIR datatypes (scan) for {self.version_name}")
+
+	def _extract_archive(self):
+		file_path = get_file_path(self.package_tarball)
+		if not file_path or not os.path.exists(file_path):
+			frappe.throw(f"Cannot find FHIR package on disk '{file_path}'")
+
+		self.temp_dir = tempfile.TemporaryDirectory()
+		try:
+			with tarfile.open(file_path, "r:gz") as tar:
+				tar.extractall(path=self.temp_dir.name)
+		except tarfile.ReadError:
+			frappe.throw(f"'{file_path}' is not a valid .tgz / .tar.gz archive.")
+
+	def _validate_package_contents(self):
+		self.package_root = Path(self.temp_dir.name) / "package"
+		if not self.package_root.exists():
+			frappe.throw("Invalid FHIR package: missing 'package/' directory.")
+
+		pkg_json_path = self.package_root / "package.json"
+		if not pkg_json_path.exists():
+			frappe.throw("Missing 'package/package.json'.")
+
+		with open(pkg_json_path, "r", encoding="utf-8") as f:
+			pkg_meta = json.load(f)
+
+		declared_versions = pkg_meta.get("fhirVersions", [])
+		if declared_versions:
+			declared_version = declared_versions[0]
+			if declared_version != self.version_name:
+				frappe.log_error(f"Declared version '{declared_version}' vs expected '{self.version_name}'")
+
+	def _process_structure_definitions(self):
+		json_files = list(self.package_root.rglob("*.json"))
+		for path in json_files:
+			try:
+				with open(path, "r", encoding="utf-8") as f:
+					data = json.load(f)
+			except Exception as e:
+				frappe.log_error(f"Failed loading JSON from {path}: {e}")
+				continue
+
+			if data.get("resourceType") != "StructureDefinition":
+				continue
+
+			self._upsert_structure_definition(data)  # enqueue?
+
+	def _upsert_structure_definition(self, sd_data):
+		sd_url = sd_data.get("url")
+		if not sd_url:
+			return
+
+		existing = frappe.db.exists(
+			{
+				"doctype": "FHIR Structure Definition",
+				"url": sd_url,
+				"fhir_profile": self.profile_name if self.profile_name else "",
+				"fhir_version": self.version_name,
+			}
+		)
+		if existing:
+			sd = frappe.get_doc("FHIR Structure Definition", existing)
+			sd.set("element_paths", [])
+		else:
+			sd = frappe.new_doc("FHIR Structure Definition")
+
+		sd.fhir_sd = sd_data.get("id")
+		sd.fhir_version = self.version_name
+		sd.fhir_profile = self.profile_name or ""
+		sd.url = sd_url
+		sd.kind = (sd_data.get("kind") or "").capitalize()
+		sd.status = (sd_data.get("status") or "").capitalize()
+		# sd.sd_type = "base"
+		sd.sd_version = sd_data.get("version")
+		sd.publisher = sd_data.get("publisher")
+		sd.sd = json.dumps(sd_data, indent=2)
+
+		self._populate_element_paths(sd, sd_data)
+
+		try:
+			sd.save(ignore_permissions=True)
+		except Exception as e:
+			frappe.log_error(f"Failed to save Structure Definition {sd_url}: {e}")
+
+	def _populate_element_paths(self, sd, sd_data):
+		elements = sd_data.get("snapshot", {}).get("element", [])
+		for e in elements:
+			row = sd.append("element_paths", {})
+			row.short = e.get("short")
+			row.definition = e.get("definition")
+			row.path = e.get("path")
+			row.min = e.get("min", 0)
+			row.max = e.get("max")
+			row.is_required = e.get("min", 0) > 0
+
+			types = e.get("type") or []
+			normalized_types = []
+			for t in types:
+				code = t.get("code") if isinstance(t, dict) else t
+				code = FHIR_SYSTEM_TYPE_MAP.get(code, code)
+				normalized_types.append(code)
+
+				# check for regex in extensions
+				extensions = t.get("extension") or []
+				for ext in extensions:
+					if ext.get("url").endswith("regex"):
+						row.regex = ext.get("valueString")
+
+			if len(normalized_types) == 1:
+				row.datatype = normalized_types[0]
+			elif normalized_types:
+				row.datatype = ",".join(normalized_types)
+				row.is_choice_type = 1
+
+			# TODO: required?
+			if any(
+				isinstance(t, dict) and t.get("code") == "Reference" and t.get("targetProfile") for t in types
+			):
+				target_profiles = []
+				for t in types:
+					if isinstance(t, dict) and t.get("code") == "Reference":
+						target_profiles.extend(t.get("targetProfile") or [])
+				row.target_profiles = json.dumps(target_profiles, indent=1)
+
+			binding = e.get("binding")
+			if binding:
+				row.valueset_url = binding.get("valueSet")
+				row.binding_strength = binding.get("strength")
+
+			element_prefix_map = {
+				"fixed": "fixed_value",
+				"pattern": "pattern_value",
+				"defaultValue": "default_value",
+			}
+
+			for key, value in e.items():
+				if value is not None and key.startswith(tuple(element_prefix_map.keys())):
+					val = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+					for prefix, fieldname in element_prefix_map.items():
+						if key.startswith(prefix):
+							setattr(row, fieldname, val)
+							break
+
+	def _iter_structure_definitions_from_container(self, data):
+		# Bundle
+		if isinstance(data, dict) and isinstance(data.get("entry"), list):
+			for ent in data["entry"]:
+				res = (ent or {}).get("resource")
+				if isinstance(res, dict) and res.get("resourceType") == "StructureDefinition":
+					yield res
+			return
+		# Array
+		if isinstance(data, list):
+			for item in data:
+				if isinstance(item, dict) and item.get("resourceType") == "StructureDefinition":
+					yield item
+			return
+		# Single SD
+		if isinstance(data, dict) and data.get("resourceType") == "StructureDefinition":
+			yield data
+
+	def _is_datatype_sd(self, sd_data):
+		kind = (sd_data.get("kind") or "").strip().lower()
+		return kind in {"primitive-type", "complex-type"}
+
+	def _upsert_fhir_datatype(self, sd_data):
+		code = (
+			(sd_data.get("type") or "").strip()
+			or (sd_data.get("name") or "").strip()
+			or (sd_data.get("id") or "").strip()
+		)
+		if not code:
+			return
+
+		is_primitive = (sd_data.get("kind") or "").strip().lower() == "primitive-type"
+
+		existing_name = frappe.db.exists("FHIR Datatype", code)
+
+		if existing_name:
+			dt_doc = frappe.get_doc("FHIR Datatype", existing_name)
+			dt_doc.set("elements", [])
+		else:
+			dt_doc = frappe.new_doc("FHIR Datatype")
+			dt_doc.datatype = code
+
+		dt_doc.datatype = code
+		dt_doc.fhir_version = self.version_name
+		dt_doc.is_primitive = 1 if is_primitive else 0
+		dt_doc.status = sd_data.get("status")
+		dt_doc.url = sd_data.get("url")
+		dt_doc.description = sd_data.get("description")
+		dt_doc.regex = sd_data.get("regex")  # remove (?)
+
+		# children
+		for base_row in self._extract_datatype_elements_from_sd(sd_data):
+			row = dict(base_row)
+			if "datatype" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
+				row["datatype"] = row.pop("type", None)
+
+			if "element" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
+				p = row.get("path") or ""
+				row["element"] = p.split(".")[-1] if p else None
+
+			child_fields = {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}
+			row = {k: v for k, v in row.items() if k in child_fields and v is not None}
+			dt_doc.append("elements", row)
+
+		try:
+			dt_doc.save(ignore_permissions=True)
+		except frappe.DuplicateEntryError:  # handle this better
+			dt_doc = frappe.get_doc("FHIR Datatype", code)
+			dt_doc.set("elements", [])
+			for base_row in self._extract_datatype_elements_from_sd(sd_data):
+				row = dict(base_row)
+				if "datatype" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
+					row["datatype"] = row.pop("type", None)
+				if "element" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
+					p = row.get("path") or ""
+					row["element"] = p.split(".")[-1] if p else None
+				child_fields = {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}
+				row = {k: v for k, v in row.items() if k in child_fields and v is not None}
+				dt_doc.append("elements", row)
+			dt_doc.save(ignore_permissions=True)
+
+	def _extract_datatype_elements_from_sd(self, sd_data):
+		rows = []
+		elements = sd_data.get("snapshot", {}).get("element", []) or []
+
+		for e in elements:
+			path = e.get("path")
+			if not path:
+				continue
+
+			types = e.get("type") or []
+			normalized_types = []
+			regex_value = None
+			target_profiles = []
+
+			for t in types:
+				code = t.get("code") if isinstance(t, dict) else t
+				code = FHIR_SYSTEM_TYPE_MAP.get(code, code)
+				if code:
+					normalized_types.append(code)
+
+				if isinstance(t, dict):
+					for ext in t.get("extension") or []:
+						if (ext.get("url") or "").endswith("regex"):
+							regex_value = ext.get("valueString") or regex_value
+					if t.get("code") == "Reference" and t.get("targetProfile"):
+						target_profiles.extend(t.get("targetProfile") or [])
+
+			is_choice_type = 1 if len(normalized_types) > 1 else 0
+			type_field = ",".join(normalized_types) if normalized_types else None
+
+			binding = e.get("binding") or {}
+			valueset_url = binding.get("valueSet")
+			binding_strength = binding.get("strength")
+
+			row = {
+				"element_name": path,
+				"min": e.get("min", 0),
+				"max": e.get("max"),
+				"fhir_datatype": type_field,
+				"short": e.get("short"),
+				"definition": e.get("definition"),
+			}
+			if regex_value:
+				row["regex"] = regex_value
+			if valueset_url:
+				row["valueset_url"] = valueset_url
+			if binding_strength:
+				row["binding_strength"] = binding_strength
+			if target_profiles:
+				row["target_profiles"] = json.dumps(target_profiles, indent=1)
+			if is_choice_type:
+				row["is_choice_type"] = 1
+
+			rows.append(row)
+		return rows
