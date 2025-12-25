@@ -3,11 +3,11 @@
 
 frappe.ui.form.on("FHIR Version", {
 	refresh: function (frm) {
-		frm.add_custom_button(__("Load Structure Definitions"), () => {
+		frm.add_custom_button(__("Load Package"), () => {
 
-			frappe.confirm(__("This will import all Structure Definitions once again if done earlier, confirm?"), ()=> {
+			frappe.confirm(__("This will import all Structure Definitions & Datatypes once again if done earlier, confirm?"), ()=> {
 
-				frm.call("import_structure_definitions")
+				frm.call("import_fhir_package")
 				.then(r => {
 					frappe.show_alert({
 						"indicator": "green",
