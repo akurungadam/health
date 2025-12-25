@@ -1,0 +1,145 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "beta": 1,
+ "creation": "2025-12-25 11:31:22.832885",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "path",
+  "datatype",
+  "is_choice_type",
+  "min",
+  "max",
+  "is_required",
+  "regex",
+  "valueset_url",
+  "binding_strength",
+  "short",
+  "column_break_zvmg",
+  "fixed_value",
+  "pattern_value",
+  "default_value",
+  "target_profiles",
+  "section_break_irwq",
+  "definition"
+ ],
+ "fields": [
+  {
+   "columns": 5,
+   "fieldname": "path",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Path",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "datatype",
+   "fieldtype": "Code",
+   "in_list_view": 1,
+   "label": "Datatype"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_choice_type",
+   "fieldtype": "Check",
+   "label": "Is Choice Type"
+  },
+  {
+   "columns": 1,
+   "fieldname": "min",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Minimum Cardinality"
+  },
+  {
+   "columns": 1,
+   "fieldname": "max",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Maximum Cardinality"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "If Minimum Cardinality > 0",
+   "fieldname": "is_required",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Required"
+  },
+  {
+   "fieldname": "valueset_url",
+   "fieldtype": "Data",
+   "label": "Value Set URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "binding_strength",
+   "fieldtype": "Data",
+   "label": "Binding Strength"
+  },
+  {
+   "fieldname": "column_break_zvmg",
+   "fieldtype": "Column Break",
+   "search_index": 1
+  },
+  {
+   "fieldname": "short",
+   "fieldtype": "Text",
+   "label": "Short"
+  },
+  {
+   "fieldname": "regex",
+   "fieldtype": "Code",
+   "label": "Regex"
+  },
+  {
+   "fieldname": "fixed_value",
+   "fieldtype": "Code",
+   "label": "Fixed Value"
+  },
+  {
+   "fieldname": "pattern_value",
+   "fieldtype": "Code",
+   "label": "Pattern Value"
+  },
+  {
+   "fieldname": "default_value",
+   "fieldtype": "Code",
+   "label": "Default Value"
+  },
+  {
+   "fieldname": "target_profiles",
+   "fieldtype": "Code",
+   "label": "Target Profiles"
+  },
+  {
+   "fieldname": "section_break_irwq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "definition",
+   "fieldtype": "Text Editor",
+   "label": "Definition",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-12-25 11:37:52.409132",
+ "modified_by": "Administrator",
+ "module": "Interoperability",
+ "name": "FHIR Structure Definition Element",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
