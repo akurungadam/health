@@ -1,0 +1,106 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "beta": 1,
+ "creation": "2025-12-25 11:25:26.924712",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "element_name",
+  "datatype",
+  "is_choice_type",
+  "min",
+  "max",
+  "regex",
+  "valueset_url",
+  "binding_strength",
+  "column_break_qkae",
+  "target_profiles",
+  "short",
+  "definition"
+ ],
+ "fields": [
+  {
+   "fieldname": "element_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Element Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "regex",
+   "fieldtype": "Code",
+   "label": "Regex"
+  },
+  {
+   "fieldname": "valueset_url",
+   "fieldtype": "Data",
+   "label": "Valueset URL"
+  },
+  {
+   "fieldname": "binding_strength",
+   "fieldtype": "Data",
+   "label": "Binding Strength"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_choice_type",
+   "fieldtype": "Check",
+   "label": "Is Choice Type"
+  },
+  {
+   "fieldname": "column_break_qkae",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "min",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Min",
+   "search_index": 1
+  },
+  {
+   "fieldname": "max",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Max",
+   "search_index": 1
+  },
+  {
+   "fieldname": "target_profiles",
+   "fieldtype": "Code",
+   "label": "Target Profiles"
+  },
+  {
+   "fieldname": "short",
+   "fieldtype": "Text",
+   "label": "Short"
+  },
+  {
+   "fieldname": "definition",
+   "fieldtype": "Text",
+   "label": "Definition"
+  },
+  {
+   "fieldname": "datatype",
+   "fieldtype": "Code",
+   "in_list_view": 1,
+   "label": "Datatype"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-12-25 11:38:24.366995",
+ "modified_by": "Administrator",
+ "module": "Interoperability",
+ "name": "FHIR Datatype Element",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
