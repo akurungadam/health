@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import tarfile
 import tempfile
 from pathlib import Path
@@ -18,6 +19,7 @@ FHIR_SYSTEM_TYPE_MAP = {
 	"http://hl7.org/fhirpath/System.Date": "date",
 	"http://hl7.org/fhirpath/System.DateTime": "dateTime",
 }
+FHIR_PRIMITIVE_REGEX_EXTENSION_URL = "http://hl7.org/fhir/StructureDefinition/regex"
 
 
 class FHIRPackageImporter:
@@ -114,6 +116,10 @@ class FHIRPackageImporter:
 				frappe.log_error(f"Declared version '{declared_version}' vs expected '{self.version_name}'")
 
 	def _process_structure_definitions(self):
+		if not self.temp_dir or not self.package_root:
+			self._extract_archive()
+			self._validate_package_contents()
+
 		json_files = list(self.package_root.rglob("*.json"))
 		for path in json_files:
 			try:
@@ -258,52 +264,30 @@ class FHIRPackageImporter:
 		is_primitive = (sd_data.get("kind") or "").strip().lower() == "primitive-type"
 
 		existing_name = frappe.db.exists("FHIR Datatype", code)
-
 		if existing_name:
 			dt_doc = frappe.get_doc("FHIR Datatype", existing_name)
 			dt_doc.set("elements", [])
 		else:
 			dt_doc = frappe.new_doc("FHIR Datatype")
-			dt_doc.datatype = code
 
+		# parent fields
 		dt_doc.datatype = code
 		dt_doc.fhir_version = self.version_name
 		dt_doc.is_primitive = 1 if is_primitive else 0
 		dt_doc.status = sd_data.get("status")
 		dt_doc.url = sd_data.get("url")
 		dt_doc.description = sd_data.get("description")
-		dt_doc.regex = sd_data.get("regex")  # remove (?)
+		dt_doc.regex = self._extract_primitive_regex(sd_data) if is_primitive else None
 
 		# children
-		for base_row in self._extract_datatype_elements_from_sd(sd_data):
-			row = dict(base_row)
-			if "datatype" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
-				row["datatype"] = row.pop("type", None)
-
-			if "element" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
-				p = row.get("path") or ""
-				row["element"] = p.split(".")[-1] if p else None
-
-			child_fields = {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}
-			row = {k: v for k, v in row.items() if k in child_fields and v is not None}
+		for row in self._extract_datatype_elements_from_sd(sd_data):
 			dt_doc.append("elements", row)
 
+		# save (retry once if duplicate naming edge case)
 		try:
 			dt_doc.save(ignore_permissions=True)
-		except frappe.DuplicateEntryError:  # handle this better
-			dt_doc = frappe.get_doc("FHIR Datatype", code)
-			dt_doc.set("elements", [])
-			for base_row in self._extract_datatype_elements_from_sd(sd_data):
-				row = dict(base_row)
-				if "datatype" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
-					row["datatype"] = row.pop("type", None)
-				if "element" in {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}:
-					p = row.get("path") or ""
-					row["element"] = p.split(".")[-1] if p else None
-				child_fields = {df.fieldname for df in frappe.get_meta("FHIR Datatype Element").fields}
-				row = {k: v for k, v in row.items() if k in child_fields and v is not None}
-				dt_doc.append("elements", row)
-			dt_doc.save(ignore_permissions=True)
+		except frappe.DuplicateEntryError:  # ToDo: handle this better?
+			frappe.log_error(f"Duplicate Datatype found, did not save '{code}'")
 
 	def _extract_datatype_elements_from_sd(self, sd_data):
 		rows = []
@@ -327,8 +311,10 @@ class FHIRPackageImporter:
 
 				if isinstance(t, dict):
 					for ext in t.get("extension") or []:
-						if (ext.get("url") or "").endswith("regex"):
+						url = (ext.get("url") or "").strip()
+						if url == FHIR_PRIMITIVE_REGEX_EXTENSION_URL or url.endswith("/regex"):
 							regex_value = ext.get("valueString") or regex_value
+
 					if t.get("code") == "Reference" and t.get("targetProfile"):
 						target_profiles.extend(t.get("targetProfile") or [])
 
@@ -360,3 +346,65 @@ class FHIRPackageImporter:
 
 			rows.append(row)
 		return rows
+
+	def _iter_sd_elements(self, sd_data):
+		snapshot = (sd_data.get("snapshot") or {}).get("element") or []
+		if snapshot:
+			return snapshot
+		return (sd_data.get("differential") or {}).get("element") or []
+
+	def _extract_regex_from_type_extensions(self, element):
+		for t in element.get("type") or []:
+			if not isinstance(t, dict):
+				continue
+			for ext in t.get("extension") or []:
+				url = (ext.get("url") or "").strip()
+				if (
+					url == FHIR_PRIMITIVE_REGEX_EXTENSION_URL or url.endswith("/regex") or url.endswith("regex")
+				):
+					# usually valueString
+					val = ext.get("valueString")
+					if isinstance(val, str) and val.strip():
+						return val.strip()
+		return None
+
+	def _extract_regex_from_constraints(self, element):
+		for c in element.get("constraint") or []:
+			expr = (c.get("expression") or "").strip()
+			if not expr:
+				continue
+
+			# matches('...') or matches("...")
+			m = re.search(r"matches\(\s*'([^']+)'\s*\)", expr)
+			if m:
+				return (m.group(1) or "").strip()
+			m = re.search(r'matches\(\s*"([^"]+)"\s*\)', expr)
+			if m:
+				return (m.group(1) or "").strip()
+
+		return None
+
+	def _extract_primitive_regex(self, sd_data):
+		primitive_type = (sd_data.get("type") or "").strip()
+		if not primitive_type:
+			return None
+
+		needle_path = f"{primitive_type}.value"
+
+		for el in self._iter_sd_elements(sd_data):
+			path = (el.get("path") or "").strip()
+			el_id = (el.get("id") or "").strip()
+
+			# Prefer exact path match; tolerate id ending in ".value"
+			if path != needle_path and not el_id.endswith(".value"):
+				continue
+
+			regex_value = self._extract_regex_from_type_extensions(el)
+			if regex_value:
+				return regex_value
+
+			regex_value = self._extract_regex_from_constraints(el)
+			if regex_value:
+				return regex_value
+
+		return None
