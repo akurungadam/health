@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-31 16:37:24.079683",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "base_structure_definition",
+  "resource_type",
+  "column_break_fivu",
+  "profiles",
+  "section_break_czjt",
+  "sources",
+  "sources_html",
+  "section_break_wges",
+  "elements_map_html",
+  "element_maps"
+ ],
+ "fields": [
+  {
+   "fetch_from": "base_structure_definition.fhir_sd",
+   "fieldname": "resource_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Resource Type",
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_czjt",
+   "fieldtype": "Section Break",
+   "label": "Frappe Source DocTypes"
+  },
+  {
+   "fieldname": "section_break_wges",
+   "fieldtype": "Section Break",
+   "label": "Element Mappings"
+  },
+  {
+   "fieldname": "profiles",
+   "fieldtype": "Table",
+   "label": "FHIR Profiles",
+   "options": "FHIR Resource Map Profile"
+  },
+  {
+   "fieldname": "sources",
+   "fieldtype": "Table",
+   "label": "Sources",
+   "options": "FHIR Resource Map Source"
+  },
+  {
+   "fieldname": "elements_map_html",
+   "fieldtype": "HTML",
+   "label": "Elements Map HTML"
+  },
+  {
+   "fieldname": "element_maps",
+   "fieldtype": "Table",
+   "label": "Elements",
+   "options": "FHIR Resource Element Map"
+  },
+  {
+   "fieldname": "base_structure_definition",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Base Structure Definition",
+   "options": "FHIR Structure Definition"
+  },
+  {
+   "fieldname": "column_break_fivu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sources_html",
+   "fieldtype": "HTML",
+   "label": "Sources HTML"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-03 18:43:56.688030",
+ "modified_by": "Administrator",
+ "module": "Interoperability",
+ "name": "FHIR Resource Map",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
