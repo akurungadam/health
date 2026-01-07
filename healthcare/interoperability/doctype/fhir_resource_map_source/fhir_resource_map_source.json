@@ -6,35 +6,35 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "source_name",
-  "source_fieldname",
+  "source_doctype",
+  "source_key",
   "config"
  ],
  "fields": [
   {
-   "fieldname": "source_name",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Source Name",
-   "options": "DocType"
-  },
-  {
    "fieldname": "config",
    "fieldtype": "Code",
-   "in_list_view": 1,
    "label": "Config"
   },
   {
-   "fieldname": "source_fieldname",
+   "fieldname": "source_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source DocType",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "source_key",
    "fieldtype": "Data",
-   "label": "Source Fieldname"
+   "in_list_view": 1,
+   "label": "Source Key"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-04 10:32:01.964292",
+ "modified": "2026-01-06 19:39:02.332815",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Resource Map Source",

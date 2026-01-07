@@ -10,11 +10,16 @@
   "column_break_fivu",
   "profiles",
   "section_break_czjt",
+  "primary_doctype",
   "sources",
   "sources_html",
   "section_break_wges",
   "elements_map_html",
-  "element_maps"
+  "element_maps",
+  "compiled_mapping_tab",
+  "compiled_mapping",
+  "compiled_hash",
+  "compiled_at"
  ],
  "fields": [
   {
@@ -75,12 +80,38 @@
    "fieldname": "sources_html",
    "fieldtype": "HTML",
    "label": "Sources HTML"
+  },
+  {
+   "fieldname": "compiled_mapping_tab",
+   "fieldtype": "Tab Break",
+   "label": "Compiled Mapping"
+  },
+  {
+   "fieldname": "compiled_mapping",
+   "fieldtype": "Code",
+   "label": "Compiled Mapping"
+  },
+  {
+   "fieldname": "compiled_hash",
+   "fieldtype": "Data",
+   "label": "Compiled Hash"
+  },
+  {
+   "fieldname": "compiled_at",
+   "fieldtype": "Datetime",
+   "label": "Compiled At"
+  },
+  {
+   "fieldname": "primary_doctype",
+   "fieldtype": "Link",
+   "label": "Primary DocType",
+   "options": "DocType"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-03 18:43:56.688030",
+ "modified": "2026-01-06 12:32:18.906966",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Resource Map",
