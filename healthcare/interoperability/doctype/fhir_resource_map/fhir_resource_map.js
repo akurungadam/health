@@ -90,37 +90,47 @@ function add_buttons(frm) {
 		}
 	});
 
-	frm.add_custom_button(__("Preview Sources"), async () => {
+	frm.add_custom_button(__("Resolve Sources"), async () => {
 		const primaryName = await prompt_primary_name(frm);
-		console.log("primaryName:", primaryName);
-
 		if (!primaryName) return;
 
 		const res = await frappe.call({
-			method: "healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.preview_sources_runtime",
+			method: "run_doc_method",
 			args: {
-				fhir_resource_map: frm.doc.name,
-				primary_name: primaryName,
+				docs: frm.doc,
+				method: "resolve_sources_runtime",
+				args: {
+					primary_name: primaryName,
+					include_docs: 0, // set 1 if you want full docs back (heavy)
+					limit_per_source: 20,
+				},
 			},
 			freeze: true,
 			freeze_message: __("Resolving sources..."),
 		});
 
-		const out = res.message ?? res;
-		console.log("out:", out);
+		const out = res.message;
+		console.log("resolve_sources_runtime:", out);
 
-		render_preview_json_in_sources_html(frm, out);
+		// Basic viewer: show JSON in a dialog
+		frappe.msgprint({
+			title: __("Resolved Sources"),
+			message: `<pre style="max-height:60vh; overflow:auto">${frappe.utils.escape_html(
+				JSON.stringify(out, null, 2),
+			)}</pre>`,
+			wide: true,
+		});
 	});
 }
 
-function prompt_primary_name(frm) {
+async function prompt_primary_name(frm) {
 	const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
 	if (!primaryDoctype) {
 		frappe.msgprint(__("Set Primary DocType first."));
-		return Promise.resolve("");
+		return "";
 	}
 
-	return new Promise(resolve => {
+	return await new Promise(resolve => {
 		frappe.prompt(
 			[
 				{
@@ -131,36 +141,12 @@ function prompt_primary_name(frm) {
 					reqd: 1,
 				},
 			],
-			values => {
-				resolve(values?.primary_name ? String(values.primary_name).trim() : "");
-			},
-			__("Preview Sources"),
-			__("Preview"),
+			values => resolve((values.primary_name || "").trim()),
+			__("Resolve Sources"),
+			__("Resolve"),
 		);
 	});
 }
-
-function render_preview_json_in_sources_html(frm, payload) {
-	const field = frm.fields_dict.sources_html;
-	const wrapper = field && field.$wrapper;
-
-	if (!wrapper) {
-		frappe.msgprint(__("sources_html field not found on this form."));
-		return;
-	}
-
-	const pretty = safe_json_stringify(payload);
-
-	wrapper.empty().append(`
-		<div style="padding:12px;">
-			<div style="font-weight:600; margin-bottom:8px;">Preview</div>
-			<pre style="max-height:420px; overflow:auto; background:var(--control-bg); padding:12px; border-radius:8px; margin:0;">${frappe.utils.escape_html(
-				pretty,
-			)}</pre>
-		</div>
-	`);
-}
-
 /* ============================================================
    ELEMENTS MAP HTML (simple)
 ============================================================ */
@@ -431,18 +417,21 @@ function bind_row_events(frm, wrapper) {
 }
 
 /* ============================================================
-   Mapping dialog (minimal, meta-only field list)
+   Mapping dialog (Frappe Field + Fixed only)
+   - Removed Expression + JSON
+   - Show Doctype name instead of source key in "Source" select
 ============================================================ */
-
 async function open_mapping_dialog(frm, row) {
-	// ensure previous closes fully (prevents stacking)
 	await close_active_dialog(frm);
 
 	const sourcesIndex = build_sources_index(frm);
-	const sourceKeys = Object.keys(sourcesIndex);
 
 	const pointer = safe_json_parse(String(row.value_pointer || "").trim()) || {};
 	const pointerKind = String(pointer.kind || "").trim();
+
+	const sourceSelect = build_source_select_data(sourcesIndex);
+	const defaultKey = resolve_source_key_default(pointer, sourcesIndex);
+	const defaultLabel = sourceSelect.keyToLabel[defaultKey] || "";
 
 	const dialog = new frappe.ui.Dialog({
 		title: __("Map FHIR Element"),
@@ -467,17 +456,13 @@ async function open_mapping_dialog(frm, row) {
 				fieldtype: "Select",
 				fieldname: "mapping_type",
 				label: "Mapping Type",
-				options: "\nFrappe Field\nFixed\nExpression\nJSON",
+				options: "\nFrappe Field\nFixed",
 				default:
 					pointerKind === "field"
 						? "Frappe Field"
 						: pointerKind === "fixed"
 						  ? "Fixed"
-						  : pointerKind === "expr"
-						    ? "Expression"
-						    : pointerKind === "json"
-						      ? "JSON"
-						      : "",
+						  : "",
 				change: async () => {
 					apply_mapping_type_visibility(dialog);
 					await refresh_field_options(dialog, sourcesIndex);
@@ -488,8 +473,8 @@ async function open_mapping_dialog(frm, row) {
 				fieldtype: "Select",
 				fieldname: "source_key",
 				label: "Source",
-				options: ["", ...sourceKeys].join("\n"),
-				default: String(pointer.source || "primary"),
+				options: sourceSelect.labels.join("\n"),
+				default: defaultLabel,
 				change: async () => {
 					await refresh_field_options(dialog, sourcesIndex);
 				},
@@ -502,19 +487,7 @@ async function open_mapping_dialog(frm, row) {
 				options: [""].join("\n"),
 				default: String(pointer.path || row.frappe_field || ""),
 			},
-			{
-				fieldtype: "Data",
-				fieldname: "json_path",
-				label: "JSON Path",
-				default: String(pointer.path || ""),
-			},
-			{
-				fieldtype: "Code",
-				fieldname: "expression",
-				label: "Expression",
-				options: "JavaScript",
-				default: String(pointer.expr || row.expression || ""),
-			},
+
 			{
 				fieldtype: "Code",
 				fieldname: "fixed_value",
@@ -540,21 +513,21 @@ async function open_mapping_dialog(frm, row) {
 		primary_action_label: __("Apply"),
 		primary_action() {
 			const mappingType = String(dialog.get_value("mapping_type") || "").trim();
-			const sourceKey = String(dialog.get_value("source_key") || "").trim();
+
+			// label -> real key
+			const selectedLabel = String(dialog.get_value("source_key") || "").trim();
+			const sourceKey =
+				(dialog.__source_label_to_key || {})[selectedLabel] ||
+				resolve_source_key_default(pointer, sourcesIndex) ||
+				"";
 
 			let newPointer = null;
 
 			if (mappingType === "Frappe Field") {
 				const fieldname = String(dialog.get_value("frappe_field") || "").trim();
-				if (sourceKey && fieldname)
+				if (sourceKey && fieldname) {
 					newPointer = { kind: "field", source: sourceKey, path: fieldname };
-			} else if (mappingType === "JSON") {
-				const path = String(dialog.get_value("json_path") || "").trim();
-				if (sourceKey && path)
-					newPointer = { kind: "json", source: sourceKey, path };
-			} else if (mappingType === "Expression") {
-				const expr = String(dialog.get_value("expression") || "").trim();
-				if (expr) newPointer = { kind: "expr", source: sourceKey || "", expr };
+				}
 			} else if (mappingType === "Fixed") {
 				const raw = String(dialog.get_value("fixed_value") || "").trim();
 				if (raw)
@@ -567,18 +540,20 @@ async function open_mapping_dialog(frm, row) {
 
 			row.value_pointer = newPointer ? JSON.stringify(newPointer) : "";
 			row.mapping_type = mappingType || "";
+
 			row.frappe_field =
 				mappingType === "Frappe Field"
 					? String(dialog.get_value("frappe_field") || "")
 					: "";
-			row.expression =
-				mappingType === "Expression"
-					? String(dialog.get_value("expression") || "")
-					: "";
+
 			row.fixed_value =
 				mappingType === "Fixed"
 					? String(dialog.get_value("fixed_value") || "")
 					: "";
+
+			row.expression = "";
+			row.json_path = "";
+
 			row.default_value = String(dialog.get_value("default_value") || "") || "";
 
 			frm.dirty();
@@ -589,14 +564,15 @@ async function open_mapping_dialog(frm, row) {
 		},
 	});
 
-	// track active
+	// stash label<->key maps on dialog (used by refresh_field_options)
+	dialog.__source_label_to_key = sourceSelect.labelToKey;
+	dialog.__source_key_to_label = sourceSelect.keyToLabel;
+
 	frm._active_mapping_dialog = dialog;
 	frm._active_mapping_row = row;
 
-	// attach keyboard nav for this dialog
 	attach_keyboard_navigation(frm, dialog);
 
-	// clear active references when hidden
 	if (dialog.$wrapper) {
 		dialog.$wrapper.one("hidden.bs.modal.fhir_map_nav_clear", () => {
 			if (frm._active_mapping_dialog === dialog) {
@@ -609,9 +585,16 @@ async function open_mapping_dialog(frm, row) {
 	dialog.show();
 
 	apply_mapping_type_visibility(dialog);
+
+	if (pointerKind === "field") {
+		const existingKey = String(pointer.source || "").trim();
+		const label = dialog.__source_key_to_label?.[existingKey];
+		if (label) dialog.set_value("source_key", label);
+	}
+
+	// populate frappe_field options based on selected source
 	refresh_field_options(dialog, sourcesIndex);
 
-	// optional footer hint
 	append_keyboard_hint(dialog);
 }
 
@@ -620,8 +603,6 @@ function apply_mapping_type_visibility(dialog) {
 
 	set_dialog_hidden(dialog, "source_key", true);
 	set_dialog_hidden(dialog, "frappe_field", true);
-	set_dialog_hidden(dialog, "json_path", true);
-	set_dialog_hidden(dialog, "expression", true);
 	set_dialog_hidden(dialog, "fixed_value", true);
 	set_dialog_hidden(dialog, "default_value", !mappingType);
 
@@ -632,16 +613,7 @@ function apply_mapping_type_visibility(dialog) {
 		set_dialog_hidden(dialog, "frappe_field", false);
 		return;
 	}
-	if (mappingType === "JSON") {
-		set_dialog_hidden(dialog, "source_key", false);
-		set_dialog_hidden(dialog, "json_path", false);
-		return;
-	}
-	if (mappingType === "Expression") {
-		set_dialog_hidden(dialog, "source_key", false);
-		set_dialog_hidden(dialog, "expression", false);
-		return;
-	}
+
 	if (mappingType === "Fixed") {
 		set_dialog_hidden(dialog, "fixed_value", false);
 		return;
@@ -659,17 +631,22 @@ async function refresh_field_options(dialog, sourcesIndex) {
 	const mappingType = String(dialog.get_value("mapping_type") || "").trim();
 	if (mappingType !== "Frappe Field") {
 		set_select_options(dialog, "frappe_field", [""]);
+		dialog.__resolved_source_key = "";
 		return;
 	}
 
-	const sourceKey = String(dialog.get_value("source_key") || "").trim();
-	const doctype = String(sourcesIndex[sourceKey]?.doctype || "").trim();
+	const label = String(dialog.get_value("source_key") || "").trim();
+	const labelToKey = dialog.__source_label_to_key || {};
+	const key = labelToKey[label] || resolve_source_key_default({}, sourcesIndex);
+
+	dialog.__resolved_source_key = key;
+
+	const doctype = String(sourcesIndex[key]?.doctype || "").trim();
 	if (!doctype) {
 		set_select_options(dialog, "frappe_field", [""]);
 		return;
 	}
 
-	// meta-only list (fast + stable)
 	await frappe.model.with_doctype(doctype);
 	const meta = frappe.get_meta(doctype);
 
@@ -689,6 +666,7 @@ async function refresh_field_options(dialog, sourcesIndex) {
 			].includes(df.fieldtype)
 		)
 			continue;
+
 		options.push(df.fieldname);
 	}
 
@@ -723,6 +701,66 @@ function build_sources_index(frm) {
 	}
 
 	return sourcesIndex;
+}
+
+function build_source_select_options(sourcesIndex) {
+	// show doctype names in dropdown, but keep values as source_key (value|label)
+	const opts = [""];
+	const entries = Object.entries(sourcesIndex);
+
+	entries.sort((a, b) => {
+		const ap = a[0] === "primary" ? 0 : 1;
+		const bp = b[0] === "primary" ? 0 : 1;
+		if (ap !== bp) return ap - bp;
+		return String(a[1].doctype || "").localeCompare(String(b[1].doctype || ""));
+	});
+
+	for (const [key, info] of entries) {
+		const label = key === "primary" ? `${info.doctype} (Primary)` : info.doctype;
+		opts.push(`${key}|${label}`);
+	}
+
+	return opts;
+}
+
+function build_source_select_data(sourcesIndex) {
+	// returns:
+	// - labels: array of displayed options
+	// - labelToKey: map label -> source_key
+	// - keyToLabel: map source_key -> label
+	const labels = [""];
+	const labelToKey = {};
+	const keyToLabel = {};
+
+	const entries = Object.entries(sourcesIndex);
+
+	// primary first
+	entries.sort((a, b) => {
+		const ap = a[0] === "primary" ? 0 : 1;
+		const bp = b[0] === "primary" ? 0 : 1;
+		if (ap !== bp) return ap - bp;
+		return String(a[1].doctype || "").localeCompare(String(b[1].doctype || ""));
+	});
+
+	for (const [key, info] of entries) {
+		const dt = String(info.doctype || "").trim();
+		if (!dt) continue;
+
+		const label = key === "primary" ? `${dt} (Primary)` : dt;
+
+		labels.push(label);
+		labelToKey[label] = key;
+		keyToLabel[key] = label;
+	}
+
+	return { labels, labelToKey, keyToLabel };
+}
+
+function resolve_source_key_default(pointer, sourcesIndex) {
+	const desired = String(pointer?.source || "").trim();
+	if (desired && sourcesIndex[desired]) return desired;
+	if (sourcesIndex.primary) return "primary";
+	return Object.keys(sourcesIndex)[0] || "";
 }
 
 /* ============================================================
@@ -874,13 +912,21 @@ function mapping_summary(row) {
 
 	const kind = String(pointer.kind || "").trim();
 
-	if (kind === "field" || kind === "json") {
-		return `<span class="text-muted">${escape_html(
-			pointer.source || "source",
-		)}</span> → ${escape_html(pointer.path || "")}`;
+	if (kind === "field") {
+		// show doctype name instead of source key if we can infer it
+		let label = String(pointer.source || "source");
+		try {
+			const sourcesIndex = build_sources_index(cur_frm);
+			const dt = sourcesIndex?.[pointer.source]?.doctype;
+			if (dt) label = pointer.source === "primary" ? `${dt} (Primary)` : dt;
+		} catch (e) {}
+		return `<span class="text-muted">${escape_html(label)}</span> → ${escape_html(
+			pointer.path || "",
+		)}`;
 	}
+
 	if (kind === "fixed") return `<span class="text-muted">Fixed</span>`;
-	if (kind === "expr") return `<span class="text-muted">Expression</span>`;
+
 	return `<span class="text-muted">Mapped</span>`;
 }
 
