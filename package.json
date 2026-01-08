@@ -6,8 +6,8 @@
   "private": true,
   "workspaces": ["patient_portal", "frappe-ui"],
   "scripts": {
-      "postinstall": "install_portal && install_viewer",
-      "build": "build_portal && build_viewer",
+      "postinstall": "yarn install_portal && yarn install_viewer",
+      "build": "yarn build_portal && yarn build_viewer",
       "install_portal": "cd patient_portal && yarn install --check-files",
       "install_viewer": "cd viewer && yarn install",
       "build_portal": "cd patient_portal && yarn build",
