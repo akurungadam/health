@@ -91,25 +91,32 @@ function add_buttons(frm) {
 	});
 
 	frm.add_custom_button(__("Resolve Sources"), async () => {
-		const primaryName = await prompt_primary_name(frm);
+		const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
+		if (!primaryDoctype) {
+			frappe.msgprint({
+				title: __("Missing config"),
+				message: __("Set Primary DocType first."),
+				indicator: "red",
+			});
+			return;
+		}
+
+		const primaryName = await prompt_primary_name(primaryDoctype);
 		if (!primaryName) return;
 
 		const res = await frappe.call({
-			method: "run_doc_method",
+			doc: frm.doc,
+			method: "resolve_sources_runtime",
 			args: {
-				docs: frm.doc,
-				method: "resolve_sources_runtime",
-				args: {
-					primary_name: primaryName,
-					include_docs: 0, // set 1 if you want full docs back (heavy)
-					limit_per_source: 20,
-				},
+				primary_name: primaryName,
+				include_docs: 0, // set 1 if you want full docs back (heavy)
+				limit_per_source: 20,
 			},
 			freeze: true,
 			freeze_message: __("Resolving sources..."),
 		});
 
-		const out = res.message;
+		const out = res.message || {};
 		console.log("resolve_sources_runtime:", out);
 
 		// Basic viewer: show JSON in a dialog
@@ -123,14 +130,8 @@ function add_buttons(frm) {
 	});
 }
 
-async function prompt_primary_name(frm) {
-	const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
-	if (!primaryDoctype) {
-		frappe.msgprint(__("Set Primary DocType first."));
-		return "";
-	}
-
-	return await new Promise(resolve => {
+async function prompt_primary_name(primaryDoctype) {
+	return new Promise(resolve => {
 		frappe.prompt(
 			[
 				{
@@ -141,12 +142,19 @@ async function prompt_primary_name(frm) {
 					reqd: 1,
 				},
 			],
-			values => resolve((values.primary_name || "").trim()),
-			__("Resolve Sources"),
+			values => {
+				const primaryName =
+					values && values.primary_name
+						? String(values.primary_name).trim()
+						: "";
+				resolve(primaryName);
+			},
+			__("Select Primary Document"),
 			__("Resolve"),
 		);
 	});
 }
+
 /* ============================================================
    ELEMENTS MAP HTML (simple)
 ============================================================ */
