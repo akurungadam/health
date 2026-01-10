@@ -1,3 +1,6 @@
+# Copyright (c) 2025, earthians Health Informatics Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
 import hashlib
 import json
 
@@ -5,12 +8,18 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import cint, now_datetime
 
+from healthcare.interoperability.fhir_engine.fhir_datatype_expander import FHIRDatatypeExpander
+
 
 class FHIRSourceCompilationError(Exception):
 	pass
 
 
 class FHIRResourceMap(Document):
+	# =========================================================
+	# Lifecycle
+	# =========================================================
+
 	def validate(self):
 		self.compile_mapping()
 
@@ -26,8 +35,17 @@ class FHIRResourceMap(Document):
 				"compiled_at": str(now_datetime()),
 			},
 			"sources": compiled_sources,
-			"elements": compiled_elements["elements"],
-			"element_order": compiled_elements["element_order"],
+			"elements_by_path": compiled_elements.get("elements_by_path") or {},
+			"element_order": compiled_elements.get("element_order") or [],
+			"repeating_containers": compiled_elements.get("repeating_containers") or {},
+			# IMPORTANT:
+			# runtime_plan is intentionally disabled because it cannot represent nested repeating arrays
+			# correctly (e.g., Patient.identifier.type.coding inside Patient.identifier[]).
+			# The generator should build arrays/objects at runtime from:
+			# elements_by_path + element_order + repeating_containers.
+			"runtime_plan": [],
+			"compile_warnings": compiled_elements.get("compile_warnings") or [],
+			"warnings": compiled_elements.get("warnings") or [],
 		}
 
 		compiled_json = json.dumps(
@@ -42,10 +60,13 @@ class FHIRResourceMap(Document):
 		self.compiled_hash = hashlib.sha256(compiled_json.encode("utf-8")).hexdigest()
 		self.compiled_at = now_datetime()
 
+	# =========================================================
+	# Sources compilation
+	# =========================================================
+
 	def compile_sources_to_compiled_mapping(self):
 		compiled_sources = {}
 
-		# implicit primary
 		primary_doctype = (self.primary_doctype or "").strip()
 		if primary_doctype:
 			compiled_sources["primary"] = {
@@ -57,14 +78,12 @@ class FHIRResourceMap(Document):
 		for row in self.get("sources") or []:
 			source_key = (row.get("source_key") or "").strip()
 			source_doctype = (row.get("source_doctype") or "").strip()
-
 			if not source_key or not source_doctype:
 				continue
 
-			config = self._parse_source_config(row.get("config"))
+			config = self._parse_source_config(row.get("config"), source_key=source_key)
 			config = self._normalize_source_config(config)
 
-			# sanity: kinds that depend on another source must specify from_source_key
 			kind = (config.get("kind") or "").strip()
 			if kind in ("direct_link", "reverse_link", "dynamic_link"):
 				from_key = (config.get("from_source_key") or "").strip()
@@ -79,7 +98,7 @@ class FHIRResourceMap(Document):
 				"config": config,
 			}
 
-		# validate source graph references (catch typos early)
+		# validate references (catch typos early)
 		for key, src in compiled_sources.items():
 			cfg = src.get("config") or {}
 			from_key = (cfg.get("from_source_key") or "").strip()
@@ -90,71 +109,96 @@ class FHIRResourceMap(Document):
 
 		return compiled_sources
 
-	def compile_elements_to_compiled_mapping(
-		self,
-		compiled_sources,
-		include_unmapped=0,
-	):
+	# =========================================================
+	# Elements compilation
+	# =========================================================
+
+	def compile_elements_to_compiled_mapping(self, compiled_sources, include_unmapped=0):
 		if not isinstance(compiled_sources, dict):
 			compiled_sources = {}
 
-		out_elements = {}
-		out_order = []
+		elements_by_path = {}
+		element_order = []
 		warnings = []
+		compile_warnings = []
+
+		# repeating containers should be based on SD overlay, not just mapped rows
+		repeating_containers = self.build_repeating_containers(
+			{
+				"meta": {
+					"resource_type": (self.resource_type or "").strip(),
+					"base_structure_definition": (self.base_structure_definition or "").strip(),
+				},
+				"elements_by_path": {},
+			}
+		)
 
 		for row in self.get("element_maps") or []:
 			element = self._compile_one_element_row(row)
-			if not element or not isinstance(element, dict):
+			if not element:
 				continue
 
 			fhir_path = (element.get("fhir_path") or "").strip()
 			if not fhir_path:
 				continue
 
-			# Only compile mapped elements by default
 			pointer = element.get("value_pointer")
+
+			# unmapped handling
 			if not pointer:
 				if include_unmapped:
-					# keep but explicitly null pointer
 					element["value_pointer"] = None
-					out_elements[fhir_path] = element
-					out_order.append(fhir_path)
+					elements_by_path[fhir_path] = element
+					element_order.append(fhir_path)
 				continue
 
-			# normalize pointer.source to a source key when user stored doctype name
+			# normalize pointer source safely
 			pointer = self._normalize_pointer_source_safe(pointer, compiled_sources)
 			element["value_pointer"] = pointer
 
-			# validate pointer usability
 			ok, reason = self._is_pointer_usable_safe(pointer, compiled_sources)
 			if not ok:
-				# mapped but invalid: skip + warn
 				warnings.append(f"Skip '{fhir_path}': {reason}")
 				continue
 
-			# store
-			out_elements[fhir_path] = element
-			out_order.append(fhir_path)
+			# warn if someone mapped a repeating container directly (e.g., Patient.generalPractitioner)
+			# This is not “wrong”, but your generator must decide how to build the complex datatype item(s).
+			if repeating_containers.get(fhir_path):
+				compile_warnings.append(
+					{
+						"fhir_path": fhir_path,
+						"warning": (
+							f"'{fhir_path}' is a repeating container (max='*'). "
+							"Mapping it directly means the generator must build array item object(s) "
+							"(e.g., Reference/ContactPoint/etc.) at runtime."
+						),
+					}
+				)
+
+			elements_by_path[fhir_path] = element
+			element_order.append(fhir_path)
 
 		return {
-			"elements": out_elements,
-			"element_order": out_order,
+			"elements_by_path": elements_by_path,
+			"element_order": element_order,
+			"repeating_containers": repeating_containers,
+			"compile_warnings": compile_warnings,
 			"warnings": warnings,
 		}
 
-	# -------------------------
-	# Internals
-	# -------------------------
+	# =========================================================
+	# Pointer helpers
+	# =========================================================
 
 	def _normalize_pointer_source_safe(self, pointer, compiled_sources):
 		"""
-		If pointer.kind == 'field' and pointer.source is a doctype name, map it to a source key.
+		If pointer.kind == 'field' and pointer.source is a doctype name,
+		translate it to a compiled source key.
 		"""
 		if not pointer or not isinstance(pointer, dict):
 			return pointer
 
-		kind = (pointer.get("kind") or "").strip()
-		if kind != "field":
+		if (pointer.get("kind") or "").strip() != "field":
 			return pointer
 
 		source = (pointer.get("source") or "").strip()
@@ -165,7 +209,7 @@ class FHIRResourceMap(Document):
 		if source in compiled_sources:
 			return pointer
 
-		# try doctype match
+		# doctype match
 		for key, src in compiled_sources.items():
 			if not isinstance(src, dict):
 				continue
@@ -177,8 +221,7 @@ class FHIRResourceMap(Document):
 
 	def _is_pointer_usable_safe(self, pointer, compiled_sources):
 		"""
-		Return (ok, reason)
-		Supports kinds: field, fixed
+		Return (ok, reason). Supports kinds: field, fixed.
 		"""
 		if not pointer or not isinstance(pointer, dict):
 			return (False, "value_pointer is not a dict")
@@ -193,7 +236,6 @@ class FHIRResourceMap(Document):
 		if kind == "field":
 			source = (pointer.get("source") or "").strip()
 			path = (pointer.get("path") or "").strip()
-
 			if not source:
 				return (False, "field pointer missing 'source'")
 			if not path:
@@ -205,12 +247,16 @@ class FHIRResourceMap(Document):
 
 		return (False, f"unsupported kind '{kind}'")
 
+	# =========================================================
+	# Element row compiler
+	# =========================================================
+
 	def _compile_one_element_row(self, row):
 		fhir_path = (row.get("fhir_path") or "").strip()
-		datatype = (row.get("datatype") or "").strip()
-		max_value = (row.get("max") or "").strip()
-		min_value = cint(row.get("min"))
+		if not fhir_path:
+			return None
 
+		min_value = cint(row.get("min"))
 		value_pointer = self._parse_value_pointer((row.get("value_pointer") or "").strip())
 		if value_pointer:
 			self._validate_pointer(value_pointer, fhir_path=fhir_path)
@@ -221,49 +267,40 @@ class FHIRResourceMap(Document):
 		else:
 			is_required = 1 if min_value >= 1 else 0
 
-		target_profiles = self._parse_json_list(row.get("target_profiles"))
-
 		return {
 			# identity
 			"element_row_name": row.get("name"),
 			"idx": cint(row.get("idx")),
 			"fhir_path": fhir_path,
-			# schema facts
-			"datatype": datatype,
+			# schema
+			"datatype": (row.get("datatype") or "").strip(),
 			"min": min_value,
-			"max": max_value,
-			# flags (keep your naming consistent with element_maps rows)
+			"max": str(row.get("max") or "").strip(),
+			# flags
 			"is_required": is_required,
 			"is_choice_type": 1 if "[x]" in fhir_path else 0,
-			# docs/metadata
+			# docs/terminology
 			"short": (row.get("short") or "").strip(),
-			# "definition": (row.get("definition") or "").strip(),
-			# terminology
 			"binding_strength": (row.get("binding_strength") or "").strip() or None,
 			"valueset_url": (row.get("valueset_url") or "").strip() or None,
-			"target_profiles": target_profiles,
-			# profile marker
+			"target_profiles": self._parse_json_list(row.get("target_profiles")),
 			"profile": (row.get("profile") or "").strip() or None,
 			# mapping
 			"value_pointer": value_pointer,
-			# optional mapping fields (keep them because UI + debugging)
+			# optional mapping fields (kept for UI/debug; not required by plan)
 			"frappe_field": (row.get("frappe_field") or "").strip() or None,
 			"fixed_value": (row.get("fixed_value") or "").strip() or None,
 			"default_value": (row.get("default_value") or "").strip() or None,
 			"pattern_value": (row.get("pattern_value") or "").strip() or None,
 		}
 
+	# =========================================================
+	# JSON parsing helpers
+	# =========================================================
+
 	def _parse_source_config(self, raw, source_key=""):
-		"""
-		Config must be a JSON object (dict). Accepts:
-		- empty -> {}
-		- dict -> dict
-		- string JSON object -> dict
-		"""
 		if raw is None:
 			return {}
-
-		# Sometimes Frappe may already give dict (rare). Accept it.
 		if isinstance(raw, dict):
 			return raw
 
@@ -273,10 +310,10 @@ class FHIRResourceMap(Document):
 
 		try:
 			val = json.loads(text)
-		except Exception as e:
+		except Exception as exc:
 			snippet = text[:250].replace("\n", "\\n")
 			raise FHIRSourceCompilationError(
-				f"Source '{source_key}': config is not valid JSON object. Error: {e}. Raw: {snippet}"
+				f"Source '{source_key}': config is not valid JSON object. Error: {exc}. Raw: {snippet}"
 			)
 
 		if not isinstance(val, dict):
@@ -287,21 +324,15 @@ class FHIRResourceMap(Document):
 		return val
 
 	def _normalize_source_config(self, config):
-		"""
-		Normalize keys + defaults. Keep only supported keys to avoid garbage.
-		"""
 		kind = (config.get("kind") or "").strip() or None
-
 		out = {"kind": kind}
 
-		# common keys (for direct/reverse)
 		if config.get("from_source_key") is not None:
 			out["from_source_key"] = str(config.get("from_source_key") or "").strip() or None
 
 		if config.get("link_fieldname") is not None:
 			out["link_fieldname"] = str(config.get("link_fieldname") or "").strip() or None
 
-		# filters_json: allow dict or JSON string
 		filters_json = config.get("filters_json")
 		if isinstance(filters_json, dict):
 			out["filters_json"] = filters_json
@@ -314,16 +345,14 @@ class FHIRResourceMap(Document):
 		else:
 			out["filters_json"] = None
 
-		# order_by default
-		order_by = self._normalize_order_by(config.get("order_by"))
-		out["order_by"] = order_by or "creation desc"
+		out["order_by"] = self._normalize_order_by(config.get("order_by")) or "creation desc"
 
 		# dynamic_link specific
-		for k in ("parenttype", "parentfield", "link_doctype"):
-			if config.get(k) is not None:
-				out[k] = str(config.get(k) or "").strip() or None
+		for key in ("parenttype", "parentfield", "link_doctype"):
+			if config.get(key) is not None:
+				out[key] = str(config.get(key) or "").strip() or None
 
-		# basic validation per kind
+		# validate per kind
 		if out["kind"] == "dynamic_link":
 			if not out.get("parenttype") or not out.get("parentfield") or not out.get("link_doctype"):
 				raise FHIRSourceCompilationError(
@@ -342,15 +371,15 @@ class FHIRResourceMap(Document):
 		try:
 			val = json.loads(raw)
 		except Exception:
-			# strict? raise instead
 			return None
+
 		if not isinstance(val, dict):
 			return None
+
 		kind = (val.get("kind") or "").strip()
 		if not kind:
 			return None
 
-		# normalize
 		val["kind"] = kind
 		if "source" in val and val["source"] is not None:
 			val["source"] = str(val.get("source") or "").strip()
@@ -384,29 +413,19 @@ class FHIRResourceMap(Document):
 			return []
 		if isinstance(raw, list):
 			return [str(x).strip() for x in raw if str(x).strip()]
+
 		text = str(raw).strip()
 		if not text:
 			return []
+
 		try:
 			val = json.loads(text)
 			if isinstance(val, list):
 				return [str(x).strip() for x in val if str(x).strip()]
 		except Exception:
 			pass
-		# fallback comma-separated
+
 		return [x.strip() for x in text.split(",") if x.strip()]
-		if not raw:
-			return None
-		if isinstance(raw, dict):
-			return raw
-		text = str(raw).strip()
-		if not text:
-			return None
-		try:
-			val = json.loads(text)
-			return val if isinstance(val, dict) else None
-		except Exception:
-			return None
 
 	def _normalize_order_by(self, value):
 		"""
@@ -418,11 +437,9 @@ class FHIRResourceMap(Document):
 		if value is None:
 			return ""
 
-		# already a string
 		if isinstance(value, str):
 			return value.strip()
 
-		# list/tuple of strings
 		if isinstance(value, (list, tuple)):
 			parts = []
 			for item in value:
@@ -437,14 +454,45 @@ class FHIRResourceMap(Document):
 					parts.append(item)
 			return ", ".join(parts)
 
-		# anything else is invalid
 		raise FHIRSourceCompilationError(
 			f"config.order_by must be a string or list of strings, got: {type(value)}"
 		)
 
-	# =========================
-	# Preview
-	# =========================
+	# =========================================================
+	# Compile-time repeating container extraction
+	# =========================================================
+
+	def build_repeating_containers(self, compiled):
+		"""
+		Return dict of repeating array paths (max="*") based on StructureDefinition overlay.
+		"""
+		meta = compiled.get("meta") or {}
+		base_sd = (meta.get("base_structure_definition") or "").strip()
+
+		if not base_sd:
+			# fallback: best-effort from compiled elements_by_path
+			elements_by_path = compiled.get("elements_by_path") or {}
+			repeating = {}
+			for fhir_path, element in (elements_by_path or {}).items():
+				if isinstance(element, dict) and str(element.get("max") or "").strip() == "*":
+					repeating[fhir_path] = 1
+			return repeating
+
+		rows = self.get_elements_from_structure_definitions(base_sd) or []
+		repeating = {}
+		for row in rows:
+			path = (row.get("fhir_path") or "").strip()
+			if not path:
+				continue
+			if str(row.get("max") or "").strip() == "*":
+				repeating[path] = 1
+
+		return repeating
+
+	# =========================================================
+	# Runtime source resolution (preview + generator)
+	# =========================================================
+
 	@frappe.whitelist()
 	def resolve_sources_runtime(
 		self,
@@ -453,15 +501,6 @@ class FHIRResourceMap(Document):
 		include_docs=1,
 		limit_per_source=20,
 	):
-		"""
-		Resolve all sources for a given primary document name.
-		- Used by client button (preview) and by resource generator (runtime).
-		- Returns a single dict with resolved docs + errors.
-
-		IMPORTANT:
-		- Internally we ALWAYS store resolved docs as Frappe Document objects.
-		- We only convert to {"name": ...} at the very end if include_docs == 0.
-		"""
 		primary_name = (primary_name or "").strip()
 		if not primary_name:
 			frappe.throw("primary_name is required")
@@ -471,24 +510,12 @@ class FHIRResourceMap(Document):
 
 		compiled = self._load_compiled_mapping(compiled_mapping_json)
 		sources = compiled.get("sources") or {}
-
-		# normalize sources into dict
-		if isinstance(sources, str):
-			try:
-				sources = json.loads(sources or "{}")
-			except Exception:
-				sources = {}
 		if not isinstance(sources, dict):
 			frappe.throw(f"sources must be a dict, got {type(sources)}")
 
-		# -------------------------
-		# primary: assume always "primary"
-		# (as per your current compiled format)
-		# -------------------------
 		primary_source_key = "primary"
 		primary_row = sources.get(primary_source_key) or {}
 		primary_doctype = (primary_row.get("doctype") or "").strip()
-
 		if not primary_doctype:
 			frappe.throw("compiled_mapping is missing primary_doctype (sources.primary.doctype)")
 
@@ -497,7 +524,6 @@ class FHIRResourceMap(Document):
 		errors = []
 		resolved_docs = {primary_source_key: [primary_doc]}
 
-		# resolve other sources
 		for source_key, source_row in sources.items():
 			if source_key == primary_source_key:
 				continue
@@ -517,18 +543,14 @@ class FHIRResourceMap(Document):
 				if not from_docs:
 					raise Exception(f"from_source_key '{from_source_key}' not resolved")
 
-				# For now: first doc is anchor
 				from_doc = from_docs[0]
-
 				docs = self._resolve_one_source_docs(
-					source_key=source_key,
 					doctype=doctype,
 					config=config,
 					from_doc=from_doc,
 					limit_per_source=limit_per_source,
 				)
 
-				# Ensure list
 				if docs is None:
 					docs = []
 				if not isinstance(docs, list):
@@ -539,21 +561,18 @@ class FHIRResourceMap(Document):
 			except Exception as exc:
 				errors.append({"source_key": source_key, "error": str(exc)})
 
-		# -------------------------
-		# build response payload last
-		# -------------------------
 		resolved = {}
-		for k, docs in resolved_docs.items():
-			row = sources.get(k) or {}
+		for key, docs in resolved_docs.items():
+			row = sources.get(key) or {}
 			doctype = (row.get("doctype") or "").strip() or (
-				primary_doctype if k == primary_source_key else ""
+				primary_doctype if key == primary_source_key else ""
 			)
 			kind = ((row.get("config") or {}).get("kind") or "").strip() or (
-				"primary" if k == primary_source_key else ""
+				"primary" if key == primary_source_key else ""
 			)
 
-			resolved[k] = self._make_resolved_payload(
-				key=k,
+			resolved[key] = self._make_resolved_payload(
+				key=key,
 				doctype=doctype,
 				kind=kind,
 				docs=docs,
@@ -561,14 +580,14 @@ class FHIRResourceMap(Document):
 			)
 
 		return {
-			"primary": {"doctype": primary_doctype, "name": primary_name, "source_key": primary_source_key},
+			"primary": {
+				"doctype": primary_doctype,
+				"name": primary_name,
+				"source_key": primary_source_key,
+			},
 			"resolved": resolved,
 			"errors": errors,
 		}
-
-	# ----------------------------
-	# preview helpers
-	# ----------------------------
 
 	def _load_compiled_mapping(self, compiled_mapping_json=None):
 		if compiled_mapping_json:
@@ -577,8 +596,7 @@ class FHIRResourceMap(Document):
 			return compiled_mapping_json
 
 		if not self.compiled_mapping:
-			# compile on demand
-			self.compile_map()
+			self.compile_mapping()
 
 		return json.loads(self.compiled_mapping or "{}")
 
@@ -591,14 +609,14 @@ class FHIRResourceMap(Document):
 			"count": len(docs),
 		}
 
-		out["docs"] = docs
-		# if include_docs:
-		# 	out["docs"] = docs
-		# else:
-		# 	out["docs"] = [{"name": d.name} for d in docs]
+		if include_docs:
+			out["docs"] = docs
+		else:
+			out["docs"] = [{"name": d.name} for d in docs]
+
 		return out
 
-	def _resolve_one_source_docs(self, source_key, doctype, config, from_doc, limit_per_source):
+	def _resolve_one_source_docs(self, doctype, config, from_doc, limit_per_source):
 		kind = (config.get("kind") or "").strip()
 
 		if kind == "direct_link":
@@ -621,7 +639,6 @@ class FHIRResourceMap(Document):
 		if not value:
 			return []
 
-		# If field is a Link to the target doctype, the value is name
 		try:
 			return [frappe.get_doc(doctype, value)]
 		except Exception:
@@ -634,7 +651,6 @@ class FHIRResourceMap(Document):
 
 		order_by = (config.get("order_by") or "").strip() or "creation desc"
 		filters = self._parse_filters_json(config.get("filters_json"))
-
 		filters[link_fieldname] = from_doc.name
 
 		names = frappe.get_all(
@@ -644,10 +660,9 @@ class FHIRResourceMap(Document):
 			order_by=order_by,
 			limit_page_length=limit_per_source,
 		)
-		return [frappe.get_doc(doctype, r["name"]) for r in names]
+		return [frappe.get_doc(doctype, row["name"]) for row in names]
 
 	def _resolve_dynamic_link_docs(self, doctype, config, from_doc, limit_per_source):
-		# Dynamic Link rows live in `tabDynamic Link` with fields: link_doctype, link_name, parent, parenttype, parentfield
 		link_doctype = (config.get("link_doctype") or "").strip()
 		parenttype = (config.get("parenttype") or "").strip()
 		parentfield = (config.get("parentfield") or "").strip()
@@ -656,9 +671,8 @@ class FHIRResourceMap(Document):
 		if not link_doctype or not parenttype or not parentfield:
 			raise Exception("dynamic_link: link_doctype, parenttype, parentfield are required")
 
-		# NOTE: This is Dynamic Link doctype. It's how Frappe models “links”.
 		rows = frappe.get_all(
-			"Dynamic Link",  # TODO remove hard coding
+			"Dynamic Link",
 			filters={
 				"link_doctype": link_doctype,
 				"link_name": from_doc.name,
@@ -670,11 +684,10 @@ class FHIRResourceMap(Document):
 			limit_page_length=limit_per_source,
 		)
 
-		parent_names = [r["parent"] for r in rows if r.get("parent")]
+		parent_names = [row["parent"] for row in rows if row.get("parent")]
 		if not parent_names:
 			return []
 
-		# parent_names are Contact names in your example
 		return [frappe.get_doc(doctype, name) for name in parent_names]
 
 	def _parse_filters_json(self, filters_json):
@@ -683,13 +696,14 @@ class FHIRResourceMap(Document):
 		if isinstance(filters_json, dict):
 			return filters_json
 		try:
-			return json.loads(filters_json)
+			parsed = json.loads(filters_json)
+			return parsed if isinstance(parsed, dict) else {}
 		except Exception:
 			return {}
 
-	# ===========================
-	# StructureDefinition overlay
-	# ===========================
+	# =========================================================
+	# StructureDefinition overlay (unchanged functionality)
+	# =========================================================
 
 	@frappe.whitelist()
 	def get_elements_from_structure_definitions(self, base_structure_definition):
@@ -713,24 +727,22 @@ class FHIRResourceMap(Document):
 		return sd.get("element_paths") or []
 
 	def _get_resource_type(self, sd):
-		return (getattr(sd, "fhir_sd", None) or "").strip()
+		# Fallback sequence depends on your SD doctype fields.
+		# Keep existing behavior but be defensive.
+		return (getattr(sd, "fhir_sd", None) or getattr(sd, "fhir_resource", None) or "").strip()
 
 	def _is_root_row(self, row, resource_type):
 		return bool(resource_type) and (row.get("fhir_path") == resource_type)
 
 	def _build_base_element_map(self, rows, resource_type):
 		merged = {}
-
 		for element_row in rows:
 			row = self.build_element_map_row(element_row)
 			if not row:
 				continue
-
 			if self._is_root_row(row, resource_type):
 				continue
-
 			merged[row["fhir_path"]] = row
-
 		return merged
 
 	def _overlay_profiles(self, merged, resource_type):
@@ -763,9 +775,9 @@ class FHIRResourceMap(Document):
 	def _get_sorted_profile_rows(self):
 		rows = list(self.get("profiles") or [])
 		rows.sort(
-			key=lambda r: (
-				0 if cint(getattr(r, "is_primary", 0)) else 1,
-				cint(getattr(r, "idx", 0)),
+			key=lambda row: (
+				0 if cint(getattr(row, "is_primary", 0)) else 1,
+				cint(getattr(row, "idx", 0)),
 			)
 		)
 		return rows
@@ -780,14 +792,12 @@ class FHIRResourceMap(Document):
 
 	def _apply_most_restrictive_overlay(self, base, overlay):
 		changed = False
-
 		changed |= self._apply_min(base, overlay)
 		changed |= self._apply_max(base, overlay)
 		changed |= self._apply_binding_strength(base, overlay)
 		changed |= self._apply_valueset(base, overlay)
 		changed |= self._apply_datatype(base, overlay)
 		changed |= self._apply_target_profiles(base, overlay)
-
 		self._fill_metadata(base, overlay)
 		return bool(changed)
 
@@ -800,7 +810,6 @@ class FHIRResourceMap(Document):
 	def _apply_max(self, base, overlay):
 		base_max = (base.get("max") or "").strip()
 		overlay_max = (overlay.get("max") or "").strip()
-
 		if not overlay_max:
 			return False
 
@@ -857,7 +866,9 @@ class FHIRResourceMap(Document):
 		return {"example": 1, "preferred": 2, "extensible": 3, "required": 4}.get((strength or "").lower(), 0)
 
 	def _sorted_rows(self, merged):
-		return [merged[k] for k in sorted(merged.keys())]
+		# NOTE: This is stable but not SD-idx-aware.
+		# If you want exact SD element order, sort by element idx stored in element_paths.
+		return [merged[key] for key in sorted(merged.keys())]
 
 	def build_element_map_row(self, element_row):
 		fhir_path = (element_row.get("path") or element_row.get("fhir_path") or "").strip()
