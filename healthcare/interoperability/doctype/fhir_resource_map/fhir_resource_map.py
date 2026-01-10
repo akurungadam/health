@@ -8,8 +8,6 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import cint, now_datetime
 
-from healthcare.interoperability.fhir_engine.fhir_datatype_expander import FHIRDatatypeExpander
-
 
 class FHIRSourceCompilationError(Exception):
 	pass
@@ -38,12 +36,7 @@ class FHIRResourceMap(Document):
 			"elements_by_path": compiled_elements.get("elements_by_path") or {},
 			"element_order": compiled_elements.get("element_order") or [],
 			"repeating_containers": compiled_elements.get("repeating_containers") or {},
-			# IMPORTANT:
-			# runtime_plan is intentionally disabled because it cannot represent nested repeating arrays
-			# correctly (e.g., Patient.identifier.type.coding inside Patient.identifier[]).
-			# The generator should build arrays/objects at runtime from:
-			# elements_by_path + element_order + repeating_containers.
-			"runtime_plan": [],
+			"runtime_plan": compiled_elements.get("runtime_plan") or [],
 			"compile_warnings": compiled_elements.get("compile_warnings") or [],
 			"warnings": compiled_elements.get("warnings") or [],
 		}
@@ -120,18 +113,6 @@ class FHIRResourceMap(Document):
 		elements_by_path = {}
 		element_order = []
 		warnings = []
-		compile_warnings = []
-
-		# repeating containers should be based on SD overlay, not just mapped rows
-		repeating_containers = self.build_repeating_containers(
-			{
-				"meta": {
-					"resource_type": (self.resource_type or "").strip(),
-					"base_structure_definition": (self.base_structure_definition or "").strip(),
-				},
-				"elements_by_path": {},
-			}
-		)
 
 		for row in self.get("element_maps") or []:
 			element = self._compile_one_element_row(row)
@@ -161,28 +142,27 @@ class FHIRResourceMap(Document):
 				warnings.append(f"Skip '{fhir_path}': {reason}")
 				continue
 
-			# warn if someone mapped a repeating container directly (e.g., Patient.generalPractitioner)
-			# This is not “wrong”, but your generator must decide how to build the complex datatype item(s).
-			if repeating_containers.get(fhir_path):
-				compile_warnings.append(
-					{
-						"fhir_path": fhir_path,
-						"warning": (
-							f"'{fhir_path}' is a repeating container (max='*'). "
-							"Mapping it directly means the generator must build array item object(s) "
-							"(e.g., Reference/ContactPoint/etc.) at runtime."
-						),
-					}
-				)
-
 			elements_by_path[fhir_path] = element
 			element_order.append(fhir_path)
+
+		# Build runtime plan using the REAL element rows
+		plan_state = self.build_runtime_plan(
+			{
+				"meta": {
+					"resource_type": (self.resource_type or "").strip(),
+					"base_structure_definition": (self.base_structure_definition or "").strip(),
+				},
+				"elements_by_path": elements_by_path,
+				"element_order": element_order,
+			}
+		)
 
 		return {
 			"elements_by_path": elements_by_path,
 			"element_order": element_order,
-			"repeating_containers": repeating_containers,
-			"compile_warnings": compile_warnings,
+			"repeating_containers": plan_state.get("repeating_containers") or {},
+			"runtime_plan": plan_state.get("runtime_plan") or [],
+			"compile_warnings": plan_state.get("compile_warnings") or [],
 			"warnings": warnings,
 		}
 
@@ -293,6 +273,26 @@ class FHIRResourceMap(Document):
 			"default_value": (row.get("default_value") or "").strip() or None,
 			"pattern_value": (row.get("pattern_value") or "").strip() or None,
 		}
+
+	# =========================================================
+	# Small path helper
+	# =========================================================
+
+	def _to_json_path(self, fhir_path, resource_type):
+		"""
+		Patient.birthDate -> birthDate
+		Patient.name.family -> name.family
+		"""
+		fhir_path = (fhir_path or "").strip()
+		resource_type = (resource_type or "").strip()
+		if not fhir_path:
+			return ""
+
+		prefix = resource_type + "."
+		if resource_type and fhir_path.startswith(prefix):
+			return fhir_path[len(prefix) :].strip()
+
+		return fhir_path
 
 	# =========================================================
 	# JSON parsing helpers
@@ -459,27 +459,34 @@ class FHIRResourceMap(Document):
 		)
 
 	# =========================================================
-	# Compile-time repeating container extraction
+	# Compile-time planning (runtime_plan)
 	# =========================================================
 
 	def build_repeating_containers(self, compiled):
 		"""
-		Return dict of repeating array paths (max="*") based on StructureDefinition overlay.
+		Return dict of repeating array paths (max="*") based on StructureDefinition overlay,
+		not just mapped element rows.
 		"""
 		meta = compiled.get("meta") or {}
+		resource_type = (meta.get("resource_type") or "").strip()
 		base_sd = (meta.get("base_structure_definition") or "").strip()
 
+		if not resource_type and base_sd:
+			resource_type = base_sd.split("-", 1)[0].strip()
+
 		if not base_sd:
-			# fallback: best-effort from compiled elements_by_path
-			elements_by_path = compiled.get("elements_by_path") or {}
+			# fallback: use whatever is in compiled elements_by_path (best-effort)
+			elements_by_path = compiled.get("elements_by_path") or compiled.get("elements") or {}
 			repeating = {}
 			for fhir_path, element in (elements_by_path or {}).items():
 				if isinstance(element, dict) and str(element.get("max") or "").strip() == "*":
 					repeating[fhir_path] = 1
 			return repeating
 
+		# get merged SD rows (base + profiles) and compute repeating arrays from that
 		rows = self.get_elements_from_structure_definitions(base_sd) or []
 		repeating = {}
+
 		for row in rows:
 			path = (row.get("fhir_path") or "").strip()
 			if not path:
@@ -488,6 +495,171 @@ class FHIRResourceMap(Document):
 				repeating[path] = 1
 
 		return repeating
+
+	def build_runtime_plan(self, compiled):
+		meta = compiled.get("meta") or {}
+		resource_type = (meta.get("resource_type") or "").strip()
+
+		if not resource_type:
+			base_sd = (meta.get("base_structure_definition") or "").strip()
+			if base_sd:
+				resource_type = base_sd.split("-", 1)[0].strip()
+
+		if not resource_type:
+			frappe.throw(
+				"Cannot compile: resource_type is missing (set Resource Type or Base Structure Definition)"
+			)
+
+		elements_by_path = compiled.get("elements_by_path")
+		if not isinstance(elements_by_path, dict):
+			# backward compat
+			elements_by_path = compiled.get("elements") or {}
+
+		element_order = compiled.get("element_order") or []
+		if not isinstance(element_order, list):
+			frappe.throw("Cannot build runtime_plan: element_order must be a list")
+
+		repeating_containers = compiled.get("repeating_containers") or self.build_repeating_containers(
+			compiled
+		)
+
+		plan = [{"op": "set_root", "path": "resourceType", "value": resource_type}]
+		array_groups = {}
+		compile_warnings = []
+
+		for fhir_path in element_order:
+			element = elements_by_path.get(fhir_path)
+			if not element:
+				compile_warnings.append(
+					{"fhir_path": fhir_path, "warning": "Missing element row in compiled.elements_by_path"}
+				)
+				continue
+
+			value_pointer = element.get("value_pointer") or {}
+			if not value_pointer:
+				continue
+
+			repeating_container_path = self._find_nearest_repeating_container(
+				fhir_path=fhir_path,
+				repeating_containers=repeating_containers,
+				resource_type=resource_type,
+			)
+
+			# if str(element.get("max") or "").strip() == "*":
+			# 	repeating_container_path = fhir_path
+
+			if not repeating_container_path:
+				plan.append(
+					{
+						"op": "set",
+						"fhir_path": fhir_path,
+						"json_path": self._to_json_path(fhir_path, resource_type),
+						"path": fhir_path,  # compat
+						"from": self._normalize_value_pointer(value_pointer),
+						"datatype": (element.get("datatype") or "").strip(),
+						"min": element.get("min"),
+						"max": element.get("max"),
+						"binding_strength": element.get("binding_strength"),
+						"valueset_url": element.get("valueset_url"),
+						"is_required": cint(element.get("is_required")),
+					}
+				)
+				continue
+
+			relative_path = self._relative_path_under_container(
+				full_path=fhir_path,
+				container_path=repeating_container_path,
+			)
+
+			if relative_path == "":
+				compile_warnings.append(
+					{
+						"fhir_path": fhir_path,
+						"warning": (
+							f"Mapped container path '{fhir_path}' directly; expected child paths under "
+							f"'{repeating_container_path}'. Skipped in runtime_plan."
+						),
+					}
+				)
+				continue
+
+			group = array_groups.get(repeating_container_path)
+			if not group:
+				group = {
+					"op": "array_item",
+					"container": repeating_container_path,
+					"index": 0,
+					"set": [],
+				}
+				array_groups[repeating_container_path] = group
+
+			group["set"].append(
+				{
+					"fhir_path": fhir_path,
+					"json_path": relative_path,
+					"path": relative_path,  # compat
+					"from": self._normalize_value_pointer(value_pointer),
+					"datatype": (element.get("datatype") or "").strip(),
+					"min": element.get("min"),
+					"max": element.get("max"),
+					"binding_strength": element.get("binding_strength"),
+					"valueset_url": element.get("valueset_url"),
+					"is_required": cint(element.get("is_required")),
+				}
+			)
+
+		for container_path in sorted(array_groups.keys()):
+			plan.append(array_groups[container_path])
+
+		compiled["repeating_containers"] = repeating_containers
+		compiled["runtime_plan"] = plan
+		compiled["compile_warnings"] = compile_warnings
+		return compiled
+
+	def _normalize_value_pointer(self, value_pointer):
+		kind = (value_pointer.get("kind") or "").strip()
+
+		if kind == "field":
+			return {
+				"kind": "field",
+				"source": (value_pointer.get("source") or "").strip(),
+				"path": (value_pointer.get("path") or "").strip(),
+			}
+
+		if kind == "fixed":
+			return {"kind": "fixed", "value": value_pointer.get("value")}
+
+		return value_pointer
+
+	def _find_nearest_repeating_container(self, fhir_path, repeating_containers, resource_type):
+		fhir_path = (fhir_path or "").strip()
+		if not fhir_path or "." not in fhir_path:
+			return None
+
+		if not fhir_path.startswith(resource_type + "."):
+			return None
+
+		parts = fhir_path.split(".")
+		while len(parts) > 1:
+			parts.pop()
+			prefix = ".".join(parts)
+			if repeating_containers.get(prefix):
+				return prefix
+
+		return None
+
+	def _relative_path_under_container(self, full_path, container_path):
+		full_path = (full_path or "").strip()
+		container_path = (container_path or "").strip()
+
+		if full_path == container_path:
+			return ""
+
+		prefix = container_path + "."
+		if not full_path.startswith(prefix):
+			return full_path
+
+		return full_path[len(prefix) :].strip()
 
 	# =========================================================
 	# Runtime source resolution (preview + generator)
@@ -727,9 +899,7 @@ class FHIRResourceMap(Document):
 		return sd.get("element_paths") or []
 
 	def _get_resource_type(self, sd):
-		# Fallback sequence depends on your SD doctype fields.
-		# Keep existing behavior but be defensive.
-		return (getattr(sd, "fhir_sd", None) or getattr(sd, "fhir_resource", None) or "").strip()
+		return (getattr(sd, "fhir_sd", None) or "").strip()
 
 	def _is_root_row(self, row, resource_type):
 		return bool(resource_type) and (row.get("fhir_path") == resource_type)
@@ -866,8 +1036,6 @@ class FHIRResourceMap(Document):
 		return {"example": 1, "preferred": 2, "extensible": 3, "required": 4}.get((strength or "").lower(), 0)
 
 	def _sorted_rows(self, merged):
-		# NOTE: This is stable but not SD-idx-aware.
-		# If you want exact SD element order, sort by element idx stored in element_paths.
 		return [merged[key] for key in sorted(merged.keys())]
 
 	def build_element_map_row(self, element_row):
