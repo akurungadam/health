@@ -22,7 +22,6 @@ frappe.ui.form.on("FHIR Resource Map", {
 		render_elements_map_html(frm);
 	},
 
-	// Optional: cleanup when leaving form
 	on_unload(frm) {
 		try {
 			detach_keyboard_navigation(frm);
@@ -43,11 +42,9 @@ function init_state(frm) {
 
 	if (!frm._elements_map_ui_built) frm._elements_map_ui_built = false;
 
-	// active dialog
 	if (!frm._active_mapping_dialog) frm._active_mapping_dialog = null;
 	if (!frm._active_mapping_row) frm._active_mapping_row = null;
 
-	// keyboard nav state
 	if (frm._mapping_nav_busy === undefined) frm._mapping_nav_busy = false;
 	if (frm._mapping_nav_seq === undefined) frm._mapping_nav_seq = 0;
 	if (!frm._mapping_keydown_handler) frm._mapping_keydown_handler = null;
@@ -106,11 +103,10 @@ function add_buttons(frm) {
 
 		const res = await frappe.call({
 			doc: frm.doc,
-			method: "resolve_sources_runtime",
+			method: "resolve_values_runtime",
 			args: {
 				primary_name: primaryName,
-				include_docs: 0, // set 1 if you want full docs back (heavy)
-				limit_per_source: 20,
+				include_docs: 0,
 			},
 			freeze: true,
 			freeze_message: __("Resolving sources..."),
@@ -119,7 +115,6 @@ function add_buttons(frm) {
 		const out = res.message || {};
 		console.log("resolve_sources_runtime:", out);
 
-		// Basic viewer: show JSON in a dialog
 		frappe.msgprint({
 			title: __("Resolved Sources"),
 			message: `<pre style="max-height:60vh; overflow:auto">${frappe.utils.escape_html(
@@ -127,6 +122,34 @@ function add_buttons(frm) {
 			)}</pre>`,
 			wide: true,
 		});
+	});
+
+	frm.add_custom_button(__("Preview FHIR Resource"), async () => {
+		const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
+		if (!primaryDoctype) {
+			frappe.msgprint({
+				title: __("Missing config"),
+				message: __("Set Primary DocType first."),
+				indicator: "red",
+			});
+			return;
+		}
+
+		const primaryName = await prompt_primary_name(primaryDoctype);
+		if (!primaryName) return;
+
+		const response = await frappe.call({
+			method: "healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.build_resource_from_compiled",
+			args: {
+				fhir_resource_map: frm.doc.name,
+				primary_name: primaryName,
+			},
+			freeze: true,
+			freeze_message: __("Building FHIR preview..."),
+		});
+
+		const payload = response.message || response;
+		show_fhir_preview_dialog(frm, payload);
 	});
 }
 
@@ -156,7 +179,7 @@ async function prompt_primary_name(primaryDoctype) {
 }
 
 /* ============================================================
-   ELEMENTS MAP HTML (simple)
+   ELEMENTS MAP HTML
 ============================================================ */
 
 function render_elements_map_html(frm) {
@@ -371,8 +394,6 @@ function build_table(rows) {
 				  )}</div>`
 				: "";
 
-			const mappingText = mapping_summary(r);
-
 			return `
 				<tr class="elements-map-row" data-rowname="${escape_html(
 					r.name,
@@ -387,7 +408,7 @@ function build_table(rows) {
 					<td style="width:14%;">${escape_html(r._ui_datatype || "")}</td>
 					<td style="width:8%;">${escape_html(String(r._ui_min))}</td>
 					<td style="width:8%;">${escape_html(String(r._ui_max || ""))}</td>
-					<td style="width:26%;">${mappingText}</td>
+					<td style="width:26%;">${mapping_summary(r)}</td>
 				</tr>
 			`;
 		})
@@ -425,10 +446,9 @@ function bind_row_events(frm, wrapper) {
 }
 
 /* ============================================================
-   Mapping dialog (Frappe Field + Fixed only)
-   - Removed Expression + JSON
-   - Show Doctype name instead of source key in "Source" select
+   Mapping dialog (Field + Fixed)
 ============================================================ */
+
 async function open_mapping_dialog(frm, row) {
 	await close_active_dialog(frm);
 
@@ -438,7 +458,7 @@ async function open_mapping_dialog(frm, row) {
 	const pointerKind = String(pointer.kind || "").trim();
 
 	const sourceSelect = build_source_select_data(sourcesIndex);
-	const defaultKey = resolve_source_key_default(pointer, sourcesIndex);
+	const defaultKey = resolve_from_source_key_default(pointer, sourcesIndex);
 	const defaultLabel = sourceSelect.keyToLabel[defaultKey] || "";
 
 	const dialog = new frappe.ui.Dialog({
@@ -493,7 +513,7 @@ async function open_mapping_dialog(frm, row) {
 				fieldname: "frappe_field",
 				label: "Frappe Field",
 				options: [""].join("\n"),
-				default: String(pointer.path || row.frappe_field || ""),
+				default: String(pointer.fieldname || row.frappe_field || ""),
 			},
 
 			{
@@ -522,19 +542,27 @@ async function open_mapping_dialog(frm, row) {
 		primary_action() {
 			const mappingType = String(dialog.get_value("mapping_type") || "").trim();
 
-			// label -> real key
 			const selectedLabel = String(dialog.get_value("source_key") || "").trim();
 			const sourceKey =
 				(dialog.__source_label_to_key || {})[selectedLabel] ||
-				resolve_source_key_default(pointer, sourcesIndex) ||
+				resolve_from_source_key_default(pointer, sourcesIndex) ||
 				"";
 
 			let newPointer = null;
 
 			if (mappingType === "Frappe Field") {
-				const fieldname = String(dialog.get_value("frappe_field") || "").trim();
+				const selected = String(dialog.get_value("frappe_field") || "").trim();
+				// handles both "dob|Date of birth (dob)" and plain "dob"
+				const fieldname = selected.includes("|")
+					? selected.split("|")[0].trim()
+					: selected;
+
 				if (sourceKey && fieldname) {
-					newPointer = { kind: "field", source: sourceKey, path: fieldname };
+					newPointer = {
+						kind: "field",
+						source_key: sourceKey,
+						fieldname: fieldname,
+					};
 				}
 			} else if (mappingType === "Fixed") {
 				const raw = String(dialog.get_value("fixed_value") || "").trim();
@@ -553,12 +581,12 @@ async function open_mapping_dialog(frm, row) {
 				mappingType === "Frappe Field"
 					? String(dialog.get_value("frappe_field") || "")
 					: "";
-
 			row.fixed_value =
 				mappingType === "Fixed"
 					? String(dialog.get_value("fixed_value") || "")
 					: "";
 
+			// nuked features
 			row.expression = "";
 			row.json_path = "";
 
@@ -572,9 +600,8 @@ async function open_mapping_dialog(frm, row) {
 		},
 	});
 
-	// stash label<->key maps on dialog (used by refresh_field_options)
 	dialog.__source_label_to_key = sourceSelect.labelToKey;
-	dialog.__source_key_to_label = sourceSelect.keyToLabel;
+	dialog.__from_source_key_to_label = sourceSelect.keyToLabel;
 
 	frm._active_mapping_dialog = dialog;
 	frm._active_mapping_row = row;
@@ -595,14 +622,12 @@ async function open_mapping_dialog(frm, row) {
 	apply_mapping_type_visibility(dialog);
 
 	if (pointerKind === "field") {
-		const existingKey = String(pointer.source || "").trim();
-		const label = dialog.__source_key_to_label?.[existingKey];
+		const existingKey = String(pointer.source_key || "").trim();
+		const label = dialog.__from_source_key_to_label?.[existingKey];
 		if (label) dialog.set_value("source_key", label);
 	}
 
-	// populate frappe_field options based on selected source
 	refresh_field_options(dialog, sourcesIndex);
-
 	append_keyboard_hint(dialog);
 }
 
@@ -612,6 +637,8 @@ function apply_mapping_type_visibility(dialog) {
 	set_dialog_hidden(dialog, "source_key", true);
 	set_dialog_hidden(dialog, "frappe_field", true);
 	set_dialog_hidden(dialog, "fixed_value", true);
+
+	// show default_value only when mapping type selected
 	set_dialog_hidden(dialog, "default_value", !mappingType);
 
 	if (!mappingType) return;
@@ -639,46 +666,123 @@ async function refresh_field_options(dialog, sourcesIndex) {
 	const mappingType = String(dialog.get_value("mapping_type") || "").trim();
 	if (mappingType !== "Frappe Field") {
 		set_select_options(dialog, "frappe_field", [""]);
-		dialog.__resolved_source_key = "";
+		dialog.__resolved_from_source_key = "";
 		return;
 	}
 
-	const label = String(dialog.get_value("source_key") || "").trim();
+	const selectedLabel = String(dialog.get_value("source_key") || "").trim();
 	const labelToKey = dialog.__source_label_to_key || {};
-	const key = labelToKey[label] || resolve_source_key_default({}, sourcesIndex);
+	const sourceKey =
+		labelToKey[selectedLabel] ||
+		resolve_from_source_key_default({}, sourcesIndex) ||
+		"";
 
-	dialog.__resolved_source_key = key;
+	dialog.__resolved_from_source_key = sourceKey;
 
-	const doctype = String(sourcesIndex[key]?.doctype || "").trim();
+	const doctype = String(sourcesIndex[sourceKey]?.doctype || "").trim();
 	if (!doctype) {
 		set_select_options(dialog, "frappe_field", [""]);
 		return;
 	}
 
+	// Load meta
 	await frappe.model.with_doctype(doctype);
 	const meta = frappe.get_meta(doctype);
 
-	const options = [""];
-	options.push("name");
+	// Build options with labels + child table expansion
+	const optionLines = await build_field_option_lines_with_labels_and_children(meta);
 
-	for (const df of meta.fields || []) {
-		if (!df.fieldname) continue;
-		if (
-			[
-				"Section Break",
-				"Column Break",
-				"Tab Break",
-				"HTML",
-				"Button",
-				"Fold",
-			].includes(df.fieldtype)
-		)
+	set_select_options(dialog, "frappe_field", optionLines);
+}
+
+async function build_field_option_lines_with_labels_and_children(meta) {
+	const optionLines = [""];
+
+	const skipFieldtypes = new Set([
+		"Section Break",
+		"Column Break",
+		"Tab Break",
+		"HTML",
+		"Button",
+		"Fold",
+	]);
+
+	// Always include docname
+	optionLines.push(`name|Name (name)`);
+
+	const fields = Array.isArray(meta?.fields) ? meta.fields : [];
+
+	for (const df of fields) {
+		if (!df || !df.fieldname) continue;
+		if (skipFieldtypes.has(df.fieldtype)) continue;
+
+		const fieldname = String(df.fieldname || "").trim();
+		const fieldLabel = String(df.label || df.fieldname || "").trim();
+
+		// Child table expansion
+		if (df.fieldtype === "Table") {
+			const childDoctype = String(df.options || "").trim();
+			if (!childDoctype) continue;
+
+			await frappe.model.with_doctype(childDoctype);
+			const childMeta = frappe.get_meta(childDoctype);
+			const childFields = Array.isArray(childMeta?.fields)
+				? childMeta.fields
+				: [];
+
+			for (const childDf of childFields) {
+				if (!childDf || !childDf.fieldname) continue;
+				if (skipFieldtypes.has(childDf.fieldtype)) continue;
+
+				const childFieldname = String(childDf.fieldname || "").trim();
+				if (!childFieldname) continue;
+
+				const childLabel = String(
+					childDf.label || childDf.fieldname || "",
+				).trim();
+
+				// ✅ value must be the real path you want to store
+				const value = `${fieldname}.${childFieldname}`;
+
+				// ✅ label is only for display
+				const label = `${fieldLabel} → ${childLabel} (${value})`;
+
+				optionLines.push(`${value}|${label}`);
+			}
+
 			continue;
+		}
 
-		options.push(df.fieldname);
+		// Normal field
+		const label = `${fieldLabel} (${fieldname})`;
+		optionLines.push(`${fieldname}|${label}`);
 	}
 
-	set_select_options(dialog, "frappe_field", options);
+	return dedupe_select_option_lines(optionLines);
+}
+
+function dedupe_select_option_lines(optionLines) {
+	const seen = new Set();
+	const out = [];
+	let addedBlank = false;
+
+	for (const line of optionLines || []) {
+		if (!line) {
+			if (!addedBlank) out.push("");
+			addedBlank = true;
+			continue;
+		}
+
+		const value = String(line).split("|")[0].trim();
+		if (!value) continue;
+
+		if (seen.has(value)) continue;
+		seen.add(value);
+
+		out.push(line);
+	}
+
+	return out;
 }
 
 function set_select_options(dialog, fieldname, options) {
@@ -711,38 +815,13 @@ function build_sources_index(frm) {
 	return sourcesIndex;
 }
 
-function build_source_select_options(sourcesIndex) {
-	// show doctype names in dropdown, but keep values as source_key (value|label)
-	const opts = [""];
-	const entries = Object.entries(sourcesIndex);
-
-	entries.sort((a, b) => {
-		const ap = a[0] === "primary" ? 0 : 1;
-		const bp = b[0] === "primary" ? 0 : 1;
-		if (ap !== bp) return ap - bp;
-		return String(a[1].doctype || "").localeCompare(String(b[1].doctype || ""));
-	});
-
-	for (const [key, info] of entries) {
-		const label = key === "primary" ? `${info.doctype} (Primary)` : info.doctype;
-		opts.push(`${key}|${label}`);
-	}
-
-	return opts;
-}
-
 function build_source_select_data(sourcesIndex) {
-	// returns:
-	// - labels: array of displayed options
-	// - labelToKey: map label -> source_key
-	// - keyToLabel: map source_key -> label
 	const labels = [""];
 	const labelToKey = {};
 	const keyToLabel = {};
 
 	const entries = Object.entries(sourcesIndex);
 
-	// primary first
 	entries.sort((a, b) => {
 		const ap = a[0] === "primary" ? 0 : 1;
 		const bp = b[0] === "primary" ? 0 : 1;
@@ -764,33 +843,30 @@ function build_source_select_data(sourcesIndex) {
 	return { labels, labelToKey, keyToLabel };
 }
 
-function resolve_source_key_default(pointer, sourcesIndex) {
-	const desired = String(pointer?.source || "").trim();
+function resolve_from_source_key_default(pointer, sourcesIndex) {
+	const desired = String(pointer?.source_key || "").trim();
 	if (desired && sourcesIndex[desired]) return desired;
 	if (sourcesIndex.primary) return "primary";
 	return Object.keys(sourcesIndex)[0] || "";
 }
 
 /* ============================================================
-   ✅ Keyboard navigation (Cmd/Ctrl + Up/Down)
+   Keyboard navigation (Cmd/Ctrl + Up/Down)
 ============================================================ */
 
 function attach_keyboard_navigation(frm, dialog) {
 	detach_keyboard_navigation(frm);
 
 	const handler = e => {
-		// only when our dialog is active
 		if (frm._active_mapping_dialog !== dialog) return;
 
 		const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 		const modifierPressed = isMac ? e.metaKey : e.ctrlKey;
 		if (!modifierPressed) return;
 
-		// don't hijack typing
 		const tag = (e.target?.tagName || "").toLowerCase();
 		if (tag === "input" || tag === "textarea" || tag === "select") return;
 
-		// don't hijack code editors
 		const $t = $(e.target);
 		if ($t.closest(".ace_editor, .CodeMirror, .cm-editor").length) return;
 
@@ -807,10 +883,8 @@ function attach_keyboard_navigation(frm, dialog) {
 
 	frm._mapping_keydown_handler = handler;
 
-	// capture phase avoids some Bootstrap focus weirdness
 	document.addEventListener("keydown", handler, true);
 
-	// auto detach on hide (prevents leaks)
 	if (dialog.$wrapper) {
 		dialog.$wrapper.one("hidden.bs.modal.fhir_map_nav_cleanup", () => {
 			detach_keyboard_navigation(frm);
@@ -830,7 +904,6 @@ function detach_keyboard_navigation(frm) {
 }
 
 async function navigate_mapping_dialog(frm, delta) {
-	// lock to prevent repeats / stacking
 	if (frm._mapping_nav_busy) return;
 	frm._mapping_nav_busy = true;
 
@@ -854,7 +927,6 @@ async function navigate_mapping_dialog(frm, delta) {
 
 		await close_active_dialog(frm);
 
-		// if another nav happened while closing, abort
 		if (seq !== frm._mapping_nav_seq) return;
 
 		await open_mapping_dialog(frm, nextRow);
@@ -878,9 +950,7 @@ function hide_dialog_and_wait(dialog) {
 		try {
 			if (!dialog.$wrapper || !dialog.$wrapper.length) return resolve();
 
-			// resolve once
 			dialog.$wrapper.one("hidden.bs.modal.fhir_map_nav_hide", () => resolve());
-
 			dialog.hide();
 		} catch (e) {
 			resolve();
@@ -896,7 +966,6 @@ function append_keyboard_hint(dialog) {
 		const $footer = dialog.$wrapper?.find(".modal-footer");
 		if (!$footer || !$footer.length) return;
 
-		// remove previous hint in case
 		$footer.find(".fhir-map-kb-hint").remove();
 
 		$footer.prepend(
@@ -915,21 +984,21 @@ function append_keyboard_hint(dialog) {
 
 function mapping_summary(row) {
 	const pointer = row._ui_pointer;
-	if (!pointer || typeof pointer !== "object")
+	if (!pointer || typeof pointer !== "object") {
 		return `<span class="text-muted">Click to map</span>`;
+	}
 
 	const kind = String(pointer.kind || "").trim();
 
 	if (kind === "field") {
-		// show doctype name instead of source key if we can infer it
-		let label = String(pointer.source || "source");
+		let label = String(pointer.source_key || "source_key");
 		try {
 			const sourcesIndex = build_sources_index(cur_frm);
-			const dt = sourcesIndex?.[pointer.source]?.doctype;
-			if (dt) label = pointer.source === "primary" ? `${dt} (Primary)` : dt;
+			const dt = sourcesIndex?.[pointer.source_key]?.doctype;
+			if (dt) label = pointer.source_key === "primary" ? `${dt} (Primary)` : dt;
 		} catch (e) {}
 		return `<span class="text-muted">${escape_html(label)}</span> → ${escape_html(
-			pointer.path || "",
+			pointer.fieldname || "",
 		)}`;
 	}
 
@@ -976,4 +1045,111 @@ function to_int(v) {
 
 function escape_html(s) {
 	return frappe.utils.escape_html(String(s || ""));
+}
+
+/* ============================================================
+   FHIR preview dialog
+============================================================ */
+
+function show_fhir_preview_dialog(frm, payload) {
+	const resource = payload && (payload.resource || payload.fhir_resource || payload);
+	const errors = (payload && payload.errors) || [];
+	const warnings = (payload && payload.warnings) || [];
+
+	const prettyJson = safe_pretty_json(resource);
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("FHIR Resource Preview"),
+		size: "extra-large",
+		fields: [
+			{ fieldtype: "HTML", fieldname: "summary_html" },
+			{ fieldtype: "HTML", fieldname: "json_html" },
+		],
+		primary_action_label: __("Copy JSON"),
+		primary_action: () => copy_to_clipboard(prettyJson),
+		secondary_action_label: __("Close"),
+		secondary_action: () => dialog.hide(),
+	});
+
+	dialog.show();
+
+	const summaryWrapper = dialog.get_field("summary_html").$wrapper;
+	summaryWrapper.html(render_summary_html(errors, warnings));
+
+	const jsonWrapper = dialog.get_field("json_html").$wrapper;
+	jsonWrapper.html(render_json_block_html(prettyJson));
+
+	// ✅ bind inline copy button (it existed but did nothing before)
+	jsonWrapper.off("click.fhir_copy_inline");
+	jsonWrapper.on("click.fhir_copy_inline", '[data-action="copy-inline"]', () => {
+		copy_to_clipboard(prettyJson);
+	});
+}
+
+function render_summary_html(errors, warnings) {
+	const errorHtml =
+		errors && errors.length
+			? `<div class="mb-2"><span class="indicator red">${__("Errors")}</span>
+		   <ul class="mt-2">${errors
+				.map(
+					e =>
+						`<li class="text-danger">${frappe.utils.escape_html(
+							String(e),
+						)}</li>`,
+				)
+				.join("")}</ul></div>`
+			: `<div class="mb-2"><span class="indicator green">${__(
+					"Errors",
+			  )}</span> <span class="text-muted">${__("None")}</span></div>`;
+
+	const warningHtml =
+		warnings && warnings.length
+			? `<div class="mb-2"><span class="indicator orange">${__("Warnings")}</span>
+		   <ul class="mt-2">${warnings
+				.map(
+					w =>
+						`<li class="text-warning">${frappe.utils.escape_html(
+							String(w),
+						)}</li>`,
+				)
+				.join("")}</ul></div>`
+			: `<div class="mb-2"><span class="indicator green">${__(
+					"Warnings",
+			  )}</span> <span class="text-muted">${__("None")}</span></div>`;
+
+	return `<div>${errorHtml}${warningHtml}<hr/></div>`;
+}
+
+function render_json_block_html(prettyJson) {
+	const escaped = frappe.utils.escape_html(prettyJson || "");
+	return `
+		<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+			<div class="text-muted">${__("Generated JSON")}</div>
+			<button class="btn btn-xs btn-default" data-action="copy-inline">${__("Copy")}</button>
+		</div>
+		<pre class="small"
+			style="max-height: 60vh; overflow:auto; background: var(--control-bg); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;"
+		>${escaped}</pre>
+	`;
+}
+
+function safe_pretty_json(obj) {
+	try {
+		return JSON.stringify(obj ?? {}, null, 2);
+	} catch (e) {
+		return JSON.stringify(
+			{ error: "Could not stringify JSON", details: String(e) },
+			null,
+			2,
+		);
+	}
+}
+
+async function copy_to_clipboard(text) {
+	try {
+		await navigator.clipboard.writeText(text || "");
+		frappe.show_alert({ message: __("Copied to clipboard"), indicator: "green" });
+	} catch (e) {
+		frappe.utils.copy_to_clipboard(text || "");
+	}
 }
