@@ -10,4 +10,4 @@ class FHIRStructureDefinition(Document):
 		if self.fhir_profile:
 			self.name = f"{self.fhir_sd}-{self.fhir_profile}-{self.fhir_version}"
 		else:
-			self.name = f"{self.fhir_sd}-{self.sd_version}"
+			self.name = f"{self.fhir_sd}-{self.fhir_version}"
