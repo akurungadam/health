@@ -77,7 +77,6 @@
    "label": "FHIR Version",
    "options": "FHIR Version",
    "read_only": 1,
-   "reqd": 1,
    "search_index": 1
   },
   {
@@ -94,8 +93,7 @@
    "fieldname": "url",
    "fieldtype": "Data",
    "label": "URL",
-   "read_only": 1,
-   "unique": 1
+   "read_only": 1
   },
   {
    "fieldname": "publisher",
@@ -141,7 +139,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-25 11:37:17.861682",
+ "modified": "2026-01-13 09:27:26.713933",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Structure Definition",

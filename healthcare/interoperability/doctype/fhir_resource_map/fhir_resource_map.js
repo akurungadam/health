@@ -68,18 +68,6 @@ function add_buttons(frm) {
 				freeze_message: __("Loading Structure Definition..."),
 			});
 
-			const elements = res.message || [];
-			if (!elements.length) {
-				frappe.msgprint(__("No elements found."));
-				return;
-			}
-
-			frm.clear_table("element_maps");
-			for (const row of elements) {
-				const child = frm.add_child("element_maps");
-				Object.assign(child, row);
-			}
-
 			frm.refresh_field("element_maps");
 			render_elements_map_html(frm);
 		} finally {
