@@ -79,14 +79,7 @@ class FHIRResourceMap(Document):
 		repeating_containers = self._compile_repeating_containers(elements=compiled["elements"])
 		compiled["repeating_containers"] = repeating_containers
 
-		# placement rules derived from repeating containers (default index 0)
-		placement = self.compile_repeating_container_placement_rules(
-			repeating_containers=repeating_containers
-		)
-		compiled["placement"] = placement
-
-		# apply placement to all element paths (concrete runtime plan path lives with the element)
-		self._apply_placement_to_compiled_elements(compiled, placement=placement)
+		self._apply_default_indexes_to_compiled_elements(compiled)
 
 		self._validate_compiled(compiled)
 		return compiled
@@ -278,69 +271,6 @@ class FHIRResourceMap(Document):
 		return repeating
 
 	# =========================================================
-	# Placement rules + apply placement
-	# =========================================================
-
-	def compile_repeating_container_placement_rules(self, repeating_containers):
-		"""
-		Return mapping like:
-		{
-		  "identifier": {"default_index": 0},
-		  "contact": {"default_index": 0},
-		  "link": {"default_index": 0},
-		  "telecom": {"default_index": 0}
-		}
-		"""
-		placement = {}
-		for container_fhir_path in (repeating_containers or {}).keys():
-			container_json_path = self.strip_resource_prefix(container_fhir_path)
-			# only the first segment is index-applied by default
-			first = (container_json_path or "").split(".", 1)[0].strip()
-			if not first:
-				continue
-			placement[first] = {"default_index": 0}
-		return placement
-
-	def strip_resource_prefix(self, fhir_path):
-		parts = (fhir_path or "").split(".", 1)
-		return parts[1] if len(parts) == 2 else fhir_path
-
-	def apply_repeating_placement(self, json_path, placement):
-		"""
-		json_path examples:
-		- "identifier.use" => "identifier[0].use"
-		- "contact.gender" => "contact[0].gender"
-		- "birthDate" => unchanged
-		"""
-		if not json_path:
-			return json_path
-
-		segments = [s for s in str(json_path).split(".") if s]
-		if not segments:
-			return json_path
-
-		first = segments[0]
-		if first in (placement or {}):
-			index = cint((placement[first] or {}).get("default_index", 0))
-			segments[0] = f"{first}[{index}]"
-
-		return ".".join(segments)
-
-	def _apply_placement_to_compiled_elements(self, compiled, placement):
-		elements = compiled.get("elements") or {}
-		for _key, element in elements.items():
-			if not isinstance(element, dict):
-				continue
-			base_json_path = (element.get("base_json_path") or "").strip()
-			if not base_json_path:
-				element["path"] = ""
-				continue
-			element["path"] = self.apply_repeating_placement(
-				json_path=base_json_path,
-				placement=placement,
-			)
-
-	# =========================================================
 	# Compiled validation
 	# =========================================================
 
@@ -475,6 +405,60 @@ class FHIRResourceMap(Document):
 			return [text]
 
 		return []
+
+	def _apply_default_indexes_to_compiled_elements(self, compiled):
+		"""
+		Fill element["path"] for every element using repeating_containers.
+		No 'placement' dict is stored.
+		"""
+		meta = compiled.get("meta") or {}
+		resource_type = (meta.get("resource_type") or "").strip()
+
+		repeating_containers = compiled.get("repeating_containers") or {}
+		elements = compiled.get("elements") or {}
+
+		for _key, element in elements.items():
+			if not isinstance(element, dict):
+				continue
+
+			base_json_path = (element.get("base_json_path") or "").strip()
+			if not base_json_path:
+				element["path"] = ""
+				continue
+
+			element["path"] = self._concretize_json_path_with_repeating_indexes(
+				resource_type=resource_type,
+				base_json_path=base_json_path,
+				repeating_containers=repeating_containers,
+				default_index=0,
+			)
+
+	def _concretize_json_path_with_repeating_indexes(
+		self, resource_type, base_json_path, repeating_containers, default_index=0
+	):
+		"""
+		Examples:
+		- base_json_path="birthDate" -> "birthDate"
+		- base_json_path="identifier.value" -> "identifier[0].value" if "Patient.identifier" repeats
+		- base_json_path="contact.telecom.value" -> "contact[0].telecom[0].value" if both repeat
+		"""
+		segments = [s for s in str(base_json_path or "").split(".") if s]
+		if not segments:
+			return base_json_path
+
+		out = []
+		prefix = ""
+
+		for seg in segments:
+			prefix = f"{prefix}.{seg}" if prefix else seg
+			container_fhir_path = f"{resource_type}.{prefix}" if resource_type else prefix
+
+			if (repeating_containers or {}).get(container_fhir_path):
+				out.append(f"{seg}[{int(default_index)}]")
+			else:
+				out.append(seg)
+
+		return ".".join(out)
 
 	# =========================================================
 	# Runtime Value Resolution (preview)
