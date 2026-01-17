@@ -68,6 +68,18 @@ function add_buttons(frm) {
 				freeze_message: __("Loading Structure Definition..."),
 			});
 
+			const elements = res.message || [];
+			if (!elements.length) {
+				frappe.msgprint(__("No elements found."));
+				return;
+			}
+
+			frm.clear_table("element_maps");
+			for (const row of elements) {
+				const child = frm.add_child("element_maps");
+				Object.assign(child, row);
+			}
+
 			frm.refresh_field("element_maps");
 			render_elements_map_html(frm);
 		} finally {
@@ -448,6 +460,7 @@ async function open_mapping_dialog(frm, row) {
 	const sourceSelect = build_source_select_data(sourcesIndex);
 	const defaultKey = resolve_from_source_key_default(pointer, sourcesIndex);
 	const defaultLabel = sourceSelect.keyToLabel[defaultKey] || "";
+	const isChoice = String(row.fhir_path || "").includes("[x]");
 
 	const dialog = new frappe.ui.Dialog({
 		title: __("Map FHIR Element"),
@@ -457,14 +470,14 @@ async function open_mapping_dialog(frm, row) {
 				fieldname: "fhir_path",
 				label: "FHIR Path",
 				default: row.fhir_path,
-				read_only: 1,
+				read_only: isChoice ? 0 : 1,
 			},
 			{
 				fieldtype: "Data",
 				fieldname: "datatype",
 				label: "Datatype",
 				default: row.datatype || "",
-				read_only: 1,
+				read_only: isChoice ? 0 : 1,
 			},
 			{ fieldtype: "Section Break", label: __("Mapping") },
 
@@ -579,6 +592,14 @@ async function open_mapping_dialog(frm, row) {
 			row.json_path = "";
 
 			row.default_value = String(dialog.get_value("default_value") || "") || "";
+			if (isChoice) {
+				const newFhirPath = String(dialog.get_value("fhir_path") || "").trim();
+				const newDatatype = String(dialog.get_value("datatype") || "").trim();
+
+				// Only update if user actually typed something
+				if (newFhirPath) row.fhir_path = newFhirPath;
+				if (newDatatype) row.datatype = newDatatype;
+			}
 
 			frm.dirty();
 			frm.refresh_field("element_maps");
@@ -641,6 +662,12 @@ function apply_mapping_type_visibility(dialog) {
 		set_dialog_hidden(dialog, "fixed_value", false);
 		return;
 	}
+}
+
+function get_choice_type_options(row) {
+	const choiceTypes = row.choice_types || [];
+	// Frappe Select wants newline-separated options
+	return choiceTypes.join("\n");
 }
 
 function set_dialog_hidden(dialog, fieldname, hidden) {
