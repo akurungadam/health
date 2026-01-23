@@ -1220,13 +1220,13 @@ class FHIRResourceGenerator:
 
 		last_segment = segments[-1]
 
-		if not current.get("last_segment"):
-			if isinstance(last_segment, str):
-				current[last_segment] = value
-			elif isinstance(last_segment, int):
-				while len(current) <= last_segment:
-					current.append({})
-				current[last_segment] = value
+		if isinstance(last_segment, str):
+			current[last_segment] = value
+		elif isinstance(last_segment, int):
+			while len(current) <= last_segment:
+				current.append({})
+			current[last_segment] = value
+
 
 
 # =========================================================
