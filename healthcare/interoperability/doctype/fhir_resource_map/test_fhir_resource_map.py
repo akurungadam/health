@@ -49,17 +49,17 @@ class IntegrationTestFHIRResourceMap(IntegrationTestCase):
 
 		# Load and overlay elements
 		elements = resource_map.get_elements_from_structure_definitions()
+		resource_map.element_maps = []
 		for el in elements:
 			resource_map.append("element_maps", el)
 
 		# Do the mapping
 		for map in resource_map.element_maps:
 			if map.fhir_path == "Patient.birthDate":
-				# self.assertEqual(map.min, 0)
+				self.assertEqual(map.min, 0)
 				map.value_pointer = json.dumps({"kind": "field", "source_key": "primary", "fieldname": "dob"})
 			elif map.fhir_path == "Patient.gender":
-				# self.assertEqual(map.min, 0)
+				self.assertEqual(map.min, 1)  #  most restrictive wins, min = 1 in profile
 				map.value_pointer = json.dumps({"kind": "field", "source_key": "gender", "fieldname": "name"})
 		resource_map.save()
-
-		print("Mapping: ", resource_map.compiled_mapping)
+		# print("Mapping: ", resource_map.compiled_mapping)
