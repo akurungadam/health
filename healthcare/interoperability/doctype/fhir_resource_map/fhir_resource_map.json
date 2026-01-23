@@ -11,8 +11,10 @@
   "profiles",
   "section_break_czjt",
   "primary_doctype",
+  "column_break_hueo",
+  "narrative",
+  "section_break_spdr",
   "sources",
-  "sources_html",
   "section_break_wges",
   "elements_map_html",
   "element_maps",
@@ -61,8 +63,10 @@
   {
    "fieldname": "element_maps",
    "fieldtype": "Table",
+   "hidden": 1,
    "label": "Elements",
-   "options": "FHIR Resource Element Map"
+   "options": "FHIR Resource Element Map",
+   "read_only": 1
   },
   {
    "fieldname": "base_structure_definition",
@@ -75,11 +79,6 @@
   {
    "fieldname": "column_break_fivu",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "sources_html",
-   "fieldtype": "HTML",
-   "label": "Sources HTML"
   },
   {
    "fieldname": "compiled_mapping_tab",
@@ -106,12 +105,26 @@
    "fieldtype": "Link",
    "label": "Primary DocType",
    "options": "DocType"
+  },
+  {
+   "fieldname": "column_break_hueo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "narrative",
+   "fieldtype": "Link",
+   "label": "Narrative",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "section_break_spdr",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-06 12:32:18.906966",
+ "modified": "2026-01-23 16:48:02.325371",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Resource Map",
