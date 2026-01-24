@@ -1,0 +1,108 @@
+[
+  {
+    "doctype": "FHIR Version",
+    "fhir_version": "R4"
+  },
+  {
+    "doctype": "FHIR Profile",
+    "profile_name": "Overlay-Strict-R4",
+    "fhir_version": "R4"
+  },
+  {
+    "doctype": "FHIR Structure Definition",
+    "name": "Patient-R4",
+    "fhir_sd": "Patient",
+    "url": "http://hl7.org/fhir/StructureDefinition/Patient",
+    "kind": "Resource",
+    "type": "Patient",
+    "fhir_version": "R4",
+    "status": "Active",
+    "resourceType": "StructureDefinition",
+    "id": "Patient",
+    "url": "http://hl7.org/fhir/StructureDefinition/Patient",
+    "version": "4.0.1",
+    "name": "Patient",
+    "status": "Active",
+    "kind": "Resource",
+    "type": "Patient",
+    "element_paths": [
+      {
+        "id": "Patient",
+        "path": "Patient",
+        "min": 0,
+        "max": "1"
+      },
+      {
+        "id": "Patient.gender",
+        "path": "Patient.gender",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ]
+      },
+      {
+        "id": "Patient.birthDate",
+        "path": "Patient.birthDate",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "doctype": "FHIR Structure Definition",
+    "name": "Patient-Overlay-Strict-R4",
+    "fhir_sd": "Patient",
+    "url": "https://example.org/fhir/StructureDefinition/Patient-Strict",
+    "kind": "Resource",
+    "type": "Patient",
+    "fhir_version": "R4",
+    "fhir_profile": "Overlay-Strict-R4",
+    "status": "Active",
+    "structure_def_type": "profile",
+    "resourceType": "StructureDefinition",
+    "id": "Patient-Strict",
+    "url": "https://example.org/fhir/StructureDefinition/Patient-Strict",
+    "version": "1.0.0",
+    "name": "PatientStrict",
+    "status": "Active",
+    "kind": "Resource",
+    "type": "Patient",
+    "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Patient",
+    "element_paths": [
+      {
+        "id": "Patient.gender",
+        "path": "Patient.gender",
+        "min": 1,
+        "max": "1",
+        "type": [
+          {
+            "code": "code"
+          }
+        ],
+        "binding": {
+          "strength": "required",
+          "valueSet": "http://hl7.org/fhir/ValueSet/administrative-gender"
+        }
+      },
+      {
+        "id": "Patient.birthDate",
+        "path": "Patient.birthDate",
+        "min": 0,
+        "max": "1",
+        "type": [
+          {
+            "code": "date"
+          }
+        ]
+      }
+    ]
+  }
+]
