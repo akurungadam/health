@@ -9,9 +9,12 @@ from frappe.model.document import Document
 from frappe.utils import now_datetime
 
 from healthcare.interoperability.doctype.fhir_resource_map.compiler import FHIRMappingCompiler
-from healthcare.interoperability.doctype.fhir_resource_map.generator import FHIRResourceGenerator
 from healthcare.interoperability.doctype.fhir_resource_map.structure_def_loader import (
 	FHIRStructureDefinitionLoader,
+)
+from healthcare.interoperability.doctype.fhir_resource_map.transformer import (
+	FHIRTransformer,
+	transform_to_fhir,
 )
 from healthcare.interoperability.doctype.fhir_resource_map.validator import FHIRMappingValidator
 from healthcare.interoperability.doctype.fhir_resource_map.value_resolver import FHIRValueResolver
@@ -116,8 +119,17 @@ def build_fhir_resource(fhir_resource_map, primary_name):
 	if isinstance(compiled_map, str):
 		compiled_map = frappe.parse_json(compiled_map)
 
-	resolver = FHIRValueResolver(compiled_map, primary_name)
-	resolved_values = resolver.resolve()
+	resource = transform_to_fhir(compiled_map, primary_name)
+	return resource
 
-	generator = FHIRResourceGenerator(compiled_map, resolved_values)
-	return generator.generate()
+	# With validation
+	# transformer = FHIRTransformer(compiled_map)
+	# resource, errors = transformer.transform_with_validation(primary_name)
+
+	# Debug access
+	# resolved = transformer.get_resolved_values()
+	# sources = transformer.get_source_data()
+
+	# Batch
+	# from fhir_transformer import transform_to_bundle
+	# bundle = transform_to_bundle(compiled_map, ["PAT-001", "PAT-002"])

@@ -123,6 +123,31 @@ class FHIRMappingCompiler:
 
 	SUPPORTED_SOURCE_KINDS = {"direct_link", "reverse_link"}
 
+	# Primitive FHIR types - arrays of these should be collected, not spread
+	PRIMITIVE_TYPES = {
+		"boolean",
+		"integer",
+		"integer64",
+		"string",
+		"decimal",
+		"uri",
+		"url",
+		"canonical",
+		"base64Binary",
+		"instant",
+		"date",
+		"dateTime",
+		"time",
+		"code",
+		"oid",
+		"id",
+		"markdown",
+		"unsignedInt",
+		"positiveInt",
+		"uuid",
+		"xhtml",
+	}
+
 	def __init__(self, resource_map):
 		self.resource_map = resource_map
 		self._sd_elements_map = {}
@@ -169,6 +194,7 @@ class FHIRMappingCompiler:
 		}
 
 		self._apply_default_indexes(compiled)
+		self._apply_is_array_flags(compiled)
 		self._validate_output(compiled)
 
 		return compiled
@@ -622,6 +648,51 @@ class FHIRMappingCompiler:
 				if base_json_path
 				else ""
 			)
+
+	def _apply_is_array_flags(self, compiled):
+		"""
+		Apply is_array flag to elements based on their datatype and cardinality.
+
+		is_array=True means the element is a primitive array (e.g., given, line)
+		and list values should be COLLECTED into an array at that path.
+
+		is_array=False (default) means list values should be SPREAD across
+		parent container indexes (e.g., telecom[0], telecom[1]).
+
+		Logic:
+		- If element datatype is primitive AND max cardinality is "*" -> is_array=True
+		- Otherwise -> is_array=False
+		"""
+		elements = compiled.get("elements") or {}
+
+		for fhir_path, element in elements.items():
+			if not isinstance(element, dict):
+				continue
+
+			# Get datatype and max cardinality
+			datatype = (element.get("datatype") or "").strip()
+			max_card = (element.get("max") or "").strip()
+
+			# Determine if this is a primitive array
+			is_primitive = self._is_primitive_type(datatype)
+			is_repeating = max_card == "*"
+
+			# Set is_array flag
+			element["is_array"] = is_primitive and is_repeating
+
+	def _is_primitive_type(self, datatype):
+		"""
+		Check if a datatype is a FHIR primitive type.
+
+		Primitive types are simple value types (string, integer, etc.)
+		as opposed to complex types (HumanName, Address, etc.)
+		"""
+		if not datatype:
+			return False
+
+		# Normalize: FHIR primitives are lowercase, complex types are PascalCase
+		# But we check against our known set to be safe
+		return datatype.lower() in self.PRIMITIVE_TYPES or datatype in self.PRIMITIVE_TYPES
 
 	def _validate_output(self, compiled):
 		sources = compiled.get("sources") or {}

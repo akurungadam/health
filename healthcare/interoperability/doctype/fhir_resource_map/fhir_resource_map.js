@@ -1155,13 +1155,11 @@ const Dialogs = {
 		const statusHtml = is_valid
 			? `<div class="mb-4">
 				<span class="indicator-pill green">
-					<span class="indicator green"></span>
 					${__("Mapping is Valid")}
 				</span>
 			</div>`
 			: `<div class="mb-4">
 				<span class="indicator-pill red">
-					<span class="indicator red"></span>
 					${__("Mapping has Issues")}
 				</span>
 			</div>`;
