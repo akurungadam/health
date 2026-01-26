@@ -1,80 +1,75 @@
 import frappe
 from frappe.utils import cint
 
-# =========================================================
-# Structure Definition Loader
-# =========================================================
-
 
 class FHIRStructureDefinitionLoader:
-	"""Loads and merges structure definition elements."""
-
-	def __init__(self, resource_map):
-		self.resource_map = resource_map
-
-	def load_merged_elements(self):
-		if not (self.resource_map.base_structure_definition or "").strip():
-			return []
-
-		base_sd = frappe.get_cached_doc(
-			"FHIR Structure Definition", self.resource_map.base_structure_definition
-		)
-		base_rows = base_sd.get("element_paths") or []
-		resource_type = (getattr(base_sd, "fhir_sd", None) or "").strip()
-
-		merger = FHIRStructureDefinitionMerger(resource_type=resource_type)
-		merged = merger.build_base_map(base_rows)
-
-		profile_rows = list(self.resource_map.get("profiles") or [])
-		profile_rows.sort(
-			key=lambda row: (0 if cint(getattr(row, "is_primary", 0)) else 1, cint(getattr(row, "idx", 0)))
-		)
-
-		for profile_row in profile_rows:
-			sd_name = (getattr(profile_row, "fhir_structure_definition", None) or "").strip()
-			if not sd_name:
-				continue
-
-			profile_url = (getattr(profile_row, "url", None) or "").strip() or (
-				getattr(profile_row, "fhir_profile", None) or ""
-			).strip()
-
-			profile_sd = frappe.get_cached_doc("FHIR Structure Definition", sd_name)
-			profile_elements = profile_sd.get("element_paths") or []
-
-			merger.overlay_profile_rows(
-				merged=merged,
-				profile_url=profile_url,
-				profile_elements=profile_elements,
-			)
-
-		return merger.to_sorted_rows(merged)
-
-
-class FHIRStructureDefinitionMerger:
-	"""Merges base and profile structure definitions with most-restrictive-wins logic."""
+	"""Loads base structure definition + overlays profile structure definitions into one merged element list."""
 
 	STRENGTH_RANK = {"example": 1, "preferred": 2, "extensible": 3, "required": 4}
 
-	def __init__(self, resource_type):
-		self.resource_type = (resource_type or "").strip()
+	def __init__(self, resource_map):
+		self.resource_map = resource_map
+		self.resource_type = ""
 
-	def build_base_map(self, base_rows):
+	def load_merged_elements(self):
+		base_sd_name = (self.resource_map.base_structure_definition or "").strip()
+		if not base_sd_name:
+			return []
+
+		base_sd = frappe.get_cached_doc("FHIR Structure Definition", base_sd_name)
+		base_rows = base_sd.get("element_paths") or []
+		self.resource_type = (getattr(base_sd, "fhir_sd", None) or "").strip()
+
+		merged = self._build_base_map(base_rows)
+
+		profile_rows = list(self.resource_map.get("profiles") or [])
+		profile_rows.sort(
+			key=lambda row: (
+				0 if cint(getattr(row, "is_primary", 0)) else 1,
+				cint(getattr(row, "idx", 0)),
+			)
+		)
+
+		for profile_row in profile_rows:
+			self._overlay_profile_row(merged, profile_row)
+
+		return self._to_sorted_rows(merged)
+
+	# =========================================================
+	# Build / Overlay
+	# =========================================================
+
+	def _build_base_map(self, base_rows):
 		merged = {}
 		for element_row in base_rows or []:
 			row = self._build_element_row(element_row)
 			if not row:
 				continue
+
+			# Skip the root "Patient" row (or whatever resourceType is)
 			if self.resource_type and row.get("fhir_path") == self.resource_type:
 				continue
+
 			merged[row["fhir_path"]] = row
 		return merged
 
-	def overlay_profile_rows(self, merged, profile_url, profile_elements):
+	def _overlay_profile_row(self, merged, profile_row):
+		sd_name = (getattr(profile_row, "fhir_structure_definition", None) or "").strip()
+		if not sd_name:
+			return
+
+		profile_url = (getattr(profile_row, "url", None) or "").strip()
+		if not profile_url:
+			profile_url = (getattr(profile_row, "fhir_profile", None) or "").strip()
+
+		profile_sd = frappe.get_cached_doc("FHIR Structure Definition", sd_name)
+		profile_elements = profile_sd.get("element_paths") or []
+
 		for element_row in profile_elements or []:
 			overlay = self._build_element_row(element_row)
 			if not overlay:
 				continue
+
 			if self.resource_type and overlay.get("fhir_path") == self.resource_type:
 				continue
 
@@ -90,8 +85,12 @@ class FHIRStructureDefinitionMerger:
 			if self._apply_most_restrictive(merged[path], overlay):
 				merged[path]["profile"] = profile_url
 
-	def to_sorted_rows(self, merged):
+	def _to_sorted_rows(self, merged):
 		return [merged[key] for key in sorted((merged or {}).keys())]
+
+	# =========================================================
+	# Row normalization
+	# =========================================================
 
 	def _build_element_row(self, element_row):
 		fhir_path = (element_row.get("path") or "").strip()
@@ -114,6 +113,10 @@ class FHIRStructureDefinitionMerger:
 			"profile": "",
 		}
 
+	# =========================================================
+	# Most restrictive wins
+	# =========================================================
+
 	def _apply_most_restrictive(self, base, overlay):
 		changed = False
 		changed |= self._apply_min(base, overlay)
@@ -128,6 +131,7 @@ class FHIRStructureDefinitionMerger:
 	def _apply_min(self, base, overlay):
 		if cint(overlay.get("min")) > cint(base.get("min")):
 			base["min"] = cint(overlay.get("min"))
+			base["is_required"] = 1 if cint(base["min"]) >= 1 else 0
 			return True
 		return False
 
@@ -154,34 +158,42 @@ class FHIRStructureDefinitionMerger:
 		return False
 
 	def _apply_binding_strength(self, base, overlay):
-		overlay_rank = self.STRENGTH_RANK.get((overlay.get("binding_strength") or "").lower(), 0)
+		overlay_strength = (overlay.get("binding_strength") or "").strip()
+		if not overlay_strength:
+			return False
+
+		overlay_rank = self.STRENGTH_RANK.get(overlay_strength.lower(), 0)
 		base_rank = self.STRENGTH_RANK.get((base.get("binding_strength") or "").lower(), 0)
 
-		if overlay_rank > base_rank and overlay.get("binding_strength"):
-			base["binding_strength"] = overlay.get("binding_strength")
+		if overlay_rank > base_rank:
+			base["binding_strength"] = overlay_strength
 			return True
+
 		return False
 
 	def _apply_valueset(self, base, overlay):
-		if overlay.get("valueset_url") and overlay.get("valueset_url") != base.get("valueset_url"):
-			base["valueset_url"] = overlay.get("valueset_url")
+		overlay_valueset = (overlay.get("valueset_url") or "").strip()
+		if overlay_valueset and overlay_valueset != (base.get("valueset_url") or "").strip():
+			base["valueset_url"] = overlay_valueset
 			return True
 		return False
 
 	def _apply_datatype(self, base, overlay):
-		if overlay.get("datatype") and overlay.get("datatype") != base.get("datatype"):
-			base["datatype"] = overlay.get("datatype")
+		overlay_datatype = (overlay.get("datatype") or "").strip()
+		if overlay_datatype and overlay_datatype != (base.get("datatype") or "").strip():
+			base["datatype"] = overlay_datatype
 			return True
 		return False
 
 	def _apply_target_profiles(self, base, overlay):
-		if overlay.get("target_profiles") and overlay.get("target_profiles") != base.get("target_profiles"):
-			base["target_profiles"] = overlay.get("target_profiles")
+		overlay_targets = overlay.get("target_profiles")
+		if overlay_targets and overlay_targets != base.get("target_profiles"):
+			base["target_profiles"] = overlay_targets
 			return True
 		return False
 
 	def _fill_metadata(self, base, overlay):
-		if overlay.get("short") and not base.get("short"):
+		if (overlay.get("short") or "").strip() and not (base.get("short") or "").strip():
 			base["short"] = overlay.get("short")
-		if overlay.get("definition") and not base.get("definition"):
+		if (overlay.get("definition") or "").strip() and not (base.get("definition") or "").strip():
 			base["definition"] = overlay.get("definition")
