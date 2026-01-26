@@ -341,6 +341,7 @@ class FHIRMappingCompiler:
 			result = self._compile_single_element(row, compiled_sources, warnings, extension_indexes)
 			if result:
 				fhir_path, element = result
+
 				if fhir_path in elements:
 					raise FHIRMappingCompilationError(
 						f"Duplicate element mapping for fhir_path '{fhir_path}'."
