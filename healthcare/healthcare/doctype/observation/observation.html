@@ -55,6 +55,93 @@
     .obs-sh-first-line {
         font-size: 11px;
     }
+
+    /* Imaging Report Styles */
+    .imaging-report {
+        margin: 20px 40px;
+        padding: 20px;
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .imaging-header {
+        border-bottom: 2px solid #777777;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+
+    .imaging-title {
+        font-size: 16px;
+        font-weight: bold;
+        color: #202124;
+        margin-bottom: 5px;
+    }
+
+    .imaging-meta {
+        font-size: 11px;
+        color: #5f6368;
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .imaging-meta-item {
+        display: flex;
+        gap: 5px;
+    }
+
+    .imaging-meta-label {
+        font-weight: 600;
+    }
+
+    .imaging-section {
+        margin-bottom: 20px;
+    }
+
+    .imaging-section-title {
+        font-size: 13px;
+        font-weight: bold;
+        color: #202124;
+        background: #f8f9fa;
+        padding: 8px 12px;
+        border-left: 3px solid #777777;
+        margin-bottom: 10px;
+    }
+
+    .imaging-content {
+        padding: 10px 15px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #3c4043;
+    }
+
+    .imaging-content img {
+        max-width: 100%;
+        height: auto;
+        margin: 15px 0;
+        border: 1px solid #dadce0;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .imaging-content p {
+        margin: 8px 0;
+    }
+
+    .imaging-interpretation {
+        background: #f8f9fa;
+        border-left: 3px solid #777777;
+        padding: 12px 15px;
+        margin-top: 15px;
+        border-radius: 0 4px 4px 0;
+    }
+
+    .imaging-findings {
+        background: #fff;
+        padding: 12px 15px;
+    }
 </style>
 
 <div class="row section-break diagnostic-report" style="margin-left: 40px;">
@@ -62,7 +149,7 @@
         <div class="row data-field">
             <div class="col-xs-4">Referred By:</div>
             {%- if doc.practitioner_name -%}
-            <div class="col-xs-8 value"><b>{{ doc.practitioner_name.upper() }}</b></div>
+                <div class="col-xs-8 value"><b>{{ doc.practitioner_name.upper() }}</b></div>
             {% else %}
                 <div class="col-xs-8 value"><b>Self</b></div>
             {% endif %}
@@ -75,289 +162,356 @@
         {% endif %}
     </div>
 </div>
-<div class = "observation-details" style="width: 100%; padding-left:40px; margin-bottom: 10px;">
-    <div class="obs-field" style="width: 15%;">
-        <div class="obs-sh-first-line">
-            <b>
-            SAMPLE
-            </b>
-        </div>
-        <div class="obs-second-line" style="color:rgb(197, 194, 194);">
-            Collected on
-        </div>
-    </div>
-    <div class="obs-field" style="width: 30%; padding-left:15px;">
-        <div class="obs-sh-first-line">
-            <b>
-            INVESTIGATION
-            </b>
-        </div>
-        <div class="obs-second-line" style="color:rgb(197, 194, 194);">
-            Method
-        </div>
-    </div>
-    <div class="obs-field" style="width: 17%; padding-left:25px;">
-        <div class="obs-sh-first-line">
-            <b>
-            RESULT
-            </b>
-        </div>
-        <div class="obs-second-line" style="color:rgb(197, 194, 194);">
-            Reported on
-        </div>
-    </div>
-    <div class="obs-field" style="width: 13%;">
-        <div class="obs-sh-first-line">
-            <b>
-            UNIT
-            </b>
-        </div>
-    </div>
-    <div class="obs-field" style="width: 29%;">
-        <div class="obs-sh-first-line">
-            <b>
-            REFERENCE INTERVAL
-            </b>
-        </div>
-    </div>
-</div>
 
-{% if doc.get("name")  %}
-    {% set full_data = get_observations_for_medical_record(doc.name, doc.parent_observation) %}
+{% if doc.observation_category == "Imaging" %}
+    <!-- Imaging Report Section -->
+    <div class="imaging-report">
+        <div class="imaging-header">
+            <div class="imaging-title">
+                {% if doc.preferred_display_name %}
+                    {{ doc.preferred_display_name }}
+                {% else %}
+                    {{ doc.observation_template or "Imaging Report" }}
+                {% endif %}
+            </div>
+            <div class="imaging-meta">
+                {% if doc.sample %}
+                    <div class="imaging-meta-item">
+                        <span class="imaging-meta-label">Sample:</span>
+                        <span>{{ doc.sample }}</span>
+                    </div>
+                {% endif %}
+                {% if doc.time_of_result %}
+                    <div class="imaging-meta-item">
+                        <span class="imaging-meta-label">Report Date:</span>
+                        <span>{{ frappe.utils.format_datetime(doc.time_of_result, "dd-MM-yyyy HH:mm") }}</span>
+                    </div>
+                {% endif %}
+                {% if doc.method %}
+                    <div class="imaging-meta-item">
+                        <span class="imaging-meta-label">Technique:</span>
+                        <span>{{ doc.method }}</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if doc.result_text %}
+            <div class="imaging-section">
+                <div class="imaging-section-title">FINDINGS</div>
+                <div class="imaging-content imaging-findings">
+                    {{ doc.result_text }}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if doc.result_interpretation %}
+            <div class="imaging-section">
+                <div class="imaging-section-title">IMPRESSION</div>
+                <div class="imaging-content imaging-interpretation">
+                    {{ doc.result_interpretation }}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if doc.note %}
+            <div class="imaging-section">
+                <div class="imaging-section-title">ADDITIONAL NOTES</div>
+                <div class="imaging-content">
+                    {{ doc.note }}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <!-- Laboratory Report Section -->
+    <div class="observation-details" style="width: 100%; padding-left:40px; margin-bottom: 10px;">
+        <div class="obs-field" style="width: 15%;">
+            <div class="obs-sh-first-line">
+                <b>
+                    SAMPLE
+                </b>
+            </div>
+            <div class="obs-second-line" style="color:rgb(197, 194, 194);">
+                Collected on
+            </div>
+        </div>
+        <div class="obs-field" style="width: 30%; padding-left:15px;">
+            <div class="obs-sh-first-line">
+                <b>
+                    INVESTIGATION
+                </b>
+            </div>
+            <div class="obs-second-line" style="color:rgb(197, 194, 194);">
+                Method
+            </div>
+        </div>
+        <div class="obs-field" style="width: 17%; padding-left:25px;">
+            <div class="obs-sh-first-line">
+                <b>
+                    RESULT
+                </b>
+            </div>
+            <div class="obs-second-line" style="color:rgb(197, 194, 194);">
+                Reported on
+            </div>
+        </div>
+        <div class="obs-field" style="width: 13%;">
+            <div class="obs-sh-first-line">
+                <b>
+                    UNIT
+                </b>
+            </div>
+        </div>
+        <div class="obs-field" style="width: 29%;">
+            <div class="obs-sh-first-line">
+                <b>
+                    REFERENCE INTERVAL
+                </b>
+            </div>
+        </div>
+    </div>
+
+    {% if doc.get("name") %}
+        {% set full_data = get_observations_for_medical_record(doc.name, doc.parent_observation) %}
         <div class="observation-report">
-    {% for data in full_data %}
-        {% if not data.get("has_component")  %}
-            {% if data.get("observation").get("preferred_display_name")  %}
-                {% set observation_name = data.get("observation").get("preferred_display_name") %}
-            {% else %}
-                {% set observation_name = data.get("observation").get("observation_template") %}
-            {% endif %}
+            {% for data in full_data %}
+                {% if not data.get("has_component") %}
+                    {% if data.get("observation").get("preferred_display_name") %}
+                        {% set observation_name = data.get("observation").get("preferred_display_name") %}
+                    {% else %}
+                        {% set observation_name = data.get("observation").get("observation_template") %}
+                {% endif %}
 
-            {% if data.get("observation") or data.get("observation")  %}
-            {% if data.get("observation").get("status")=="Approved" and (data.get("observation").get("result_data") or data.get("observation").get("result_text") or  data.get("observation").get("result_select")  not in [None, "", "Null"]) %}
-            <div class="observation-section grouped-obs">
-                <div class="flex" style="padding-bottom: 5px; margin-left:5px;">
-                    <b>
-                        {{observation_name}}
-                    </b>
-                </div>
-                <div class="observation single-obs">
-                <div class="observation-details" style="width: 100%;">
-                    <div class="obs-field" style="width: 15%;">
-                        {% if data.get("observation").get("sample")  %}
-                            <div class="obs-first-line">
-                                {{data.get("observation").get("sample")}}
+                {% if data.get("observation") or data.get("observation") %}
+                    {% if data.get("observation").get("status")=="Approved" and (data.get("observation").get("result_data") or
+                        data.get("observation").get("result_text") or data.get("observation").get("result_select") not in [None, "",
+                        "Null"])
+                    %}
+                        <div class="observation-section grouped-obs">
+                            <div class="flex" style="padding-bottom: 5px; margin-left:5px;">
+                                <b>
+                                    {{observation_name}}
+                                </b>
                             </div>
-                        {% else %}
-                            <div class="obs-first-line">
-                                {{ frappe.db.get_value("Observation Template", data.get("observation").get("observation_template"), "sample") or "" }}
-                            </div>
-                        {% endif %}
-                        {% if data.get("observation").get("received_time")  %}
-                            <div class="text-muted obs-second-line">
-                                {{frappe.utils.format_datetime(data.get("observation").get("received_time"))[:-3]}}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="obs-field" style="width: 30%;">
-                        <div class="obs-first-line">
-                            {{observation_name}}
-                        </div>
-                        {% if data.get("observation").get("method")  %}
-                            <div class="text-muted obs-second-line">
-                                {{data.get("observation").get("method")}}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="obs-field" style="width: 20%;">
-                        <div class="obs-first-line text-center" style="text-align: center;">
-                            {% if data.get("observation").get("result_data") or data.get("observation").get("result_select") %}
-                                {{data.get("observation").get("result_data")
-                                or data.get("observation").get("result_select")}}
-                            {% elif data.get("observation").get("result_text") %}
-                                {% if '</div>' in data.get("observation").get("result_text") %}
-                                        {% if  data.get("observation").get("result_text")|length <= 60 %}
-                                        {{data.get("observation").get("result_text")}}
-                                    {% endif %}
-                                {% elif data.get("observation").get("result_text")|length <= 24 %}
-                                        {{data.get("observation").get("result_text")}}
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                        {% if data.get("observation").get("time_of_result")  %}
-                        <div class="text-muted obs-second-line text-center" style="text-align: center;">
-                            {{frappe.utils.format_datetime(data.get("observation").get("time_of_result"))[:-3]}}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="obs-field obs-first-line" style="width: 12%; padding-right:5px;">
-                        {% if data.get("observation").get("permitted_unit")  %}
-                            {{data.get("observation").get("permitted_unit")}}
-                        {% endif %}
-                    </div>
-                    <div class="obs-field obs-second-line ref-range" style="width: 23%; padding-left:5px;">
-                        {% if data.get("observation").get("reference")  %}
-                            {{data.get("observation").get("reference")}}
-                        {% endif %}
-                    </div>
-                </div>
-                {% if data.get("observation").get("result_text") %}
-                    {% if '</div>' in data.get("observation").get("result_text") %}
-                        {% if  data.get("observation").get("result_text")|length > 60 %}
-                            <div class="note obs-second-line">
-                                {{data.get("observation").get("result_text")}}
-                            </div>
-                        {% endif %}
-                    {% elif data.get("observation").get("result_text")|length > 24 %}
-                        <div class="note obs-second-line">
-                            {{data.get("observation").get("result_text")}}
-                        </div>
-                    {% endif %}
-                {% endif %}
-                {% if data.get("observation").get("result_interpretation")  %}
-                    <div class="note obs-second-line">
-                        {{data.get("observation").get("result_interpretation")}}
-                    </div>
-                {% endif %}
-                {% if data.get("observation").get("note")  %}
-                    <div class="note obs-second-line">
-                        {{data.get("observation").get("note")}}
-                    </div>
-                {% endif %}
-                {% if data.get("observation").get("description")  %}
-                    <div class="note obs-second-line">
-                        {{data.get("observation").get("description")}}
-                    </div>
-                {% endif %}
-                </div>
-                </div>
-            {% endif %}
-            {% endif %}
-        {% else %}
-            {% if data["obs_approved"] and data[data.get("observation")] and data["has_result"] %}
-                <div class="observation-section">
-                <div class="section-body">
-                <div class="observations pr-1">
-                <div class="grouped-obs">
-                    <div class="flex" style="padding-bottom: 5px; margin-left: 15px;">
-                        <b>
-                            {{data.get("display_name")}}
-                        </b>
-                    </div>
-                    {% for comps in data[data.get("observation")] %}
-                        {% set comps_dict = comps.get("observation") %}
-                        {% if comps_dict and isinstance(comps_dict, dict) %}
-                        {% if comps.get("observation").get("preferred_display_name")  %}
-                            {% set observation_name = comps.get("observation").get("preferred_display_name") %}
-                        {% else %}
-                            {% set observation_name = comps.get("observation").get("observation_template") %}
-                        {% endif %}
-                        {% if comps.get("observation").get("status")=="Approved" and comps.get("observation")  %}
-                        {% if comps.get("observation").get("result_data") or comps.get("observation").get("result_text") or  comps.get("observation").get("result_select")  not in [None, "", "Null"] %}
-                            <div class="observation-section">
                             <div class="observation single-obs">
-                            <div class="observation-details" style="width: 100%;">
-                                <div class="obs-field" style="width: 15%;">
-                                    {% if comps.get("observation").get("sample")  %}
-                                        <div class="obs-first-line">
-                                            {{comps.get("observation").get("sample")}}
-                                        </div>
-                                    {% else %}
-                                        <div class="obs-first-line">
-                                            {{ frappe.db.get_value("Observation Template", comps.get("observation").get("observation_template"), "sample") or ""}}
-                                        </div>
-                                    {% endif %}
-                                    {% if comps.get("observation").get("received_time")  %}
-                                        <div class="text-muted obs-second-line">
-                                            {{frappe.utils.format_datetime(comps.get("observation").get("received_time"))[:-3]}}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="obs-field" style="width: 30%;">
-                                    <div class="obs-first-line">
-                                        {{observation_name}}
-                                    </div>
-                                    {% if comps.get("observation").get("method")  %}
-                                        <div class="text-muted obs-second-line">
-                                            {{comps.get("observation").get("method")}}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="obs-field" style="width: 20%;">
-                                    <div class="obs-first-line text-center" style="text-align: center;">
-                                        {% if comps.get("observation").get("result_data") or comps.get("observation").get("result_select") %}
-                                            {{comps.get("observation").get("result_data")
-                                            or comps.get("observation").get("result_select")}}
-                                        {% elif comps.get("observation").get("result_text") %}
-                                            {% if '</div>' in comps.get("observation").get("result_text") %}
-                                                    {% if  comps.get("observation").get("result_text")|length <= 60 %}
-                                                    {{comps.get("observation").get("result_text")}}
-                                                {% endif %}
-                                            {% elif comps.get("observation").get("result_text")|length <= 24 %}
-                                                    {{comps.get("observation").get("result_text")}}
-                                            {% endif %}
+                                <div class="observation-details" style="width: 100%;">
+                                    <div class="obs-field" style="width: 15%;">
+                                        {% if data.get("observation").get("sample") %}
+                                            <div class="obs-first-line">
+                                                {{data.get("observation").get("sample")}}
+                                            </div>
+                                        {% else %}
+                                            <div class="obs-first-line">
+                                                {{ frappe.db.get_value("Observation Template",
+                                                data.get("observation").get("observation_template"), "sample") or "" }}
+                                            </div>
+                                        {% endif %}
+                                        {% if data.get("observation").get("received_time") %}
+                                            <div class="text-muted obs-second-line">
+                                                {{frappe.utils.format_datetime(data.get("observation").get("received_time"))[:-3]}}
+                                            </div>
                                         {% endif %}
                                     </div>
-                                    {% if comps.get("observation").get("time_of_result")  %}
-                                    <div class="text-muted obs-second-line text-center">
-                                        {{frappe.utils.format_datetime(comps.get("observation").get("time_of_result"))[:-3]}}
+                                    <div class="obs-field" style="width: 30%;">
+                                        <div class="obs-first-line">
+                                            {{observation_name}}
+                                        </div>
+                                        {% if data.get("observation").get("method") %}
+                                            <div class="text-muted obs-second-line">
+                                                {{data.get("observation").get("method")}}
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    {% endif %}
+                                    <div class="obs-field" style="width: 20%;">
+                                        <div class="obs-first-line text-center" style="text-align: center;">
+                                            {% if data.get("observation").get("result_data") or data.get("observation").get("result_select")%}
+                                                {{data.get("observation").get("result_data") or data.get("observation").get("result_select")}}
+                                            {% elif data.get("observation").get("result_text") %}
+                                                {% if '</div>' in data.get("observation").get("result_text") %}
+                                                    {% if data.get("observation").get("result_text")|length <= 60 %}
+                                                        {{data.get("observation").get("result_text")}}
+                                                    {% endif %}
+                                                {% elif data.get("observation").get("result_text")|length <=24 %}
+                                                    {{data.get("observation").get("result_text")}}
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                        {% if data.get("observation").get("time_of_result") %}
+                                            <div class="text-muted obs-second-line text-center" style="text-align: center;">
+                                                {{frappe.utils.format_datetime(data.get("observation").get("time_of_result"))[:-3]}}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="obs-field obs-first-line" style="width: 12%; padding-right:5px;">
+                                        {% if data.get("observation").get("permitted_unit") %}
+                                            {{data.get("observation").get("permitted_unit")}}
+                                        {% endif %}
+                                    </div>
+                                    <div class="obs-field obs-second-line ref-range" style="width: 23%; padding-left:5px;">
+                                        {% if data.get("observation").get("reference") %}
+                                            {{data.get("observation").get("reference")}}
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <div class="obs-field obs-first-line" style="width: 12%;">
-                                    {% if comps.get("observation").get("permitted_unit")  %}
-                                        {{comps.get("observation").get("permitted_unit")}}
-                                    {% endif %}
-                                </div>
-                                <div class="obs-field obs-first-line" style="width: 23%;">
-                                    {% if comps.get("observation").get("reference")  %}
-                                        {{comps.get("observation").get("reference")}}
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% if comps.get("observation").get("result_text") %}
-                                {% if '</div>' in comps.get("observation").get("result_text") %}
-                                    {% if comps.get("observation").get("result_text")|length > 60 %}
+                                {% if data.get("observation").get("result_text") %}
+                                    {% if '</div>' in data.get("observation").get("result_text") %}
+                                        {% if data.get("observation").get("result_text")|length > 60 %}
+                                            <div class="note obs-second-line">
+                                                {{data.get("observation").get("result_text")}}
+                                            </div>
+                                        {% endif %}
+                                    {% elif data.get("observation").get("result_text")|length > 24 %}
                                         <div class="note obs-second-line">
-                                            {{comps.get("observation").get("result_text")}}
+                                            {{data.get("observation").get("result_text")}}
                                         </div>
                                     {% endif %}
-                                {% elif comps.get("observation").get("result_text")|length > 24 %}
+                                {% endif %}
+                                {% if data.get("observation").get("result_interpretation") %}
                                     <div class="note obs-second-line">
-                                        {{comps.get("observation").get("result_text")}}
+                                        {{data.get("observation").get("result_interpretation")}}
                                     </div>
                                 {% endif %}
-                            {% endif %}
-                            {% if comps.get("observation").get("result_interpretation")  %}
-                                <div class="note obs-second-line">
-                                    {{comps.get("observation").get("result_interpretation")}}
-                                </div>
-                            {% endif %}
-                            {% if comps.get("observation").get("note")  %}
-                                <div class="note obs-second-line">
-                                    {{comps.get("observation").get("note")}}
-                                </div>
-                            {% endif %}
-                            {% if comps.get("observation").get("description") and not data.get("description") %}
-                                <div class="note obs-second-line">
-                                    {{comps.get("observation").get("description")}}
-                                </div>
-                            {% endif %}
+                                {% if data.get("observation").get("note") %}
+                                    <div class="note obs-second-line">
+                                        {{data.get("observation").get("note")}}
+                                    </div>
+                                {% endif %}
+                                {% if data.get("observation").get("description") %}
+                                    <div class="note obs-second-line">
+                                        {{data.get("observation").get("description")}}
+                                    </div>
+                                {% endif %}
                             </div>
-                            </div>
-                        {% endif %}
-                        {% endif %}
+                        </div>
                     {% endif %}
-                    {% endfor %}
-                    <div class="note obs-second-line">
-                        {{data.get("description") or ""}}
+                {% endif %}
+                {% endif %}
+                {% if data["obs_approved"] and data[data.get("observation")] and data["has_result"] %}
+                    <div class="observation-section">
+                        <div class="section-body">
+                            <div class="observations pr-1">
+                                <div class="grouped-obs">
+                                    <div class="flex" style="padding-bottom: 5px; margin-left: 15px;">
+                                        <b>
+                                            {{data.get("display_name")}}
+                                        </b>
+                                    </div>
+                                    {% for comps in data[data.get("observation")] %}
+                                        {% set comps_dict = comps.get("observation") %}
+                                        {% if comps_dict and isinstance(comps_dict, dict) %}
+                                            {% if comps.get("observation").get("preferred_display_name") %}
+                                                {% set observation_name = comps.get("observation").get("preferred_display_name") %}
+                                            {% else %}
+                                                {% set observation_name = comps.get("observation").get("observation_template") %}
+                                            {% endif %}
+                                            {% if comps.get("observation").get("status")=="Approved" and comps.get("observation") %}
+                                                {% if comps.get("observation").get("result_data") or comps.get("observation").get("result_text") or
+                                                comps.get("observation").get("result_select") not in [None, "", "Null"]
+                                            %}
+                                                <div class="observation-section">
+                                                    <div class="observation single-obs">
+                                                        <div class="observation-details" style="width: 100%;">
+                                                            <div class="obs-field" style="width: 15%;">
+                                                                {% if comps.get("observation").get("sample") %}
+                                                                    <div class="obs-first-line">
+                                                                        {{comps.get("observation").get("sample")}}
+                                                                    </div>
+                                                                {% else %}
+                                                                    <div class="obs-first-line">
+                                                                        {{ frappe.db.get_value("Observation Template",
+                                                                        comps.get("observation").get("observation_template"), "sample") or ""}}
+                                                                    </div>
+                                                                {% endif %}
+                                                                {% if comps.get("observation").get("received_time") %}
+                                                                    <div class="text-muted obs-second-line">
+                                                                        {{frappe.utils.format_datetime(comps.get("observation").get("received_time"))[:-3]}}
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="obs-field" style="width: 30%;">
+                                                                <div class="obs-first-line">
+                                                                    {{observation_name}}
+                                                                </div>
+                                                                {% if comps.get("observation").get("method") %}
+                                                                    <div class="text-muted obs-second-line">
+                                                                        {{comps.get("observation").get("method")}}
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="obs-field" style="width: 20%;">
+                                                                <div class="obs-first-line text-center" style="text-align: center;">
+                                                                    {% if comps.get("observation").get("result_data") or comps.get("observation").get("result_select") %}
+                                                                        {{comps.get("observation").get("result_data") or comps.get("observation").get("result_select")}}
+                                                                    {% elif comps.get("observation").get("result_text") %}
+                                                                        {% if '</div>' in comps.get("observation").get("result_text") %}
+                                                                            {% if comps.get("observation").get("result_text")|length <= 60 %}
+                                                                                {{comps.get("observation").get("result_text")}}
+                                                                            {% endif %}
+                                                                        {% elif comps.get("observation").get("result_text")|length <=24 %}
+                                                                            {{comps.get("observation").get("result_text")}}
+                                                                        {% endif %}
+                                                                    {% endif %} </div>
+                                                                    {% if comps.get("observation").get("time_of_result") %}
+                                                                        <div class="text-muted obs-second-line text-center">
+                                                                            {{frappe.utils.format_datetime(comps.get("observation").get("time_of_result"))[:-3]}}
+                                                                        </div>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="obs-field obs-first-line" style="width: 12%;">
+                                                                    {% if comps.get("observation").get("permitted_unit") %}
+                                                                        {{comps.get("observation").get("permitted_unit")}}
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="obs-field obs-first-line" style="width: 23%;">
+                                                                    {% if comps.get("observation").get("reference") %}
+                                                                        {{comps.get("observation").get("reference")}}
+                                                                    {% endif %}
+                                                                </div>
+                                                            </div>
+                                                            {% if comps.get("observation").get("result_text") %}
+                                                                {% if '</div>' in comps.get("observation").get("result_text") %}
+                                                                    {% if comps.get("observation").get("result_text")|length > 60 %}
+                                                                        <div class="note obs-second-line">
+                                                                            {{comps.get("observation").get("result_text")}}
+                                                                        </div>
+                                                                    {% endif %}
+                                                                {% elif comps.get("observation").get("result_text")|length > 24 %}
+                                                                    <div class="note obs-second-line">
+                                                                        {{comps.get("observation").get("result_text")}}
+                                                                    </div>
+                                                                {% endif %}
+                                                            {% endif %}
+                                                            {% if comps.get("observation").get("result_interpretation") %}
+                                                                <div class="note obs-second-line">
+                                                                    {{comps.get("observation").get("result_interpretation")}}
+                                                                </div>
+                                                            {% endif %}
+                                                            {% if comps.get("observation").get("note") %}
+                                                                <div class="note obs-second-line">
+                                                                    {{comps.get("observation").get("note")}}
+                                                                </div>
+                                                            {% endif %}
+                                                            {% if comps.get("observation").get("description") and not data.get("description") %}
+                                                                <div class="note obs-second-line">
+                                                                    {{comps.get("observation").get("description")}}
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <div class="note obs-second-line">
+                                        {{data.get("description") or ""}}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                </div>
-                </div>
-                </div>
-            {% endif %}
-        {% endif %}
-    {% endfor %}
-    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
 {% endif %}
