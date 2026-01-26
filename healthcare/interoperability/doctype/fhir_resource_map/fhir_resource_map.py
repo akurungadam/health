@@ -8,7 +8,7 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from healthcare.interoperability.doctype.fhir_resource_map.compiler import FHIRMappingCompiler
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import FHIRMappingCompiler
 from healthcare.interoperability.doctype.fhir_resource_map.structure_def_loader import (
 	FHIRStructureDefinitionLoader,
 )
@@ -29,7 +29,7 @@ class FHIRResourceMap(Document):
 			sort_keys=True,
 			separators=(",", ":"),
 			ensure_ascii=False,
-			indent=1,
+			indent=2,
 		)
 
 		self.compiled_mapping = compiled_json
