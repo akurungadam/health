@@ -9,15 +9,12 @@ from frappe.model.document import Document
 from frappe.utils import now_datetime
 
 from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import FHIRMappingCompiler
-from healthcare.interoperability.doctype.fhir_resource_map.structure_def_loader import (
+from healthcare.healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import (
 	FHIRStructureDefinitionLoader,
 )
-from healthcare.interoperability.doctype.fhir_resource_map.transformer import (
-	FHIRTransformer,
-	transform_to_fhir,
-)
+
 from healthcare.interoperability.doctype.fhir_resource_map.validator import FHIRMappingValidator
-from healthcare.interoperability.doctype.fhir_resource_map.value_resolver import FHIRValueResolver
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_value_resolver import FHIRValueResolver
 
 
 class FHIRResourceMap(Document):
@@ -109,27 +106,3 @@ def resolve_fhir_values(fhir_resource_map, primary_name):
 
 	resolver = FHIRValueResolver(compiled_map, primary_name)
 	return resolver.resolve()
-
-
-@frappe.whitelist()
-def build_fhir_resource(fhir_resource_map, primary_name):
-	resource_map = frappe.get_doc("FHIR Resource Map", fhir_resource_map)
-
-	compiled_map = resource_map.compiled_mapping
-	if isinstance(compiled_map, str):
-		compiled_map = frappe.parse_json(compiled_map)
-
-	resource = transform_to_fhir(compiled_map, primary_name)
-	return resource
-
-	# With validation
-	# transformer = FHIRTransformer(compiled_map)
-	# resource, errors = transformer.transform_with_validation(primary_name)
-
-	# Debug access
-	# resolved = transformer.get_resolved_values()
-	# sources = transformer.get_source_data()
-
-	# Batch
-	# from fhir_transformer import transform_to_bundle
-	# bundle = transform_to_bundle(compiled_map, ["PAT-001", "PAT-002"])
