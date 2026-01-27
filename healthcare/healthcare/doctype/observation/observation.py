@@ -148,6 +148,7 @@ def get_observation_details(docname):
 				"parent_observation": "",
 				"status": ["!=", "Cancelled"],
 				"docstatus": ["!=", 2],
+				"observation_category": "Laboratory",
 			},
 			order_by="creation",
 		)
@@ -171,6 +172,7 @@ def get_observation_details(docname):
 				"parent_observation": "",
 				"status": ["!=", "Cancelled"],
 				"docstatus": ["!=", 2],
+				"observation_category": "Laboratory",
 			},
 			order_by="creation",
 		)
