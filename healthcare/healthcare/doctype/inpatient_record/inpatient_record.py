@@ -32,7 +32,6 @@ from healthcare.healthcare.doctype.patient_insurance_coverage.patient_insurance_
 )
 from healthcare.healthcare.utils import (
 	get_appointment_billing_item_and_rate,
-	get_pending_invoices,
 	validate_nursing_tasks,
 )
 
@@ -105,7 +104,9 @@ class InpatientRecord(Document):
 						},
 					):
 						parent_doc = frappe.get_doc(item.get("parenttype"), item.get("parent"))
-						parent_doc.append("links", {"link_doctype": "Inpatient Record", "link_name": self.name})
+						parent_doc.append(
+							"links", {"link_doctype": "Inpatient Record", "link_name": self.name}
+						)
 						parent_doc.save()
 
 	def validate(self):
@@ -161,7 +162,8 @@ class InpatientRecord(Document):
 	def admit(self, service_unit, check_in, expected_discharge=None, currency=None, price_list=None):
 		admit_patient(self, service_unit, check_in, expected_discharge, currency, price_list)
 		create_orders_from_treatment_counselling(self)
-		close_emergency_record(self)
+		if self.emergency_record:
+			close_emergency_record(self)
 
 	@frappe.whitelist()
 	def discharge(self):
@@ -312,7 +314,6 @@ class InpatientRecord(Document):
 						)
 					)
 
-				total_hours = inpatient.get("total_hours") or 0
 				minimum_billable_qty = inpatient.get("minimum_billable_qty")
 				total_qty = (
 					(inpatient.get("total_hours") / inpatient.get("no_of_hours"))
@@ -1230,9 +1231,7 @@ def get_stock_consumables(inpatient_record):
 
 
 def get_item_price(item_code):
-	price = frappe.db.get_value(
-		"Item Price", {"item_code": item_code, "selling": 1}, "price_list_rate"
-	)
+	price = frappe.db.get_value("Item Price", {"item_code": item_code, "selling": 1}, "price_list_rate")
 	return price or 0
 
 
