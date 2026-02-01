@@ -12,8 +12,8 @@ const API_METHODS = {
 		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.load_structure_definition_elements",
 	resolve_fhir_values:
 		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.resolve_fhir_values",
-	generate_fhir_resource:
-		"healthcare.interoperability.doctype.fhir_resource_map.builder.generate_fhir_resource",
+	preview_fhir_resource:
+		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.preview_fhir_resource",
 	validate_fhir_mapping:
 		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.validate_fhir_mapping",
 };
@@ -213,9 +213,9 @@ const FormButtons = {
 				if (!primaryName) return;
 
 				const response = await frappe.call({
-					method: API_METHODS.generate_fhir_resource,
+					method: API_METHODS.preview_fhir_resource,
 					args: {
-						resource_map_name: frm.doc.name,
+						fhir_resource_map: frm.doc.name,
 						primary_name: primaryName,
 					},
 					freeze: true,
