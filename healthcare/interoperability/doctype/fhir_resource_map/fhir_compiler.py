@@ -1,601 +1,909 @@
-# Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
-# For license information, please see license.txt
-
 import json
+from datetime import datetime
+
 import frappe
 
-from frappe.utils import cint, now_datetime
+
+class CompilationMetadata:
+	def __init__(self, fhir_version, profile_url, resource_type):
+		self.fhir_version = fhir_version
+		self.profile_url = profile_url
+		self.resource_type = resource_type
+		self.compiled_at = None
+
+	def to_dict(self):
+		return {
+			"fhir_version": self.fhir_version,
+			"profile_url": self.profile_url,
+			"resource_type": self.resource_type,
+			"compiled_at": str(self.compiled_at) if self.compiled_at else None,
+		}
+
+	@classmethod
+	def from_dict(cls, data):
+		instance = cls(data.get("fhir_version"), data.get("profile_url"), data.get("resource_type"))
+		instance.compiled_at = data.get("compiled_at")
+		return instance
+
+	def __repr__(self):
+		return f"CompilationMetadata({self.resource_type}, {self.fhir_version})"
 
 
-class FHIRMappingCompilationError(Exception):
-	pass
+class CompiledSource:
+	def __init__(self, key, entity, entity_type):
+		self.key = key
+		self.entity = entity
+		self.entity_type = entity_type
+		self.filters = {}
+		self.is_primary = False
+		self.is_collection = False
+		self.parent_source_key = None
+		self.link_field = None
+		self.config = {}
+
+	def to_dict(self):
+		return {
+			"key": self.key,
+			"entity": self.entity,
+			"entity_type": self.entity_type,
+			"filters": self.filters,
+			"is_primary": self.is_primary,
+			"is_collection": self.is_collection,
+			"parent_source_key": self.parent_source_key,
+			"link_field": self.link_field,
+			"config": self.config,
+		}
+
+	@classmethod
+	def from_dict(cls, data):
+		instance = cls(data.get("key"), data.get("entity"), data.get("entity_type"))
+		instance.filters = data.get("filters", {})
+		instance.is_primary = data.get("is_primary", False)
+		instance.is_collection = data.get("is_collection", False)
+		instance.parent_source_key = data.get("parent_source_key")
+		instance.link_field = data.get("link_field")
+		instance.config = data.get("config", {})
+		return instance
+
+	def __repr__(self):
+		return f"CompiledSource({self.key}, {self.entity})"
 
 
-class FHIRMappingCompiler:
-	"""Compiles FHIR Resource Map into a runtime friendly mapping structure."""
+class CompiledElement:
+	MAPPING_FIELD = "field"
+	MAPPING_FIXED = "fixed"
+	MAPPING_EXPRESSION = "expression"
+	MAPPING_JSON = "json"
 
+	def __init__(self, path, source_key):
+		self.path = path
+		self.source_key = source_key
+		self.mapping_type = None
+		self.field = None
+		self.expression = None
+		self.fixed_value = None
+		self.json_value = None
+		self.default_value = None
+		self.pattern_value = None
+		self.transformer = None
+		self.is_array = False
+		self.is_required = False
+		self.parent_path = None
+
+		# Extension support
+		self.extension_url = None
+		self.extension_value_type = None
+		self.is_modifier_extension = False
+
+		# Slice support
+		self.slice_name = None
+		self.slice_of = None
+
+	def to_dict(self):
+		return {
+			"path": self.path,
+			"source_key": self.source_key,
+			"mapping_type": self.mapping_type,
+			"field": self.field,
+			"expression": self.expression,
+			"fixed_value": self.fixed_value,
+			"json_value": self.json_value,
+			"default_value": self.default_value,
+			"pattern_value": self.pattern_value,
+			"transformer": self.transformer,
+			"is_array": self.is_array,
+			"is_required": self.is_required,
+			"parent_path": self.parent_path,
+			"extension_url": self.extension_url,
+			"extension_value_type": self.extension_value_type,
+			"is_modifier_extension": self.is_modifier_extension,
+			"slice_name": self.slice_name,
+			"slice_of": self.slice_of,
+		}
+
+	@classmethod
+	def from_dict(cls, data):
+		instance = cls(data.get("path"), data.get("source_key"))
+		instance.mapping_type = data.get("mapping_type")
+		instance.field = data.get("field")
+		instance.expression = data.get("expression")
+		instance.fixed_value = data.get("fixed_value")
+		instance.json_value = data.get("json_value")
+		instance.default_value = data.get("default_value")
+		instance.pattern_value = data.get("pattern_value")
+		instance.transformer = data.get("transformer")
+		instance.is_array = data.get("is_array", False)
+		instance.is_required = data.get("is_required", False)
+		instance.parent_path = data.get("parent_path")
+		instance.extension_url = data.get("extension_url")
+		instance.extension_value_type = data.get("extension_value_type")
+		instance.is_modifier_extension = data.get("is_modifier_extension", False)
+		instance.slice_name = data.get("slice_name")
+		instance.slice_of = data.get("slice_of")
+		return instance
+
+	def is_extension(self):
+		return self.extension_url is not None
+
+	def is_slice(self):
+		return self.slice_name is not None
+
+	def has_mapping(self):
+		return (
+			self.field is not None
+			or self.expression is not None
+			or self.fixed_value is not None
+			or self.json_value is not None
+		)
+
+	def has_default(self):
+		return self.default_value is not None
+
+	def has_pattern(self):
+		return self.pattern_value is not None
+
+	def __repr__(self):
+		return f"CompiledElement({self.path})"
+
+
+class ResourceTreeNode:
+	def __init__(self, name):
+		self.name = name
+		self.is_array = False
+		self.is_primitive = False
+		self.children = []
+
+	def to_dict(self):
+		result = {"name": self.name, "is_array": self.is_array, "is_primitive": self.is_primitive}
+
+		if self.children:
+			result["children"] = [child.to_dict() for child in self.children]
+
+		return result
+
+	@classmethod
+	def from_dict(cls, data):
+		instance = cls(data.get("name"))
+		instance.is_array = data.get("is_array", False)
+		instance.is_primitive = data.get("is_primitive", False)
+
+		for child_data in data.get("children", []):
+			instance.children.append(cls.from_dict(child_data))
+
+		return instance
+
+	def add_child(self, node):
+		self.children.append(node)
+		return node
+
+	def find_child(self, name):
+		for child in self.children:
+			if child.name == name:
+				return child
+		return None
+
+	def find_by_path(self, path):
+		parts = path.split(".")
+		current = self
+
+		for part in parts:
+			if current is None:
+				return None
+			if part == current.name:
+				continue
+			current = current.find_child(part)
+
+		return current
+
+	def __repr__(self):
+		return f"ResourceTreeNode({self.name})"
+
+
+class CompiledResource:
+	def __init__(self, metadata):
+		self.metadata = metadata
+		self.sources = []
+		self.elements = []
+		self.resource_tree = None
+
+	def to_dict(self):
+		return {
+			"metadata": self.metadata.to_dict(),
+			"sources": [source.to_dict() for source in self.sources],
+			"elements": [element.to_dict() for element in self.elements],
+			"resource_tree": self.resource_tree.to_dict() if self.resource_tree else None,
+		}
+
+	@classmethod
+	def from_dict(cls, data):
+		metadata = CompilationMetadata.from_dict(data.get("metadata", {}))
+		instance = cls(metadata)
+
+		for source_data in data.get("sources", []):
+			instance.sources.append(CompiledSource.from_dict(source_data))
+
+		for element_data in data.get("elements", []):
+			instance.elements.append(CompiledElement.from_dict(element_data))
+
+		tree_data = data.get("resource_tree")
+		if tree_data:
+			instance.resource_tree = ResourceTreeNode.from_dict(tree_data)
+
+		return instance
+
+	def add_source(self, source):
+		self.sources.append(source)
+		return source
+
+	def add_element(self, element):
+		self.elements.append(element)
+		return element
+
+	def get_source(self, key):
+		for source in self.sources:
+			if source.key == key:
+				return source
+		return None
+
+	def get_primary_source(self):
+		for source in self.sources:
+			if source.is_primary:
+				return source
+		return None
+
+	def get_elements_by_source(self, source_key):
+		result = []
+		for element in self.elements:
+			if element.source_key == source_key:
+				result.append(element)
+		return result
+
+	def get_elements_by_parent_path(self, parent_path):
+		result = []
+		for element in self.elements:
+			if element.parent_path == parent_path:
+				result.append(element)
+		return result
+
+	def __repr__(self):
+		return f"CompiledResource({self.metadata.resource_type}, {len(self.sources)} sources, {len(self.elements)} elements)"
+
+
+class FHIRCompiler:
 	def __init__(self, resource_map):
 		self.resource_map = resource_map
-		self.resource_type = self.resource_map.resource_type
-		self.primary_doctype = self.resource_map.primary_doctype
-		self.base_structure_definition = self.resource_map.base_structure_definition
+		self.compiled = None
+		self._element_map_lookup = {}
+		self._custom_elements = None
 
 	def compile(self):
-		self.validate_required_fields()
+		self._custom_elements = self._parse_custom_elements()
 
-		sources = self.compile_sources()
-		elements = self.compile_elements(sources)
+		metadata = self._build_metadata()
+		self.compiled = CompiledResource(metadata)
 
-		# Compile-time optimization:
-		# Collapse leaf mappings that read from a child table into one container mapping
-		# with value_spec.kind = "child_table_rows".
-		elements = self.collapse_child_table_row_mappings(elements, sources)
-		elements = self.collapse_object_group_mappings(elements)
+		# Determine compilation mode
+		if self._is_custom_only_mode():
+			self._compile_from_custom_elements()
+		else:
+			self._compile_from_ui_config()
+			self._merge_custom_additions()
 
-		element_order = sorted(elements.keys())
+		self._build_resource_tree()
+		self.compiled.metadata.compiled_at = datetime.now()
 
-		compiled = {
-			"meta": {
-				"primary_doctype": self.primary_doctype,
-				"base_structure_definition": self.base_structure_definition,
-				"resource_type": self.resource_type,
-				"compiled_version": "fhir-map-compiled/v1",
-				"compiled_at": str(now_datetime()),
-			},
-			"profiles": self.collect_profile_urls(),
-			"sources": sources,
-			"elements": elements,
-			"element_order": element_order,
-		}
-		return compiled
+		return self.compiled
 
-	def validate_required_fields(self):
-		if not self.primary_doctype:
-			raise FHIRMappingCompilationError("primary_doctype is required.")
-		if not self.resource_type:
-			raise FHIRMappingCompilationError("resource_type is required.")
-
-	# =========================================================
-	# Sources
-	# =========================================================
-
-	def compile_sources(self):
-		sources = {
-			"primary": {
-				"source_key": "primary",
-				"kind": "primary",
-				"doctype": self.primary_doctype,
-			}
-		}
-
-		for source in self.resource_map.get("sources") or []:
-			source_key = (source.get("source_key") or "").strip()
-			kind = (source.get("kind") or "").strip()
-			doctype = (source.get("source_doctype") or source.get("doctype") or "").strip()
-
-			if not all([source_key, kind, doctype]):
-				continue
-
-			if source_key == "primary":
-				raise FHIRMappingCompilationError(
-					"Do not add a source with key 'primary' in the sources table."
-				)
-
-			supported_kinds = ("direct_link", "reverse_link")
-			if kind not in supported_kinds:
-				raise FHIRMappingCompilationError(
-					f"Source '{source_key}': unsupported kind '{kind}'. Supported: {supported_kinds}"
-				)
-
-			if source_key in sources:
-				raise FHIRMappingCompilationError(f"Duplicate source_key '{source_key}'.")
-
-			link_fieldname = (source.get("link_fieldname") or "").strip()
-			if not link_fieldname:
-				raise FHIRMappingCompilationError(
-					f"Source '{source_key}': link_fieldname is required for '{kind}'."
-				)
-
-			spec = {
-				"source_key": source_key,
-				"kind": kind,
-				"doctype": doctype,
-				"link_fieldname": link_fieldname,
-				"filters": parse_json_object(source.get("filters_json")) or {},
-				"order_by": (source.get("order_by") or "").strip() or "creation desc",
-			}
-			sources[spec["source_key"]] = spec
-
-		return sources
-
-	# =========================================================
-	# Elements
-	# =========================================================
-
-	def compile_elements(self, compiled_sources):
-		elements = {}
-
-		for row in self.resource_map.get("element_maps") or []:
-			fhir_path = (row.get("fhir_path") or "").strip()
-			if not fhir_path:
-				continue
-
-			if fhir_path in elements:
-				raise FHIRMappingCompilationError(f"Duplicate element mapping for fhir_path '{fhir_path}'.")
-
-			pointer = parse_value_pointer(row.get("value_pointer"))
-			if not pointer:
-				continue
-
-			value_spec = self.build_value_spec(pointer, fhir_path, compiled_sources)
-
-			datatype = (row.get("datatype") or "").strip()
-
-			max_raw = row.get("max")
-			max_card = (max_raw or "").strip() if isinstance(max_raw, str) else str(max_raw or "")
-
-			element = {
-				"base_json_path": self._to_json_path(fhir_path),
-				"value_spec": value_spec,
-				"datatype": datatype,
-				"regex": row.get("regex"),
-				"min": cint(row.get("min", 0)),
-				"max": max_card,
-				"binding_strength": (row.get("binding_strength") or "").strip(),
-				"is_choice_type": cint(row.get("is_choice_type")),
-				"valueset_url": (row.get("valueset_url") or "").strip(),
-				"profile": (row.get("profile") or "").strip(),
-				"target_profiles": normalize_string_list(row.get("target_profiles")),
-			}
-
-			elements[fhir_path] = element
-
-		return elements
-
-	def build_value_spec(self, pointer, fhir_path, compiled_sources):
-		kind = (pointer.get("kind") or "").strip()
-
-		if kind == "fixed":
-			if "value" not in pointer:
-				raise FHIRMappingCompilationError(f"'{fhir_path}': fixed pointer missing 'value'")
-			return {"kind": "fixed", "value": pointer.get("value")}
-
-		if kind == "field":
-			source_key = (pointer.get("source_key") or "").strip()
-			fieldname = (pointer.get("fieldname") or "").strip()
-
-			if not source_key:
-				raise FHIRMappingCompilationError(f"'{fhir_path}': field pointer missing 'source_key'")
-			if not fieldname:
-				raise FHIRMappingCompilationError(f"'{fhir_path}': field pointer missing 'fieldname'")
-			if source_key not in compiled_sources:
-				raise FHIRMappingCompilationError(
-					f"'{fhir_path}': unknown source_key '{source_key}'. "
-					f"Available: {sorted(compiled_sources.keys())}"
-				)
-
-			return {"kind": "field", "source_key": source_key, "fieldname": fieldname}
-
-		raise FHIRMappingCompilationError(f"'{fhir_path}': unsupported pointer kind '{kind}'")
-
-	# =========================================================
-	# Compile-time collapse: child-table row mappings
-	# =========================================================
-	def collapse_child_table_row_mappings(self, elements, compiled_sources):
+	def _is_custom_only_mode(self):
 		"""
-		Collapse leaf mappings that read from a child table into a single container mapping,
-		while carrying per-leaf constraints (min/max/datatype/binding_strength/valueset_url/regex).
-
-		Also throws if both:
-		  - container is explicitly mapped (e.g. Patient.telecom)
-		  - AND one or more leaf mappings exist (e.g. Patient.telecom.system)
+		Custom-only mode when:
+		1. custom_elements has 'sources' defined, OR
+		2. No UI sources/element_maps defined (empty resource map)
 		"""
-		if not elements:
-			return elements
+		if not self._custom_elements:
+			return False
 
-		groups = {}
-		leaf_paths_by_container = {}
-		containers_explicitly_mapped = set()
+		# If custom_elements defines sources, use custom-only mode
+		if self._custom_elements.get("sources"):
+			return True
 
-		# Identify explicitly mapped containers (base_json_path has no dot)
-		for fhir_path, element in (elements or {}).items():
-			base_json_path = ((element or {}).get("base_json_path") or "").strip()
-			if base_json_path and "." not in base_json_path:
-				# container candidate like "telecom"
-				containers_explicitly_mapped.add(fhir_path)
+		# If UI has no sources and no element_maps, fall back to custom elements
+		has_ui_sources = self.resource_map.primary_doctype or (
+			hasattr(self.resource_map, "sources") and self.resource_map.sources
+		)
+		has_ui_elements = hasattr(self.resource_map, "element_maps") and self.resource_map.element_maps
 
-		for fhir_path, element in (elements or {}).items():
-			value_spec = (element or {}).get("value_spec") or {}
-			if (value_spec.get("kind") or "").strip() != "field":
-				continue
+		if not has_ui_sources and not has_ui_elements:
+			return bool(self._custom_elements.get("elements"))
 
-			source_key = (value_spec.get("source_key") or "").strip()
-			fieldname = (value_spec.get("fieldname") or "").strip()
-			if not source_key or not fieldname:
-				continue
+		return False
 
-			base_json_path = (element.get("base_json_path") or "").strip()
-			if "." not in base_json_path:
-				continue
+	def _compile_from_custom_elements(self):
+		"""Compile entirely from custom_elements JSON"""
+		custom = self._custom_elements
 
-			# fieldname must be "table_field.row_field"
-			if "." not in fieldname:
-				continue
+		# Sources
+		for source_def in custom.get("sources", []):
+			source = self._compile_custom_source(source_def)
+			if source:
+				self.compiled.add_source(source)
 
-			table_fieldname = fieldname.split(".", 1)[0].strip()
-			row_fieldname = fieldname.split(".", 1)[1].strip()
-			if not table_fieldname or not row_fieldname:
-				continue
+		# Elements
+		for element_def in custom.get("elements", []):
+			element = self._compile_custom_element(element_def)
+			if element:
+				self.compiled.add_element(element)
 
-			source_doctype = ((compiled_sources or {}).get(source_key) or {}).get("doctype")
-			if not source_doctype:
-				continue
+		# Extensions
+		for ext_def in custom.get("extensions", []):
+			element = self._compile_extension(ext_def)
+			if element:
+				self.compiled.add_element(element)
 
-			if not self._is_table_field(source_doctype, table_fieldname):
-				continue
+		# Slices
+		for slice_def in custom.get("slices", []):
+			element = self._compile_slice(slice_def)
+			if element:
+				self.compiled.add_element(element)
 
-			container_name = base_json_path.split(".", 1)[0].strip()
-			child_key = base_json_path.split(".", 1)[1].strip()
-			if not container_name or not child_key:
-				continue
+	def _compile_from_ui_config(self):
+		"""Compile from UI-defined sources and element maps"""
+		self._build_element_map_lookup()
+		self._compile_sources()
+		self._compile_elements()
 
-			container_fhir_path = f"{self.resource_type}.{container_name}"
-			group_key = (container_fhir_path, source_key, table_fieldname)
+	def _merge_custom_additions(self):
+		"""Merge extensions and slices from custom_elements into UI-compiled output"""
+		if not self._custom_elements:
+			return
 
-			if group_key not in groups:
-				groups[group_key] = {
-					"container_fhir_path": container_fhir_path,
-					"container_name": container_name,
-					"source_key": source_key,
-					"table_fieldname": table_fieldname,
-					"row_mapping": {},
-					"row_constraints": {},
-					"template_element": element,
-				}
+		# Additional sources
+		for source_def in self._custom_elements.get("sources", []):
+			source = self._compile_custom_source(source_def)
+			if source:
+				self.compiled.add_source(source)
 
-			# Map child_key -> row field
-			groups[group_key]["row_mapping"][child_key] = row_fieldname
+		# Extensions
+		for ext_def in self._custom_elements.get("extensions", []):
+			element = self._compile_extension(ext_def)
+			if element:
+				self.compiled.add_element(element)
 
-			# Carry constraints for per-row validation
-			groups[group_key]["row_constraints"][child_key] = {
-				"datatype": (element.get("datatype") or "").strip(),
-				"regex": element.get("regex"),
-				"min": cint(element.get("min", 0)),
-				"max": (element.get("max") or "").strip()
-				if isinstance(element.get("max") or "", str)
-				else str(element.get("max") or ""),
-				"binding_strength": (element.get("binding_strength") or "").strip(),
-				"valueset_url": (element.get("valueset_url") or "").strip(),
-				"profile": (element.get("profile") or "").strip(),
-				"target_profiles": normalize_string_list(element.get("target_profiles")),
-				"is_choice_type": cint(element.get("is_choice_type")),
-			}
+		# Slices
+		for slice_def in self._custom_elements.get("slices", []):
+			element = self._compile_slice(slice_def)
+			if element:
+				self.compiled.add_element(element)
 
-			leaf_paths_by_container.setdefault(container_fhir_path, []).append(fhir_path)
+	def _parse_custom_elements(self):
+		if not hasattr(self.resource_map, "custom_elements"):
+			return None
 
-		# Conflict check: container explicitly mapped + leaf mappings present
-		for container_fhir_path, leaf_paths in (leaf_paths_by_container or {}).items():
-			if container_fhir_path in elements and container_fhir_path in containers_explicitly_mapped:
-				raise FHIRMappingCompilationError(
-					f"Conflicting mappings: '{container_fhir_path}' is mapped directly, "
-					f"but leaf mappings also exist: {sorted(set(leaf_paths))}. "
-					f"Remove either the container mapping or the leaf mappings."
-				)
+		if not self.resource_map.custom_elements:
+			return None
 
-		# Create container elements
-		for group_key, group in groups.items():
-			container_fhir_path = group["container_fhir_path"]
+		try:
+			return json.loads(self.resource_map.custom_elements)
+		except (json.JSONDecodeError, TypeError):
+			frappe.log_error(f"Invalid custom_elements JSON in FHIR Resource Map: {self.resource_map.name}")
+			return None
 
-			# If container exists (but wasn't explicitly mapped), don't override; still remove leaves below.
-			if container_fhir_path not in elements:
-				template = group.get("template_element") or {}
+	def _build_metadata(self):
+		fhir_version = None
+		profile_url = None
 
-				container_element = {
-					"base_json_path": group["container_name"],
-					"value_spec": {
-						"kind": "child_table_rows",
-						"source_key": group["source_key"],
-						"table_fieldname": group["table_fieldname"],
-						"row_mapping": group["row_mapping"],
-						"row_constraints": group["row_constraints"],
-					},
-					"datatype": "",  # intentionally blank (complex container)
-					"regex": None,
-					"min": 0,
-					"max": "*",
-					"binding_strength": "",
-					"is_choice_type": 0,
-					"valueset_url": "",
-					"profile": (template.get("profile") or "").strip(),
-					"target_profiles": normalize_string_list(template.get("target_profiles")),
-				}
+		# First try custom_elements metadata
+		if self._custom_elements and self._custom_elements.get("metadata"):
+			meta = self._custom_elements["metadata"]
+			fhir_version = meta.get("fhir_version")
+			profile_url = meta.get("profile_url")
 
-				elements[container_fhir_path] = container_element
+		# Fall back to resource_map fields
+		if not fhir_version:
+			fhir_version = self._get_fhir_version()
 
-		# Remove leaf elements only if the container exists (created or already present)
-		for container_fhir_path, leaf_paths in (leaf_paths_by_container or {}).items():
-			if container_fhir_path not in elements:
-				continue
-			for leaf_path in leaf_paths:
-				elements.pop(leaf_path, None)
+		if not profile_url:
+			profile_url = self._get_profile_url()
 
-		return elements
+		resource_type = self.resource_map.resource_type
 
-	def collapse_object_group_mappings(self, elements):
-		if not elements:
-			return elements
+		return CompilationMetadata(fhir_version, profile_url, resource_type)
 
-		# Explicit containers: base_json_path has no dot (meaning the user mapped the container directly)
-		explicit_containers = set()
-		for fhir_path, element in (elements or {}).items():
-			base_json_path = ((element or {}).get("base_json_path") or "").strip()
-			if base_json_path and "." not in base_json_path:
-				explicit_containers.add(fhir_path)
+	def _get_fhir_version(self):
+		if not self.resource_map.base_structure_definition:
+			return None
 
-		# container_fhir_path -> group
-		groups = {}
-
-		for leaf_fhir_path, leaf_element in (elements or {}).items():
-			base_json_path = ((leaf_element or {}).get("base_json_path") or "").strip()
-			if "." not in base_json_path:
-				continue
-
-			value_spec = (leaf_element or {}).get("value_spec") or {}
-			kind = (value_spec.get("kind") or "").strip()
-			if kind not in ("field", "fixed"):
-				continue
-
-			container_name, child_key = base_json_path.split(".", 1)
-			container_name = (container_name or "").strip()
-			child_key = (child_key or "").strip()
-			if not container_name or not child_key:
-				continue
-
-			container_fhir_path = f"{self.resource_type}.{container_name}"
-
-			# Conflict: container explicitly mapped + leafs exist
-			if container_fhir_path in explicit_containers:
-				raise FHIRMappingCompilationError(
-					f"Conflicting mappings: '{container_fhir_path}' is mapped directly, "
-					f"but leaf mappings also exist (e.g. '{leaf_fhir_path}'). "
-					f"Remove either the container mapping or the leaf mappings."
-				)
-
-			group = groups.setdefault(
-				container_fhir_path,
-				{
-					"container_name": container_name,
-					"embedded_children": {},
-					"leaf_paths": [],
-					"field_source_keys": set(),
-					"has_repeating_child": False,
-					"has_field_child": False,
-					"all_children_fixed": True,
-					"all_children_max_one": True,
-				},
+		try:
+			sd = frappe.get_cached_doc(
+				"FHIR Structure Definition", self.resource_map.base_structure_definition
 			)
-
-			group["leaf_paths"].append(leaf_fhir_path)
-
-			if kind == "field":
-				group["has_field_child"] = True
-				source_key = (value_spec.get("source_key") or "").strip()
-				if source_key:
-					group["field_source_keys"].add(source_key)
-				group["all_children_fixed"] = False
-
-			if kind != "fixed":
-				group["all_children_fixed"] = False
-
-			child_max = leaf_element.get("max")
-			child_max = (child_max or "").strip() if isinstance(child_max, str) else str(child_max or "")
-
-			if child_max == "*":
-				group["has_repeating_child"] = True
-
-			if child_max and child_max != "1":
-				group["all_children_max_one"] = False
-
-			group["embedded_children"][child_key] = {
-				"leaf_fhir_path": leaf_fhir_path,
-				"value_spec": value_spec,
-				"datatype": (leaf_element.get("datatype") or "").strip(),
-				"regex": leaf_element.get("regex"),
-				"min": cint(leaf_element.get("min", 0)),
-				"max": child_max,
-				"binding_strength": (leaf_element.get("binding_strength") or "").strip(),
-				"valueset_url": (leaf_element.get("valueset_url") or "").strip(),
-				"profile": (leaf_element.get("profile") or "").strip(),
-				"target_profiles": normalize_string_list(leaf_element.get("target_profiles")),
-				"is_choice_type": cint(leaf_element.get("is_choice_type")),
-			}
-
-		# Provenance check: a single source_key across field children
-		for container_fhir_path, group in groups.items():
-			source_keys = group.get("field_source_keys") or set()
-			if len(source_keys) > 1:
-				raise FHIRMappingCompilationError(
-					f"Cannot collapse '{container_fhir_path}' into object_group because its leaf fields "
-					f"come from multiple sources: {sorted(source_keys)}. "
-					"Use a child table row mapping or keep leaf mappings as-is."
-				)
-
-		# Collapse groups
-		for container_fhir_path, group in groups.items():
-			leaf_paths = group.get("leaf_paths") or []
-			if len(leaf_paths) < 2:
-				continue
-
-			# If any child repeats (max="*"), object_group is the wrong tool.
-			if group.get("has_repeating_child"):
-				continue
-
-			# Decide container repetition if available
-			existing_container = elements.get(container_fhir_path)
-			container_max = ""
-			if existing_container:
-				raw = existing_container.get("max")
-				container_max = (raw or "").strip() if isinstance(raw, str) else str(raw or "")
-
-			container_is_repeating = (container_max == "*") if container_max else True
-
-			# Generic guard for repeating containers:
-			# - OK if all children are fixed (harmless)
-			# - OK if all children are max=1 and single provenance (already enforced) => "single logical object"
-			# - Otherwise skip (ambiguous multi-row)
-			if container_is_repeating and group.get("has_field_child"):
-				if not (group.get("all_children_fixed") or group.get("all_children_max_one")):
-					continue
-
-			# wrap_in_array: use container max if available else True
-			wrap_in_array = True
-			if container_max:
-				wrap_in_array = (container_max == "*")
-
-			if container_fhir_path in elements:
-				# If it exists, only acceptable if it's already object_group (rare). Otherwise error.
-				existing_kind = ((elements[container_fhir_path].get("value_spec") or {}).get("kind") or "").strip()
-				if existing_kind and existing_kind != "object_group":
-					raise FHIRMappingCompilationError(
-						f"'{container_fhir_path}' exists but is not an object_group; cannot collapse leafs {sorted(set(leaf_paths))}."
-					)
-
-			if container_fhir_path not in elements:
-				elements[container_fhir_path] = {
-					"base_json_path": group["container_name"],
-					"value_spec": {
-						"kind": "object_group",
-						"children": group["embedded_children"],
-						"wrap_in_array": wrap_in_array,
-					},
-					"datatype": "",
-					"regex": None,
-					"min": 0,
-					"max": "*",  # safe default; wrap_in_array controls the JSON shape
-					"binding_strength": "",
-					"is_choice_type": 0,
-					"valueset_url": "",
-					"profile": "",
-					"target_profiles": [],
-				}
-			else:
-				# Update wrap_in_array if already object_group
-				elements[container_fhir_path].setdefault("value_spec", {})
-				elements[container_fhir_path]["value_spec"]["wrap_in_array"] = wrap_in_array
-				elements[container_fhir_path]["value_spec"]["children"] = group["embedded_children"]
-
-			# Remove leafs
-			for leaf_path in leaf_paths:
-				elements.pop(leaf_path, None)
-
-		return elements
-
-	def _is_table_field(self, doctype, fieldname):
-		if not doctype or not fieldname:
-			return False
-
-		try:
-			meta = frappe.get_meta(doctype)
+			return sd.fhir_version if hasattr(sd, "fhir_version") else None
 		except Exception:
-			return False
-
-		field = meta.get_field(fieldname)
-		if not field:
-			return False
-
-		return (field.fieldtype or "").strip().lower() == "table"
-
-	def _safe_int(value, default=0):
-		try:
-			return int(value)
-		except Exception:
-			return default
-
-	# =========================================================
-	# Profiles + paths
-	# =========================================================
-
-	def collect_profile_urls(self):
-		"""Collect profile URLs from the profiles child table."""
-		urls = []
-		for row in self.resource_map.get("profiles") or []:
-			url = (row.get("url") or "").strip()
-			if url and url not in urls:
-				urls.append(url)
-		return urls
-
-	def _to_json_path(self, fhir_path):
-		fhir_path = (fhir_path or "").strip()
-		prefix = f"{self.resource_type}."
-		if self.resource_type and fhir_path.startswith(prefix):
-			return fhir_path[len(prefix) :]
-		return fhir_path
-
-
-# =========================================================
-# Helper functions
-# =========================================================
-
-
-def parse_json_object(value):
-	if not value:
-		return {}
-	if isinstance(value, dict):
-		return value
-	text = str(value).strip()
-	if not text:
-		return {}
-	try:
-		parsed = json.loads(text)
-		return parsed if isinstance(parsed, dict) else {}
-	except json.JSONDecodeError:
-		raise FHIRMappingCompilationError("filters_json must be a JSON object.")
-
-
-def parse_value_pointer(raw):
-	if raw is None:
-		return None
-
-	if isinstance(raw, dict):
-		pointer = raw
-	else:
-		text = str(raw).strip()
-		if not text:
-			return None
-		try:
-			pointer = json.loads(text)
-		except json.JSONDecodeError:
 			return None
 
-	if not isinstance(pointer, dict):
+	def _get_profile_url(self):
+		if not hasattr(self.resource_map, "profiles"):
+			return None
+
+		for profile in self.resource_map.profiles:
+			if profile.is_primary:
+				return profile.url
+
+		if self.resource_map.profiles:
+			return self.resource_map.profiles[0].url
+
 		return None
 
-	if not (pointer.get("kind") or "").strip():
-		return None
+	def _build_element_map_lookup(self):
+		if not hasattr(self.resource_map, "element_maps"):
+			return
 
-	return pointer
+		for element_row in self.resource_map.element_maps:
+			self._element_map_lookup[element_row.fhir_path] = element_row
 
+	def _compile_sources(self):
+		if self.resource_map.primary_doctype:
+			primary = CompiledSource(
+				key="primary", entity=self.resource_map.primary_doctype, entity_type="document"
+			)
+			primary.is_primary = True
+			self.compiled.add_source(primary)
 
-def normalize_string_list(value):
-	if value is None:
-		return []
+		if not hasattr(self.resource_map, "sources"):
+			return
 
-	if isinstance(value, list):
-		return [str(v).strip() for v in value if str(v).strip()]
+		for source_row in self.resource_map.sources:
+			source = CompiledSource(
+				key=source_row.source_key,
+				entity=source_row.source_doctype,
+				entity_type=self._normalize_source_kind(source_row.kind),
+			)
+			source.is_collection = source_row.kind in ("child_table", "reverse_link")
+			source.link_field = source_row.link_fieldname
+			source.config = self._parse_config(source_row.config)
 
-	if isinstance(value, str):
-		text = value.strip()
-		if not text:
-			return []
+			if source_row.kind == "child_table":
+				source.parent_source_key = "primary"
 
-		if text.startswith("[") and text.endswith("]"):
+			self.compiled.add_source(source)
+
+	def _compile_custom_source(self, source_def):
+		key = source_def.get("key")
+		if not key:
+			frappe.log_error("Custom source missing 'key' in custom_elements")
+			return None
+
+		# Skip if source already exists
+		existing = self.compiled.get_source(key)
+		if existing:
+			return None
+
+		doctype = source_def.get("doctype")
+		if not doctype:
+			frappe.log_error(f"Custom source '{key}' missing 'doctype' in custom_elements")
+			return None
+
+		kind = source_def.get("kind", "document")
+
+		source = CompiledSource(key=key, entity=doctype, entity_type=self._normalize_source_kind(kind))
+
+		source.is_primary = source_def.get("is_primary", key == "primary")
+		source.is_collection = kind in ("child_table", "reverse_link")
+		source.link_field = source_def.get("link_field")
+		source.parent_source_key = source_def.get("parent_source_key", "primary")
+		source.filters = source_def.get("filters", {})
+		source.config = source_def.get("config", {})
+
+		return source
+
+	def _normalize_source_kind(self, kind):
+		if not kind:
+			return "document"
+
+		kind_lower = kind.lower()
+
+		if kind_lower == "child_table":
+			return "child_table"
+		elif kind_lower == "direct_link":
+			return "direct_link"
+		elif kind_lower == "reverse_link":
+			return "reverse_link"
+		else:
+			return "document"
+
+	def _parse_config(self, config_str):
+		if not config_str:
+			return {}
+
+		try:
+			return json.loads(config_str)
+		except (json.JSONDecodeError, TypeError):
+			return {}
+
+	def _compile_elements(self):
+		if not hasattr(self.resource_map, "element_maps"):
+			return
+
+		for element_row in self.resource_map.element_maps:
+			if not self._should_include_element(element_row):
+				continue
+
+			element = self._compile_element(element_row)
+			self.compiled.add_element(element)
+
+	def _should_include_element(self, element_row):
+		if element_row.is_required or element_row.min > 0:
+			return True
+
+		if element_row.mapping_type:
+			return True
+
+		if element_row.pattern_value:
+			return True
+
+		return False
+
+	def _compile_element(self, element_row):
+		source_key = self._get_source_key(element_row)
+
+		element = CompiledElement(path=element_row.fhir_path, source_key=source_key)
+
+		element.mapping_type = self._normalize_mapping_type(element_row.mapping_type)
+		element.field = self._get_field(element_row)
+		element.expression = element_row.expression or None
+		element.fixed_value = element_row.fixed_value or None
+		element.json_value = self._parse_json_value(element_row)
+		element.default_value = element_row.default_value or None
+		element.pattern_value = self._parse_pattern_value(element_row.pattern_value)
+
+		element.transformer = self._determine_transformer(element_row.datatype)
+		element.is_array = self._is_array(element_row.max)
+		element.is_required = element_row.is_required or element_row.min > 0
+		element.parent_path = self._get_parent_path(element_row.fhir_path)
+
+		return element
+
+	def _compile_custom_element(self, element_def):
+		path = element_def.get("path")
+		if not path:
+			frappe.log_error("Custom element missing 'path' in custom_elements")
+			return None
+
+		source_key = element_def.get("source_key", "primary")
+
+		# Validate source exists
+		if not self.compiled.get_source(source_key):
+			frappe.log_error(f"Custom element '{path}' references unknown source '{source_key}'")
+			return None
+
+		element = CompiledElement(path, source_key)
+
+		element.mapping_type = self._normalize_mapping_type(element_def.get("mapping_type"))
+		element.field = element_def.get("field")
+		element.expression = element_def.get("expression")
+		element.fixed_value = element_def.get("fixed_value")
+		element.json_value = element_def.get("json_value")
+		element.default_value = element_def.get("default_value")
+		element.pattern_value = element_def.get("pattern_value")
+
+		element.transformer = self._determine_transformer(element_def.get("datatype"))
+		element.is_array = element_def.get("is_array", False)
+		element.is_required = element_def.get("is_required", False)
+		element.parent_path = self._get_parent_path(path)
+
+		return element
+
+	def _compile_extension(self, ext_def):
+		if not ext_def.get("url"):
+			frappe.log_error("Extension missing 'url' in custom_elements")
+			return None
+
+		parent_path = ext_def.get("path")
+		if not parent_path:
+			frappe.log_error("Extension missing 'path' in custom_elements")
+			return None
+
+		source_key = ext_def.get("source_key", "primary")
+
+		# Validate source exists
+		if not self.compiled.get_source(source_key):
+			frappe.log_error(f"Extension references unknown source '{source_key}' in custom_elements")
+			return None
+
+		is_modifier = ext_def.get("is_modifier", False)
+		extension_field = "modifierExtension" if is_modifier else "extension"
+		element_path = f"{parent_path}.{extension_field}"
+
+		element = CompiledElement(element_path, source_key)
+
+		element.mapping_type = self._normalize_mapping_type(ext_def.get("mapping_type"))
+		element.field = ext_def.get("field")
+		element.expression = ext_def.get("expression")
+		element.fixed_value = ext_def.get("fixed_value")
+		element.json_value = ext_def.get("json_value")
+		element.default_value = ext_def.get("default_value")
+
+		element.extension_url = ext_def.get("url")
+		element.extension_value_type = ext_def.get("value_type", "valueString")
+		element.is_modifier_extension = is_modifier
+
+		element.transformer = self._extension_value_type_to_transformer(
+			ext_def.get("value_type", "valueString")
+		)
+		element.is_array = True
+		element.is_required = ext_def.get("is_required", False)
+		element.parent_path = parent_path
+
+		return element
+
+	def _compile_slice(self, slice_def):
+		if not slice_def.get("path"):
+			frappe.log_error("Slice missing 'path' in custom_elements")
+			return None
+
+		if not slice_def.get("slice_name"):
+			frappe.log_error("Slice missing 'slice_name' in custom_elements")
+			return None
+
+		source_key = slice_def.get("source_key", "primary")
+
+		# Validate source exists
+		if not self.compiled.get_source(source_key):
+			frappe.log_error(f"Slice references unknown source '{source_key}' in custom_elements")
+			return None
+
+		base_path = slice_def.get("path")
+		slice_name = slice_def.get("slice_name")
+		element_path = f"{base_path}:{slice_name}"
+
+		element = CompiledElement(element_path, source_key)
+
+		element.mapping_type = self._normalize_mapping_type(slice_def.get("mapping_type"))
+		element.field = slice_def.get("field")
+		element.expression = slice_def.get("expression")
+		element.fixed_value = slice_def.get("fixed_value")
+		element.json_value = slice_def.get("json_value")
+		element.default_value = slice_def.get("default_value")
+		element.pattern_value = slice_def.get("discriminator_value")
+
+		element.transformer = self._determine_transformer(slice_def.get("datatype"))
+		element.is_array = slice_def.get("is_array", False)
+		element.is_required = slice_def.get("is_required", False)
+		element.parent_path = self._get_parent_path(base_path)
+
+		element.slice_name = slice_name
+		element.slice_of = base_path
+
+		return element
+
+	def _extension_value_type_to_transformer(self, value_type):
+		if not value_type:
+			return "string"
+
+		mapping = {
+			"valueString": "string",
+			"valueCode": "code",
+			"valueBoolean": "boolean",
+			"valueInteger": "integer",
+			"valueDecimal": "decimal",
+			"valueDate": "date",
+			"valueDateTime": "datetime",
+			"valueInstant": "instant",
+			"valueUri": "uri",
+			"valueUrl": "url",
+			"valueCanonical": "canonical",
+			"valueId": "id",
+			"valueOid": "oid",
+			"valueUuid": "uuid",
+			"valueMarkdown": "markdown",
+			"valuePositiveInt": "positiveint",
+			"valueUnsignedInt": "unsignedint",
+		}
+
+		return mapping.get(value_type)
+
+	def _get_source_key(self, element_row):
+		if hasattr(element_row, "source_name") and element_row.source_name:
+			return element_row.source_name
+
+		if hasattr(element_row, "value_pointer") and element_row.value_pointer:
 			try:
-				parsed = json.loads(text)
-				if isinstance(parsed, list):
-					return [str(v).strip() for v in parsed if str(v).strip()]
-			except json.JSONDecodeError:
-				return []
+				pointer = json.loads(element_row.value_pointer)
+				if isinstance(pointer, dict) and pointer.get("source_key"):
+					return pointer["source_key"]
+			except (json.JSONDecodeError, TypeError):
+				pass
 
-		return [text]
+		return "primary"
 
-	return []
+	def _get_field(self, element_row):
+		if element_row.frappe_field:
+			return element_row.frappe_field
+
+		if hasattr(element_row, "value_pointer") and element_row.value_pointer:
+			try:
+				pointer = json.loads(element_row.value_pointer)
+				if isinstance(pointer, dict) and pointer.get("kind") == "field":
+					fieldname = pointer.get("fieldname")
+					if fieldname:
+						return fieldname
+			except (json.JSONDecodeError, TypeError):
+				pass
+
+		return None
+
+	def _normalize_mapping_type(self, mapping_type):
+		if not mapping_type:
+			return None
+
+		mapping_type_lower = mapping_type.lower()
+
+		if mapping_type_lower in ("frappe field", "field"):
+			return CompiledElement.MAPPING_FIELD
+		elif mapping_type_lower == "fixed":
+			return CompiledElement.MAPPING_FIXED
+		elif mapping_type_lower == "expression":
+			return CompiledElement.MAPPING_EXPRESSION
+		elif mapping_type_lower == "json":
+			return CompiledElement.MAPPING_JSON
+
+		return None
+
+	def _parse_json_value(self, element_row):
+		if element_row.mapping_type != "JSON":
+			return None
+
+		value = element_row.fixed_value or element_row.expression
+		if not value:
+			return None
+
+		try:
+			return json.loads(value)
+		except (json.JSONDecodeError, TypeError):
+			return None
+
+	def _parse_pattern_value(self, pattern_value):
+		if not pattern_value:
+			return None
+
+		if isinstance(pattern_value, dict):
+			return pattern_value
+
+		try:
+			return json.loads(pattern_value)
+		except (json.JSONDecodeError, TypeError):
+			return pattern_value
+
+	def _determine_transformer(self, datatype):
+		if not datatype:
+			return None
+
+		datatype_lower = datatype.lower()
+
+		primitive_types = {
+			"string": "string",
+			"boolean": "boolean",
+			"integer": "integer",
+			"decimal": "decimal",
+			"date": "date",
+			"datetime": "datetime",
+			"instant": "instant",
+			"time": "time",
+			"uri": "uri",
+			"url": "url",
+			"canonical": "canonical",
+			"code": "code",
+			"id": "id",
+			"oid": "oid",
+			"uuid": "uuid",
+			"markdown": "markdown",
+			"base64binary": "base64binary",
+			"positiveint": "positiveint",
+			"unsignedint": "unsignedint",
+		}
+
+		return primitive_types.get(datatype_lower)
+
+	def _is_array(self, max_cardinality):
+		if not max_cardinality:
+			return False
+
+		if max_cardinality == "*":
+			return True
+
+		try:
+			return int(max_cardinality) > 1
+		except ValueError:
+			return False
+
+	def _get_parent_path(self, path):
+		if not path or "." not in path:
+			return None
+
+		parts = path.rsplit(".", 1)
+		return parts[0]
+
+	def _build_resource_tree(self):
+		resource_type = self.compiled.metadata.resource_type
+		root = ResourceTreeNode(resource_type)
+		root.is_array = False
+		root.is_primitive = False
+
+		for element in self.compiled.elements:
+			self._add_path_to_tree(root, element)
+
+		self.compiled.resource_tree = root
+
+	def _add_path_to_tree(self, root, element):
+		path = element.path
+
+		# Handle slice paths
+		if ":" in path:
+			path = path.split(":")[0]
+
+		# Skip extension paths
+		if element.is_extension():
+			return
+
+		parts = path.split(".")
+
+		if parts and parts[0] == root.name:
+			parts = parts[1:]
+
+		current = root
+		current_path = root.name
+
+		for i, part in enumerate(parts):
+			current_path = current_path + "." + part
+			is_last = i == len(parts) - 1
+
+			child = current.find_child(part)
+
+			if child is None:
+				child = ResourceTreeNode(part)
+				child.is_array = self._is_path_array_from_element(current_path)
+				child.is_primitive = False
+				current.add_child(child)
+
+			if self._is_path_array_from_element(current_path):
+				child.is_array = True
+
+			if is_last:
+				if element.is_array:
+					child.is_array = True
+				child.is_primitive = element.transformer is not None
+
+			current = child
+
+	def _is_path_array_from_element(self, path):
+		# Check UI-defined elements
+		element_row = self._element_map_lookup.get(path)
+		if element_row:
+			return self._is_array(element_row.max)
+
+		# Check compiled elements
+		for element in self.compiled.elements:
+			if element.path == path:
+				return element.is_array
+
+		return False

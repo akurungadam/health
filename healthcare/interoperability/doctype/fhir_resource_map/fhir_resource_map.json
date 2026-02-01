@@ -19,6 +19,9 @@
   "elements_map_html",
   "element_maps",
   "compiled_mapping_tab",
+  "custom_section",
+  "custom_elements",
+  "compiled_output_section",
   "compiled_mapping",
   "compiled_hash",
   "compiled_at"
@@ -88,7 +91,8 @@
   {
    "fieldname": "compiled_mapping",
    "fieldtype": "Code",
-   "label": "Compiled Mapping"
+   "label": "Compiled Mapping",
+   "read_only": 1
   },
   {
    "fieldname": "compiled_hash",
@@ -119,15 +123,31 @@
   {
    "fieldname": "section_break_spdr",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "custom_section",
+   "fieldtype": "Section Break",
+   "label": "Custom Input"
+  },
+  {
+   "fieldname": "custom_elements",
+   "fieldtype": "Code",
+   "label": "Custom Elements"
+  },
+  {
+   "fieldname": "compiled_output_section",
+   "fieldtype": "Section Break",
+   "label": "Compiled Output"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-23 16:48:02.325371",
+ "modified": "2026-02-01 18:54:28.487715",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Resource Map",
+ "naming_rule": "By script",
  "owner": "Administrator",
  "permissions": [
   {
