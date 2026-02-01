@@ -8,21 +8,29 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import FHIRMappingCompiler
-from healthcare.healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import (
-	FHIRStructureDefinitionLoader,
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import (
+	CompiledResource,
+	FHIRCompiler,
 )
-
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_runtime import (
+	FHIRRuntime,
+	FrappeSourceResolver,
+)
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import FHIRStructureDefinitionLoader
 from healthcare.interoperability.doctype.fhir_resource_map.validator import FHIRMappingValidator
-from healthcare.interoperability.doctype.fhir_resource_map.fhir_value_resolver import FHIRValueResolver
 
 
 class FHIRResourceMap(Document):
+	def autoname(self):
+		if self.base_structure_definition:
+			self.name = f"{self.resource_type}-{self.base_structure_definition}"
+		else:
+			self.name = f"{self.resource_type}"
+
 	def validate(self):
 		compiled = self.compile_mapping()
-
 		compiled_json = json.dumps(
-			compiled,
+			compiled.to_dict(),
 			sort_keys=True,
 			separators=(",", ":"),
 			ensure_ascii=False,
@@ -35,14 +43,10 @@ class FHIRResourceMap(Document):
 
 	@frappe.whitelist()
 	def compile_mapping(self):
-		return FHIRMappingCompiler(resource_map=self).compile()
+		# return FHIRMappingCompiler(resource_map=self).compile()
 
-	def _load_compiled(self):
-		if self.compiled_mapping:
-			if isinstance(self.compiled_mapping, str):
-				return json.loads(self.compiled_mapping)
-			return self.compiled_mapping
-		return self.compile_mapping()
+		compiler = FHIRCompiler(self)
+		return compiler.compile()
 
 	@frappe.whitelist()
 	def load_structure_definition_elements(self):
@@ -97,12 +101,17 @@ def load_structure_definition_elements(fhir_resource_map):
 
 
 @frappe.whitelist()
-def resolve_fhir_values(fhir_resource_map, primary_name):
-	resource_map = frappe.get_doc("FHIR Resource Map", fhir_resource_map)
+def preview_fhir_resource(fhir_resource_map, primary_name):
+	"""
+	Preview the FHIR resource that would be generated.
+	"""
+	doc = frappe.get_doc("FHIR Resource Map", fhir_resource_map)
+	compiled_data = json.loads(doc.compiled_mapping)
+	compiled = CompiledResource.from_dict(compiled_data)
 
-	compiled_map = resource_map.compiled_mapping
-	if isinstance(compiled_map, str):
-		compiled_map = frappe.parse_json(compiled_map)
+	# Generate FHIR resource
+	resolver = FrappeSourceResolver()
+	runtime = FHIRRuntime(resolver)
+	fhir_resource = runtime.generate(compiled, primary_name)
 
-	resolver = FHIRValueResolver(compiled_map, primary_name)
-	return resolver.resolve()
+	return fhir_resource
