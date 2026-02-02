@@ -1437,11 +1437,11 @@ class TestFHIRCompilerCustomOnly(IntegrationTestCase):
 		frappe.db.commit()
 
 	def _create_resource_map(self, custom_elements):
-		import uuid
 		import json as json_module
+		import uuid
 
 		suffix = uuid.uuid4().hex[:8]
-		sd_fhir_sd = "PatientTest{0}".format(suffix)
+		sd_fhir_sd = f"PatientTest{suffix}"
 
 		sd = frappe.get_doc(
 			{
@@ -1496,11 +1496,11 @@ class TestFHIRCompilerCustomOnly(IntegrationTestCase):
 
 	def _create_resource_map_with_primary(self, custom_elements, resource_type="Patient"):
 		"""Create resource map with primary_doctype set (for non-custom-only mode tests)"""
-		import uuid
 		import json as json_module
+		import uuid
 
 		suffix = uuid.uuid4().hex[:8]
-		sd_fhir_sd = "TestSD{0}".format(suffix)
+		sd_fhir_sd = f"TestSD{suffix}"
 
 		sd = frappe.get_doc(
 			{
@@ -2199,3 +2199,409 @@ class TestFHIRCompilerCustomOnly(IntegrationTestCase):
 		restored = CompiledResource.from_dict(json_module.loads(json_str))
 		# Resource type comes from resource_map.resource_type
 		self.assertEqual(restored.metadata.resource_type, resource_map.resource_type)
+
+
+# =============================================================================
+# Reference Element Tests
+# =============================================================================
+
+
+class TestCompiledElementReferences(IntegrationTestCase):
+	def test_element_is_reference_false_by_default(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+
+		self.assertFalse(element.is_reference())
+
+	def test_element_is_reference_true(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+
+		self.assertTrue(element.is_reference())
+
+	def test_element_reference_fields_to_dict(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+		element.reference_display_field = "organization_name"
+		element.is_contained_reference = False
+
+		result = element.to_dict()
+
+		self.assertEqual(result["reference_type"], "Organization")
+		self.assertEqual(result["reference_display_field"], "organization_name")
+		self.assertFalse(result["is_contained_reference"])
+
+	def test_element_contained_reference(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+		element.is_contained_reference = True
+
+		result = element.to_dict()
+
+		self.assertTrue(result["is_contained_reference"])
+
+	def test_element_reference_roundtrip(self):
+		original = CompiledElement("Patient.generalPractitioner", "practitioners")
+		original.mapping_type = "field"
+		original.field = "practitioner"
+		original.reference_type = "Practitioner"
+		original.reference_display_field = "practitioner_name"
+		original.is_contained_reference = False
+		original.is_array = True
+
+		data = original.to_dict()
+		restored = CompiledElement.from_dict(data)
+
+		self.assertEqual(restored.reference_type, original.reference_type)
+		self.assertEqual(restored.reference_display_field, original.reference_display_field)
+		self.assertEqual(restored.is_contained_reference, original.is_contained_reference)
+		self.assertTrue(restored.is_reference())
+
+
+class TestFHIRCompilerReferences(IntegrationTestCase):
+	def setUp(self):
+		self.created_structure_definitions = []
+		self.created_resource_maps = []
+
+	def tearDown(self):
+		self._cleanup_test_data()
+
+	def _cleanup_test_data(self):
+		for name in self.created_resource_maps:
+			if frappe.db.exists("FHIR Resource Map", name):
+				frappe.delete_doc("FHIR Resource Map", name, force=True)
+
+		for name in self.created_structure_definitions:
+			if frappe.db.exists("FHIR Structure Definition", name):
+				frappe.delete_doc("FHIR Structure Definition", name, force=True)
+
+		self.created_resource_maps = []
+		self.created_structure_definitions = []
+		frappe.db.commit()
+
+	def _create_resource_map(self, custom_elements, primary_doctype=None):
+		import json as json_module
+		import uuid
+
+		suffix = uuid.uuid4().hex[:8]
+		sd_fhir_sd = f"TestSD{suffix}"
+
+		sd = frappe.get_doc(
+			{
+				"doctype": "FHIR Structure Definition",
+				"fhir_sd": sd_fhir_sd,
+				"fhir_version": "R4",
+			}
+		)
+		sd.flags.ignore_validate = True
+		sd.flags.ignore_mandatory = True
+		sd.insert(ignore_permissions=True)
+		sd_name = sd.name
+		self.created_structure_definitions.append(sd_name)
+
+		doc_data = {
+			"doctype": "FHIR Resource Map",
+			"resource_type": "Patient",
+			"base_structure_definition": sd_name,
+			"custom_elements": json_module.dumps(custom_elements),
+		}
+
+		if primary_doctype:
+			doc_data["primary_doctype"] = primary_doctype
+
+		doc = frappe.get_doc(doc_data)
+		doc.insert(ignore_permissions=True)
+		self.created_resource_maps.append(doc.name)
+		frappe.db.commit()
+
+		return doc
+
+	def test_compile_reference_element(self):
+		custom = {
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{
+					"path": "Patient.managingOrganization",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "organization",
+					"datatype": "Reference",
+					"reference_type": "Organization",
+					"reference_display_field": "organization_name",
+				}
+			],
+		}
+		resource_map = self._create_resource_map(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		ref_elements = [el for el in result.elements if el.is_reference()]
+		self.assertEqual(len(ref_elements), 1)
+		self.assertEqual(ref_elements[0].reference_type, "Organization")
+		self.assertEqual(ref_elements[0].reference_display_field, "organization_name")
+		self.assertFalse(ref_elements[0].is_contained_reference)
+
+	def test_compile_contained_reference_element(self):
+		custom = {
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{
+					"path": "Patient.managingOrganization",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "organization",
+					"datatype": "Reference",
+					"reference_type": "Organization",
+					"is_contained_reference": True,
+				}
+			],
+		}
+		resource_map = self._create_resource_map(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		ref_elements = [el for el in result.elements if el.is_reference()]
+		self.assertEqual(len(ref_elements), 1)
+		self.assertTrue(ref_elements[0].is_contained_reference)
+
+	def test_compile_array_reference_element(self):
+		custom = {
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{
+					"path": "Patient.generalPractitioner",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "practitioner",
+					"datatype": "Reference",
+					"reference_type": "Practitioner",
+					"is_array": True,
+				}
+			],
+		}
+		resource_map = self._create_resource_map(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		ref_elements = [el for el in result.elements if el.is_reference()]
+		self.assertEqual(len(ref_elements), 1)
+		self.assertTrue(ref_elements[0].is_array)
+
+
+class TestFHIRCompilerHybridMode(IntegrationTestCase):
+	"""Test that custom_elements extends UI config when primary_doctype is set"""
+
+	def setUp(self):
+		self.created_structure_definitions = []
+		self.created_resource_maps = []
+		self._create_base_fixtures()
+
+	def tearDown(self):
+		self._cleanup_test_data()
+
+	def _create_base_fixtures(self):
+		if not frappe.db.exists("FHIR Structure Definition", "Patient-R4"):
+			frappe.get_doc(
+				{
+					"doctype": "FHIR Structure Definition",
+					"name": "Patient-R4",
+					"fhir_sd": "Patient",
+					"fhir_version": "R4",
+				}
+			).insert(ignore_permissions=True)
+			frappe.db.commit()
+
+	def _cleanup_test_data(self):
+		for name in self.created_resource_maps:
+			if frappe.db.exists("FHIR Resource Map", name):
+				frappe.delete_doc("FHIR Resource Map", name, force=True)
+
+		for name in self.created_structure_definitions:
+			if frappe.db.exists("FHIR Structure Definition", name):
+				frappe.delete_doc("FHIR Structure Definition", name, force=True)
+
+		self.created_resource_maps = []
+		self.created_structure_definitions = []
+		frappe.db.commit()
+
+	def _create_resource_map_with_ui_config(self, custom_elements=None):
+		import json as json_module
+		import uuid
+
+		suffix = uuid.uuid4().hex[:8]
+		name = f"Patient-HybridTest-{suffix}"
+
+		doc_data = {
+			"doctype": "FHIR Resource Map",
+			"name": name,
+			"resource_type": "Patient",
+			"primary_doctype": "Patient",
+			"base_structure_definition": "Patient-R4",
+			"element_maps": [
+				{
+					"fhir_path": "Patient.id",
+					"datatype": "string",
+					"min": 0,
+					"max": "1",
+					"mapping_type": "Frappe Field",
+					"frappe_field": "name",
+				},
+				{
+					"fhir_path": "Patient.birthDate",
+					"datatype": "date",
+					"min": 0,
+					"max": "1",
+					"mapping_type": "Frappe Field",
+					"frappe_field": "dob",
+				},
+			],
+		}
+
+		if custom_elements:
+			doc_data["custom_elements"] = json_module.dumps(custom_elements)
+
+		doc = frappe.get_doc(doc_data)
+		doc.insert(ignore_permissions=True)
+		self.created_resource_maps.append(doc.name)
+		frappe.db.commit()
+
+		return doc
+
+	def test_hybrid_mode_detection(self):
+		"""When primary_doctype is set, should NOT be custom-only mode even with custom sources"""
+		custom = {
+			"sources": [
+				{"key": "extra", "doctype": "Company", "kind": "direct_link", "link_field": "company"}
+			],
+			"elements": [],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+		compiler._custom_elements = compiler._parse_custom_elements()
+
+		self.assertFalse(compiler._is_custom_only_mode())
+
+	def test_hybrid_mode_includes_ui_elements(self):
+		"""UI-configured elements should be present"""
+		custom = {
+			"elements": [
+				{
+					"path": "Patient.active",
+					"source_key": "primary",
+					"mapping_type": "fixed",
+					"fixed_value": "true",
+					"datatype": "boolean",
+				}
+			],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		# Check UI elements are present
+		id_element = None
+		birth_date_element = None
+		for el in result.elements:
+			if el.path == "Patient.id":
+				id_element = el
+			elif el.path == "Patient.birthDate":
+				birth_date_element = el
+
+		self.assertIsNotNone(id_element)
+		self.assertIsNotNone(birth_date_element)
+
+	def test_hybrid_mode_includes_custom_elements(self):
+		"""Custom elements should be added to UI elements"""
+		custom = {
+			"elements": [
+				{
+					"path": "Patient.active",
+					"source_key": "primary",
+					"mapping_type": "fixed",
+					"fixed_value": "true",
+					"datatype": "boolean",
+				}
+			],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		# Check custom element is present
+		active_element = None
+		for el in result.elements:
+			if el.path == "Patient.active":
+				active_element = el
+
+		self.assertIsNotNone(active_element)
+		self.assertEqual(active_element.mapping_type, CompiledElement.MAPPING_FIXED)
+
+	def test_hybrid_mode_adds_custom_sources(self):
+		"""Custom sources should be added to UI sources"""
+		custom = {
+			"sources": [{"key": "gender", "doctype": "Gender", "kind": "direct_link", "link_field": "sex"}],
+			"elements": [],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		# Check primary source exists
+		primary = result.get_primary_source()
+		self.assertIsNotNone(primary)
+
+		# Check custom source exists
+		gender_source = result.get_source("gender")
+		self.assertIsNotNone(gender_source)
+		self.assertEqual(gender_source.entity, "Gender")
+
+	def test_hybrid_mode_adds_custom_extension(self):
+		"""Custom extensions should be added"""
+		custom = {
+			"extensions": [
+				{
+					"path": "Patient",
+					"url": "http://example.org/religion",
+					"value_type": "valueString",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "religion",
+				}
+			],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		ext_elements = [el for el in result.elements if el.is_extension()]
+		self.assertEqual(len(ext_elements), 1)
+
+	def test_hybrid_mode_adds_custom_reference(self):
+		"""Custom reference elements should be added"""
+		custom = {
+			"elements": [
+				{
+					"path": "Patient.managingOrganization",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "customer",
+					"datatype": "Reference",
+					"reference_type": "Customer",
+					"reference_display_field": "customer",
+				}
+			],
+		}
+		resource_map = self._create_resource_map_with_ui_config(custom)
+		compiler = FHIRCompiler(resource_map)
+
+		result = compiler.compile()
+
+		ref_elements = [el for el in result.elements if el.is_reference()]
+		self.assertEqual(len(ref_elements), 1)
+		self.assertEqual(ref_elements[0].reference_type, "Customer")
