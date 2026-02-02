@@ -129,7 +129,12 @@ class ValueResolver:
 		value = self._extract_value(element, source_data)
 		value = self._apply_default(element, value)
 		value = self._apply_pattern(element, value)
-		value = self._transform(element, value)
+
+		# Build reference if this is a reference element
+		if element.is_reference() and value is not None:
+			value = self._build_reference(element, value, source_data)
+		else:
+			value = self._transform(element, value)
 
 		return value
 
@@ -207,7 +212,6 @@ class ValueResolver:
 		if not element.pattern_value:
 			return value
 
-		# Don't apply pattern for slices - handled separately
 		if element.is_slice():
 			return value
 
@@ -222,6 +226,31 @@ class ValueResolver:
 			return pattern
 
 		return value
+
+	def _build_reference(self, element, value, source_data):
+		if value is None or value == "":
+			return None
+
+		# Contained reference uses # prefix
+		if element.is_contained_reference:
+			return {"reference": f"#{value}"}
+
+		# Build full reference
+		reference = {}
+
+		if element.reference_type:
+			reference["reference"] = f"{element.reference_type}/{value}"
+			reference["type"] = element.reference_type
+		else:
+			reference["reference"] = str(value)
+
+		# Add display if configured
+		if element.reference_display_field:
+			display = self._get_field_value(element.reference_display_field, source_data)
+			if display:
+				reference["display"] = str(display)
+
+		return reference
 
 	def _transform(self, element, value):
 		if value is None:
@@ -311,14 +340,12 @@ class FHIRRuntime:
 		context = {"primary_id": primary_id}
 		sources_data = {}
 
-		# Resolve primary first
 		primary_source = compiled.get_primary_source()
 		if primary_source:
 			primary_doc = self.source_resolver.resolve(primary_source, context)
 			sources_data["primary"] = primary_doc
 			context["primary"] = primary_doc
 
-		# Resolve other sources
 		for source in compiled.sources:
 			if source.is_primary:
 				continue
@@ -341,6 +368,7 @@ class FHIRRuntime:
 
 			source_data = sources_data.get(element.source_key)
 
+			# Check for child table field (dot notation)
 			if element.field and "." in element.field.split("|")[0]:
 				values = self._resolve_child_table_field(element, source_data)
 				if values:
@@ -373,7 +401,6 @@ class FHIRRuntime:
 
 			source_data = sources_data.get(element.source_key)
 
-			# Handle collection sources
 			if isinstance(source_data, list):
 				for item in source_data:
 					ext_obj = self._build_extension_object(element, item, sources_data)
@@ -396,7 +423,6 @@ class FHIRRuntime:
 		if source_data is None:
 			return None
 
-		# Create a sources dict with this source data
 		item_sources = dict(sources_data)
 		item_sources[element.source_key] = source_data
 
@@ -424,7 +450,6 @@ class FHIRRuntime:
 			if source_data is None:
 				continue
 
-			# Handle collection sources
 			if isinstance(source_data, list):
 				for item in source_data:
 					slice_obj = self._build_slice_object(element, item, sources_data)
@@ -447,7 +472,6 @@ class FHIRRuntime:
 		if source_data is None:
 			return None
 
-		# Resolve value
 		value = None
 
 		if element.mapping_type == CompiledElement.MAPPING_FIELD:
@@ -459,15 +483,12 @@ class FHIRRuntime:
 		elif element.mapping_type == CompiledElement.MAPPING_JSON:
 			value = element.json_value
 
-		# Apply transformer
 		if value is not None and element.transformer:
 			value = self.value_resolver._apply_transformer(element.transformer, value)
 
-		# Skip if no value
 		if value is None or value == "":
 			return None
 
-		# Build slice object from pattern_value + resolved value
 		slice_obj = {}
 
 		if element.pattern_value and isinstance(element.pattern_value, dict):
@@ -524,9 +545,15 @@ class FHIRRuntime:
 			if isinstance(row, dict):
 				value = row.get(child_field)
 				if value is not None:
-					transformed = self.value_resolver._apply_transformer(element.transformer, value)
-					if transformed is not None:
-						values.append(transformed)
+					# Handle reference elements in child tables
+					if element.is_reference():
+						ref_value = self.value_resolver._build_reference(element, value, row)
+						if ref_value is not None:
+							values.append(ref_value)
+					else:
+						transformed = self.value_resolver._apply_transformer(element.transformer, value)
+						if transformed is not None:
+							values.append(transformed)
 
 		return values
 
@@ -536,7 +563,6 @@ class FHIRRuntime:
 
 		child_table_parents = self._detect_child_table_parents(compiled.elements, resolved_values)
 
-		# Add top-level extensions
 		root_ext_key = (resource_type, "extension")
 		if root_ext_key in extensions:
 			result["extension"] = extensions[root_ext_key]
@@ -552,7 +578,6 @@ class FHIRRuntime:
 			path = resource_type + "." + child.name
 			value = self._build_node(child, path, resolved_values, extensions, slices, child_table_parents)
 
-			# Merge slices into array elements
 			if path in slices:
 				slice_items = slices[path]
 				if value is None:
@@ -608,7 +633,6 @@ class FHIRRuntime:
 
 		result = {}
 
-		# Add extensions for this path
 		ext_key = (path, "extension")
 		if ext_key in extensions:
 			result["extension"] = extensions[ext_key]
@@ -626,7 +650,6 @@ class FHIRRuntime:
 				child, child_path, resolved_values, extensions, slices, child_table_parents
 			)
 
-			# Merge slices for nested arrays
 			if child_path in slices:
 				slice_items = slices[child_path]
 				if child_value is None:

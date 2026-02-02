@@ -99,6 +99,11 @@ class CompiledElement:
 		self.slice_name = None
 		self.slice_of = None
 
+		# Reference support
+		self.reference_type = None
+		self.reference_display_field = None
+		self.is_contained_reference = False
+
 	def to_dict(self):
 		return {
 			"path": self.path,
@@ -119,6 +124,9 @@ class CompiledElement:
 			"is_modifier_extension": self.is_modifier_extension,
 			"slice_name": self.slice_name,
 			"slice_of": self.slice_of,
+			"reference_type": self.reference_type,
+			"reference_display_field": self.reference_display_field,
+			"is_contained_reference": self.is_contained_reference,
 		}
 
 	@classmethod
@@ -140,6 +148,9 @@ class CompiledElement:
 		instance.is_modifier_extension = data.get("is_modifier_extension", False)
 		instance.slice_name = data.get("slice_name")
 		instance.slice_of = data.get("slice_of")
+		instance.reference_type = data.get("reference_type")
+		instance.reference_display_field = data.get("reference_display_field")
+		instance.is_contained_reference = data.get("is_contained_reference", False)
 		return instance
 
 	def is_extension(self):
@@ -147,6 +158,9 @@ class CompiledElement:
 
 	def is_slice(self):
 		return self.slice_name is not None
+
+	def is_reference(self):
+		return self.reference_type is not None
 
 	def has_mapping(self):
 		return (
@@ -298,11 +312,8 @@ class FHIRCompiler:
 
 	def compile(self):
 		self._custom_elements = self._parse_custom_elements()
+		self.compiled = CompiledResource(self._build_metadata())
 
-		metadata = self._build_metadata()
-		self.compiled = CompiledResource(metadata)
-
-		# Determine compilation mode
 		if self._is_custom_only_mode():
 			self._compile_from_custom_elements()
 		else:
@@ -310,33 +321,19 @@ class FHIRCompiler:
 			self._merge_custom_additions()
 
 		self._build_resource_tree()
-		self.compiled.metadata.compiled_at = datetime.now()
 
+		self.compiled.metadata.compiled_at = datetime.now()
 		return self.compiled
 
 	def _is_custom_only_mode(self):
-		"""
-		Custom-only mode when:
-		1. custom_elements has 'sources' defined, OR
-		2. No UI sources/element_maps defined (empty resource map)
-		"""
+		"""Custom-only when sources in custom_elements AND no UI primary doctype"""
 		if not self._custom_elements:
 			return False
 
-		# If custom_elements defines sources, use custom-only mode
-		if self._custom_elements.get("sources"):
-			return True
+		has_custom_sources = bool(self._custom_elements.get("sources"))
+		has_ui_primary = bool(self.resource_map.primary_doctype)
 
-		# If UI has no sources and no element_maps, fall back to custom elements
-		has_ui_sources = self.resource_map.primary_doctype or (
-			hasattr(self.resource_map, "sources") and self.resource_map.sources
-		)
-		has_ui_elements = hasattr(self.resource_map, "element_maps") and self.resource_map.element_maps
-
-		if not has_ui_sources and not has_ui_elements:
-			return bool(self._custom_elements.get("elements"))
-
-		return False
+		return has_custom_sources and not has_ui_primary
 
 	def _compile_from_custom_elements(self):
 		"""Compile entirely from custom_elements JSON"""
@@ -373,23 +370,38 @@ class FHIRCompiler:
 		self._compile_elements()
 
 	def _merge_custom_additions(self):
-		"""Merge extensions and slices from custom_elements into UI-compiled output"""
+		"""Merge custom sources, elements, extensions, slices into UI-compiled result"""
 		if not self._custom_elements:
 			return
 
-		# Additional sources
+		# Add custom sources (without replacing existing ones)
 		for source_def in self._custom_elements.get("sources", []):
-			source = self._compile_custom_source(source_def)
-			if source:
-				self.compiled.add_source(source)
+			source_key = source_def.get("key")
+			if not source_key:
+				continue
 
-		# Extensions
+			# Skip if source already exists from UI config
+			existing = self.compiled.get_source(source_key)
+			if existing:
+				continue
+
+			compiled_source = self._compile_custom_source(source_def)
+			if compiled_source:
+				self.compiled.add_source(compiled_source)
+
+		# Add custom elements
+		for element_def in self._custom_elements.get("elements", []):
+			element = self._compile_custom_element(element_def)
+			if element:
+				self.compiled.add_element(element)
+
+		# Add extensions
 		for ext_def in self._custom_elements.get("extensions", []):
 			element = self._compile_extension(ext_def)
 			if element:
 				self.compiled.add_element(element)
 
-		# Slices
+		# Add slices
 		for slice_def in self._custom_elements.get("slices", []):
 			element = self._compile_slice(slice_def)
 			if element:
@@ -591,7 +603,6 @@ class FHIRCompiler:
 
 		source_key = element_def.get("source_key", "primary")
 
-		# Validate source exists
 		if not self.compiled.get_source(source_key):
 			frappe.log_error(f"Custom element '{path}' references unknown source '{source_key}'")
 			return None
@@ -610,6 +621,12 @@ class FHIRCompiler:
 		element.is_array = element_def.get("is_array", False)
 		element.is_required = element_def.get("is_required", False)
 		element.parent_path = self._get_parent_path(path)
+
+		# Reference support
+		if element_def.get("datatype") == "Reference" or element_def.get("reference_type"):
+			element.reference_type = element_def.get("reference_type")
+			element.reference_display_field = element_def.get("reference_display_field")
+			element.is_contained_reference = element_def.get("is_contained_reference", False)
 
 		return element
 
