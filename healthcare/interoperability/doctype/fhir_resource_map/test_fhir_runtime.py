@@ -12,8 +12,8 @@ from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import 
 	ResourceTreeNode,
 )
 from healthcare.interoperability.doctype.fhir_resource_map.fhir_runtime import (
+	FHIRGenerationError,
 	FHIRRuntime,
-	FrappeSourceResolver,
 	ValueResolver,
 )
 
