@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import frappe
@@ -8,6 +9,7 @@ from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import 
 	CompiledElement,
 	CompiledResource,
 	CompiledSource,
+	FHIRCompilationError,
 	FHIRCompiler,
 	ResourceTreeNode,
 )
@@ -2605,3 +2607,671 @@ class TestFHIRCompilerHybridMode(IntegrationTestCase):
 		ref_elements = [el for el in result.elements if el.is_reference()]
 		self.assertEqual(len(ref_elements), 1)
 		self.assertEqual(ref_elements[0].reference_type, "Customer")
+
+
+# =============================================================================
+# Data Classes Tests
+# =============================================================================
+
+
+class TestCompilationMetadata(IntegrationTestCase):
+	"""Test CompilationMetadata data class"""
+
+	def test_create_metadata(self):
+		metadata = CompilationMetadata("R4", "http://example.org/Patient", "Patient")
+
+		self.assertEqual(metadata.fhir_version, "R4")
+		self.assertEqual(metadata.profile_url, "http://example.org/Patient")
+		self.assertEqual(metadata.resource_type, "Patient")
+		# compiled_at is set by the compiler, not on direct creation
+		self.assertIsNone(metadata.compiled_at)
+
+	def test_metadata_serialization(self):
+		metadata = CompilationMetadata("R4", "http://example.org/Patient", "Patient")
+
+		data = metadata.to_dict()
+		restored = CompilationMetadata.from_dict(data)
+
+		self.assertEqual(restored.fhir_version, "R4")
+		self.assertEqual(restored.profile_url, "http://example.org/Patient")
+		self.assertEqual(restored.resource_type, "Patient")
+
+
+class TestCompiledSource(IntegrationTestCase):
+	"""Test CompiledSource data class"""
+
+	def test_create_source(self):
+		source = CompiledSource("primary", "Patient", "document")
+
+		self.assertEqual(source.key, "primary")
+		self.assertEqual(source.entity, "Patient")
+		self.assertEqual(source.entity_type, "document")
+		self.assertFalse(source.is_primary)
+		self.assertFalse(source.is_collection)
+
+	def test_source_serialization(self):
+		source = CompiledSource("addresses", "Patient Address", "child_table")
+		source.is_collection = True
+		source.parent_source_key = "primary"
+		source.link_field = "patient_addresses"
+
+		data = source.to_dict()
+		restored = CompiledSource.from_dict(data)
+
+		self.assertEqual(restored.key, "addresses")
+		self.assertEqual(restored.entity, "Patient Address")
+		self.assertEqual(restored.entity_type, "child_table")
+		self.assertTrue(restored.is_collection)
+		self.assertEqual(restored.parent_source_key, "primary")
+		self.assertEqual(restored.link_field, "patient_addresses")
+
+	def test_source_with_filters(self):
+		source = CompiledSource("encounters", "Patient Encounter", "reverse_link")
+		source.filters = {"status": "completed"}
+
+		data = source.to_dict()
+		restored = CompiledSource.from_dict(data)
+
+		self.assertEqual(restored.filters, {"status": "completed"})
+
+
+class TestCompiledElement(IntegrationTestCase):
+	"""Test CompiledElement data class"""
+
+	def test_create_element(self):
+		element = CompiledElement("Patient.id", "primary")
+
+		self.assertEqual(element.path, "Patient.id")
+		self.assertEqual(element.source_key, "primary")
+		self.assertIsNone(element.mapping_type)
+		self.assertFalse(element.is_array)
+
+	def test_element_field_mapping(self):
+		element = CompiledElement("Patient.birthDate", "primary")
+		element.mapping_type = CompiledElement.MAPPING_FIELD
+		element.field = "dob"
+		element.transformer = "date"
+
+		self.assertEqual(element.mapping_type, "field")
+		self.assertEqual(element.field, "dob")
+		self.assertEqual(element.transformer, "date")
+		self.assertTrue(element.has_mapping())
+
+	def test_element_fixed_mapping(self):
+		element = CompiledElement("Patient.active", "primary")
+		element.mapping_type = CompiledElement.MAPPING_FIXED
+		element.fixed_value = "true"
+
+		self.assertEqual(element.mapping_type, "fixed")
+		self.assertEqual(element.fixed_value, "true")
+		self.assertTrue(element.has_mapping())
+
+	def test_element_expression_mapping(self):
+		element = CompiledElement("Patient.deceasedBoolean", "primary")
+		element.mapping_type = CompiledElement.MAPPING_EXPRESSION
+		element.expression = "doc.get('status') == 'Deceased'"
+
+		self.assertEqual(element.mapping_type, "expression")
+		self.assertEqual(element.expression, "doc.get('status') == 'Deceased'")
+		self.assertTrue(element.has_mapping())
+
+	def test_element_json_mapping(self):
+		element = CompiledElement("Patient.meta", "primary")
+		element.mapping_type = CompiledElement.MAPPING_JSON
+		element.json_value = {"profile": ["http://example.org/Patient"]}
+
+		self.assertEqual(element.mapping_type, "json")
+		self.assertEqual(element.json_value, {"profile": ["http://example.org/Patient"]})
+		self.assertTrue(element.has_mapping())
+
+	def test_element_serialization(self):
+		element = CompiledElement("Patient.birthDate", "primary")
+		element.mapping_type = CompiledElement.MAPPING_FIELD
+		element.field = "dob"
+		element.transformer = "date"
+		element.is_required = True
+		element.parent_path = "Patient"
+
+		data = element.to_dict()
+		restored = CompiledElement.from_dict(data)
+
+		self.assertEqual(restored.path, "Patient.birthDate")
+		self.assertEqual(restored.source_key, "primary")
+		self.assertEqual(restored.mapping_type, "field")
+		self.assertEqual(restored.field, "dob")
+		self.assertEqual(restored.transformer, "date")
+		self.assertTrue(restored.is_required)
+		self.assertEqual(restored.parent_path, "Patient")
+
+
+class TestCompiledElementExtension(IntegrationTestCase):
+	"""Test CompiledElement extension support"""
+
+	def test_extension_fields(self):
+		element = CompiledElement("Patient.extension", "primary")
+		element.extension_url = "http://example.org/ext"
+		element.extension_value_type = "string"
+
+		self.assertTrue(element.is_extension())
+		self.assertEqual(element.extension_url, "http://example.org/ext")
+		self.assertEqual(element.extension_value_type, "string")
+		self.assertFalse(element.is_modifier_extension)
+
+	def test_modifier_extension(self):
+		element = CompiledElement("Patient.modifierExtension", "primary")
+		element.extension_url = "http://example.org/mod-ext"
+		element.extension_value_type = "boolean"
+		element.is_modifier_extension = True
+
+		self.assertTrue(element.is_extension())
+		self.assertTrue(element.is_modifier_extension)
+
+	def test_extension_serialization(self):
+		element = CompiledElement("Patient.extension", "primary")
+		element.extension_url = "http://example.org/ext"
+		element.extension_value_type = "CodeableConcept"
+		element.is_modifier_extension = False
+
+		data = element.to_dict()
+		restored = CompiledElement.from_dict(data)
+
+		self.assertEqual(restored.extension_url, "http://example.org/ext")
+		self.assertEqual(restored.extension_value_type, "CodeableConcept")
+		self.assertFalse(restored.is_modifier_extension)
+
+
+class TestCompiledElementSlice(IntegrationTestCase):
+	"""Test CompiledElement slice support"""
+
+	def test_slice_fields(self):
+		element = CompiledElement("Patient.identifier", "primary")
+		element.slice_name = "mrn"
+		element.slice_of = "Patient.identifier"
+		element.pattern_value = {"system": "http://example.org/mrn"}
+
+		self.assertTrue(element.is_slice())
+		self.assertEqual(element.slice_name, "mrn")
+		self.assertEqual(element.slice_of, "Patient.identifier")
+		self.assertTrue(element.has_pattern())
+
+	def test_slice_serialization(self):
+		element = CompiledElement("Patient.identifier", "primary")
+		element.slice_name = "passport"
+		element.slice_of = "Patient.identifier"
+		element.pattern_value = {
+			"type": {"coding": [{"code": "PPN"}]},
+			"system": "http://example.org/passport",
+		}
+
+		data = element.to_dict()
+		restored = CompiledElement.from_dict(data)
+
+		self.assertEqual(restored.slice_name, "passport")
+		self.assertEqual(restored.slice_of, "Patient.identifier")
+		self.assertEqual(restored.pattern_value["type"]["coding"][0]["code"], "PPN")
+
+
+class TestCompiledElementReference(IntegrationTestCase):
+	"""Test CompiledElement reference support"""
+
+	def test_reference_fields(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+		element.reference_display_field = "organization_name"
+
+		self.assertTrue(element.is_reference())
+		self.assertEqual(element.reference_type, "Organization")
+		self.assertEqual(element.reference_display_field, "organization_name")
+
+	def test_simple_contained_reference(self):
+		element = CompiledElement("Patient.generalPractitioner", "primary")
+		element.is_contained_reference = True
+
+		self.assertTrue(element.is_reference())
+		self.assertTrue(element.is_contained_reference)
+		self.assertFalse(element.is_full_contained_reference())
+
+	def test_full_contained_reference(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+		element.is_contained_reference = True
+		element.contained_resource_map = "Organization-Organization-R4"
+		element.contained_id_field = "name"
+
+		self.assertTrue(element.is_reference())
+		self.assertTrue(element.is_contained_reference)
+		self.assertTrue(element.is_full_contained_reference())
+		self.assertEqual(element.contained_resource_map, "Organization-Organization-R4")
+		self.assertEqual(element.contained_id_field, "name")
+
+	def test_reference_serialization(self):
+		element = CompiledElement("Patient.managingOrganization", "primary")
+		element.reference_type = "Organization"
+		element.is_contained_reference = True
+		element.contained_resource_map = "Organization-Organization-R4"
+		element.contained_id_field = "name"
+
+		data = element.to_dict()
+		restored = CompiledElement.from_dict(data)
+
+		self.assertEqual(restored.reference_type, "Organization")
+		self.assertTrue(restored.is_contained_reference)
+		self.assertEqual(restored.contained_resource_map, "Organization-Organization-R4")
+		self.assertEqual(restored.contained_id_field, "name")
+		self.assertTrue(restored.is_full_contained_reference())
+
+
+class TestResourceTreeNode(IntegrationTestCase):
+	"""Test ResourceTreeNode data class"""
+
+	def test_create_node(self):
+		node = ResourceTreeNode("Patient")
+
+		self.assertEqual(node.name, "Patient")
+		self.assertFalse(node.is_array)
+		self.assertFalse(node.is_primitive)
+		self.assertEqual(len(node.children), 0)
+
+	def test_add_child(self):
+		root = ResourceTreeNode("Patient")
+		child = ResourceTreeNode("name")
+		child.is_array = True
+
+		root.add_child(child)
+
+		self.assertEqual(len(root.children), 1)
+		self.assertEqual(root.children[0].name, "name")
+		self.assertTrue(root.children[0].is_array)
+
+	def test_find_child(self):
+		root = ResourceTreeNode("Patient")
+		root.add_child(ResourceTreeNode("id"))
+		root.add_child(ResourceTreeNode("name"))
+		root.add_child(ResourceTreeNode("birthDate"))
+
+		found = root.find_child("name")
+
+		self.assertIsNotNone(found)
+		self.assertEqual(found.name, "name")
+
+	def test_find_child_not_found(self):
+		root = ResourceTreeNode("Patient")
+		root.add_child(ResourceTreeNode("id"))
+
+		found = root.find_child("nonexistent")
+
+		self.assertIsNone(found)
+
+	def test_find_by_path(self):
+		root = ResourceTreeNode("Patient")
+		name = ResourceTreeNode("name")
+		name.is_array = True
+		family = ResourceTreeNode("family")
+		name.add_child(family)
+		root.add_child(name)
+
+		found = root.find_by_path("Patient.name.family")
+
+		self.assertIsNotNone(found)
+		self.assertEqual(found.name, "family")
+
+	def test_tree_serialization(self):
+		root = ResourceTreeNode("Patient")
+		name = ResourceTreeNode("name")
+		name.is_array = True
+		family = ResourceTreeNode("family")
+		family.is_primitive = True
+		name.add_child(family)
+		root.add_child(name)
+
+		data = root.to_dict()
+		restored = ResourceTreeNode.from_dict(data)
+
+		self.assertEqual(restored.name, "Patient")
+		self.assertEqual(len(restored.children), 1)
+		self.assertEqual(restored.children[0].name, "name")
+		self.assertTrue(restored.children[0].is_array)
+		self.assertEqual(restored.children[0].children[0].name, "family")
+		self.assertTrue(restored.children[0].children[0].is_primitive)
+
+
+class TestCompiledResource(IntegrationTestCase):
+	"""Test CompiledResource data class"""
+
+	def test_create_compiled_resource(self):
+		metadata = CompilationMetadata("R4", None, "Patient")
+		compiled = CompiledResource(metadata)
+
+		self.assertEqual(compiled.metadata.resource_type, "Patient")
+		self.assertEqual(len(compiled.sources), 0)
+		self.assertEqual(len(compiled.elements), 0)
+
+	def test_add_source(self):
+		metadata = CompilationMetadata("R4", None, "Patient")
+		compiled = CompiledResource(metadata)
+
+		source = CompiledSource("primary", "Patient", "document")
+		source.is_primary = True
+		compiled.add_source(source)
+
+		self.assertEqual(len(compiled.sources), 1)
+		self.assertEqual(compiled.sources[0].key, "primary")
+
+	def test_add_element(self):
+		metadata = CompilationMetadata("R4", None, "Patient")
+		compiled = CompiledResource(metadata)
+
+		element = CompiledElement("Patient.id", "primary")
+		compiled.add_element(element)
+
+		self.assertEqual(len(compiled.elements), 1)
+		self.assertEqual(compiled.elements[0].path, "Patient.id")
+
+	def test_get_source(self):
+		metadata = CompilationMetadata("R4", None, "Patient")
+		compiled = CompiledResource(metadata)
+
+		source1 = CompiledSource("primary", "Patient", "document")
+		source2 = CompiledSource("gender", "Gender", "direct_link")
+		compiled.add_source(source1)
+		compiled.add_source(source2)
+
+		found = compiled.get_source("gender")
+
+		self.assertIsNotNone(found)
+		self.assertEqual(found.entity, "Gender")
+
+	def test_get_primary_source(self):
+		metadata = CompilationMetadata("R4", None, "Patient")
+		compiled = CompiledResource(metadata)
+
+		source1 = CompiledSource("primary", "Patient", "document")
+		source1.is_primary = True
+		source2 = CompiledSource("gender", "Gender", "direct_link")
+		compiled.add_source(source1)
+		compiled.add_source(source2)
+
+		primary = compiled.get_primary_source()
+
+		self.assertIsNotNone(primary)
+		self.assertEqual(primary.key, "primary")
+
+	def test_compiled_resource_serialization(self):
+		metadata = CompilationMetadata("R4", "http://example.org/Patient", "Patient")
+		compiled = CompiledResource(metadata)
+
+		source = CompiledSource("primary", "Patient", "document")
+		source.is_primary = True
+		compiled.add_source(source)
+
+		element = CompiledElement("Patient.id", "primary")
+		element.mapping_type = CompiledElement.MAPPING_FIELD
+		element.field = "name"
+		compiled.add_element(element)
+
+		tree = ResourceTreeNode("Patient")
+		tree.add_child(ResourceTreeNode("id"))
+		compiled.resource_tree = tree
+
+		data = compiled.to_dict()
+		restored = CompiledResource.from_dict(data)
+
+		self.assertEqual(restored.metadata.resource_type, "Patient")
+		self.assertEqual(len(restored.sources), 1)
+		self.assertEqual(len(restored.elements), 1)
+		self.assertIsNotNone(restored.resource_tree)
+		self.assertEqual(restored.resource_tree.name, "Patient")
+
+
+# =============================================================================
+# Compiler Tests
+# =============================================================================
+
+
+class TestFHIRCompilerCustomElements(IntegrationTestCase):
+	"""Test FHIRCompiler with custom_elements JSON"""
+
+	def _create_mock_resource_map(self, custom_elements):
+		"""Create a mock resource map object"""
+
+		class MockResourceMap:
+			def __init__(self):
+				self.name = "Test-Patient-R4"
+				self.resource_type = "Patient"
+				self.base_structure_definition = None
+				self.primary_doctype = None
+				self.fhir_element_map = []
+				self.fhir_resource_map_source = []
+				self.custom_elements = json.dumps(custom_elements) if custom_elements else None
+
+		return MockResourceMap()
+
+	def test_compile_simple_custom_elements(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{"path": "Patient.id", "source_key": "primary", "mapping_type": "field", "field": "name"}
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		self.assertEqual(result.metadata.resource_type, "Patient")
+		self.assertEqual(len(result.sources), 1)
+		self.assertEqual(len(result.elements), 1)
+		self.assertEqual(result.elements[0].path, "Patient.id")
+		self.assertEqual(result.elements[0].field, "name")
+
+	def test_compile_with_extensions(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [],
+			"extensions": [
+				{
+					"url": "http://example.org/religion",
+					"path": "Patient.extension",
+					"source_key": "primary",
+					"value_type": "string",
+					"mapping_type": "field",
+					"field": "religion",
+				}
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		extensions = [e for e in result.elements if e.is_extension()]
+		self.assertEqual(len(extensions), 1)
+		self.assertEqual(extensions[0].extension_url, "http://example.org/religion")
+		self.assertEqual(extensions[0].extension_value_type, "string")
+
+	def test_compile_with_slices(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [],
+			"slices": [
+				{
+					"slice_of": "Patient.identifier",
+					"slice_name": "mrn",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "mrn",
+					"pattern": {"system": "http://example.org/mrn"},
+				}
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		slices = [e for e in result.elements if e.is_slice()]
+		self.assertEqual(len(slices), 1)
+		self.assertEqual(slices[0].slice_name, "mrn")
+		self.assertEqual(slices[0].slice_of, "Patient.identifier")
+		self.assertEqual(slices[0].pattern_value["system"], "http://example.org/mrn")
+
+	def test_compile_with_contained_reference(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{
+					"path": "Patient.managingOrganization",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "organization",
+					"reference_type": "Organization",
+					"is_contained_reference": True,
+					"contained_resource_map": "Organization-Organization-R4",
+					"contained_id_field": "name",
+				}
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		refs = [e for e in result.elements if e.is_reference()]
+		self.assertEqual(len(refs), 1)
+		self.assertTrue(refs[0].is_contained_reference)
+		self.assertTrue(refs[0].is_full_contained_reference())
+		self.assertEqual(refs[0].contained_resource_map, "Organization-Organization-R4")
+
+	def test_compile_multiple_sources(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [
+				{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True},
+				{"key": "gender", "doctype": "Gender", "kind": "direct_link", "link_field": "gender"},
+				{
+					"key": "addresses",
+					"doctype": "Patient Address",
+					"kind": "child_table",
+					"link_field": "addresses",
+					"is_collection": True,
+				},
+			],
+			"elements": [
+				{"path": "Patient.id", "source_key": "primary", "mapping_type": "field", "field": "name"},
+				{
+					"path": "Patient.gender",
+					"source_key": "gender",
+					"mapping_type": "field",
+					"field": "fhir_code",
+				},
+				{
+					"path": "Patient.address.city",
+					"source_key": "addresses",
+					"mapping_type": "field",
+					"field": "city",
+				},
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		self.assertEqual(len(result.sources), 3)
+		self.assertEqual(len(result.elements), 3)
+
+		gender_source = result.get_source("gender")
+		self.assertIsNotNone(gender_source)
+		self.assertEqual(gender_source.entity_type, "direct_link")
+
+		addresses_source = result.get_source("addresses")
+		self.assertIsNotNone(addresses_source)
+		self.assertTrue(addresses_source.is_collection)
+
+
+class TestFHIRCompilerTransformers(IntegrationTestCase):
+	"""Test FHIRCompiler transformer assignment"""
+
+	def _create_mock_resource_map(self, custom_elements):
+		class MockResourceMap:
+			def __init__(self):
+				self.name = "Test-Patient-R4"
+				self.resource_type = "Patient"
+				self.base_structure_definition = None
+				self.primary_doctype = None
+				self.fhir_element_map = []
+				self.fhir_resource_map_source = []
+				self.custom_elements = json.dumps(custom_elements) if custom_elements else None
+
+		return MockResourceMap()
+
+	def test_primitive_transformers(self):
+		custom_elements = {
+			"metadata": {"fhir_version": "R4", "resource_type": "Patient"},
+			"sources": [{"key": "primary", "doctype": "Patient", "kind": "document", "is_primary": True}],
+			"elements": [
+				{
+					"path": "Patient.id",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "name",
+					"datatype": "id",
+				},
+				{
+					"path": "Patient.active",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "enabled",
+					"datatype": "boolean",
+				},
+				{
+					"path": "Patient.birthDate",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "dob",
+					"datatype": "date",
+				},
+				{
+					"path": "Patient.gender",
+					"source_key": "primary",
+					"mapping_type": "field",
+					"field": "sex",
+					"datatype": "code",
+				},
+			],
+		}
+
+		resource_map = self._create_mock_resource_map(custom_elements)
+		compiler = FHIRCompiler(resource_map)
+		result = compiler.compile()
+
+		elements_by_path = {e.path: e for e in result.elements}
+
+		self.assertEqual(elements_by_path["Patient.id"].transformer, "id")
+		self.assertEqual(elements_by_path["Patient.active"].transformer, "boolean")
+		self.assertEqual(elements_by_path["Patient.birthDate"].transformer, "date")
+		self.assertEqual(elements_by_path["Patient.gender"].transformer, "code")
+
+
+class TestFHIRCompilationError(IntegrationTestCase):
+	"""Test FHIRCompilationError"""
+
+	def test_error_creation(self):
+		error = FHIRCompilationError("Invalid mapping", path="Patient.invalid", details={"field": "test"})
+
+		self.assertEqual(error.message, "Invalid mapping")
+		self.assertEqual(error.path, "Patient.invalid")
+		self.assertEqual(error.details["field"], "test")
+
+	def test_error_to_dict(self):
+		error = FHIRCompilationError("Missing source", path="Patient.id", details={"source_key": "unknown"})
+
+		data = error.to_dict()
+
+		self.assertEqual(data["message"], "Missing source")
+		self.assertEqual(data["path"], "Patient.id")
+		self.assertEqual(data["details"]["source_key"], "unknown")

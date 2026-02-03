@@ -2,15 +2,48 @@ import json
 
 import frappe
 
-from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import CompiledElement
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_compiler import (
+	CompiledElement,
+	CompiledResource,
+	FHIRCompiler,
+)
+
+"""
+FHIR Runtime
+
+Executes compiled FHIR Resource Maps to generate FHIR resources from Frappe documents.
+"""
+
+
+class FHIRGenerationError(Exception):
+	"""Exception raised during FHIR resource generation"""
+
+	def __init__(self, message, element_path=None, source_key=None, details=None):
+		super().__init__(message)
+		self.message = message
+		self.element_path = element_path
+		self.source_key = source_key
+		self.details = details or {}
+
+	def to_dict(self):
+		return {
+			"message": self.message,
+			"element_path": self.element_path,
+			"source_key": self.source_key,
+			"details": self.details,
+		}
 
 
 class SourceResolver:
+	"""Base class for source resolution"""
+
 	def resolve(self, source, context):
 		raise NotImplementedError
 
 
 class FrappeSourceResolver(SourceResolver):
+	"""Resolves sources from Frappe database"""
+
 	def resolve(self, source, context):
 		if source.is_primary:
 			return self._resolve_primary(source, context)
@@ -33,8 +66,16 @@ class FrappeSourceResolver(SourceResolver):
 
 		try:
 			return frappe.get_cached_doc(source.entity, primary_id).as_dict()
-		except Exception:
-			frappe.log_error(f"Failed to resolve primary source: {source.entity}/{primary_id}")
+		except frappe.DoesNotExistError:
+			frappe.log_error(
+				f"Primary document not found: {source.entity}/{primary_id}", "FHIR Source Resolution"
+			)
+			return None
+		except Exception as e:
+			frappe.log_error(
+				f"Failed to resolve primary source: {source.entity}/{primary_id} - {e!s}",
+				"FHIR Source Resolution",
+			)
 			return None
 
 	def _resolve_child_table(self, source, context):
@@ -48,7 +89,13 @@ class FrappeSourceResolver(SourceResolver):
 		if not field:
 			return []
 
-		return parent_doc.get(field, [])
+		child_data = parent_doc.get(field, [])
+
+		# Convert to list of dicts if needed
+		if isinstance(child_data, list):
+			return [row.as_dict() if hasattr(row, "as_dict") else row for row in child_data]
+
+		return []
 
 	def _resolve_direct_link(self, source, context):
 		parent_key = source.parent_source_key or "primary"
@@ -67,8 +114,13 @@ class FrappeSourceResolver(SourceResolver):
 
 		try:
 			return frappe.get_cached_doc(source.entity, linked_id).as_dict()
-		except Exception:
-			frappe.log_error(f"Failed to resolve direct_link source: {source.entity}/{linked_id}")
+		except frappe.DoesNotExistError:
+			return None
+		except Exception as e:
+			frappe.log_error(
+				f"Failed to resolve direct_link: {source.entity}/{linked_id} - {e!s}",
+				"FHIR Source Resolution",
+			)
 			return None
 
 	def _resolve_reverse_link(self, source, context):
@@ -99,8 +151,10 @@ class FrappeSourceResolver(SourceResolver):
 				result.append(full_doc)
 
 			return result
-		except Exception:
-			frappe.log_error(f"Failed to resolve reverse_link source: {source.entity}")
+		except Exception as e:
+			frappe.log_error(
+				f"Failed to resolve reverse_link: {source.entity} - {e!s}", "FHIR Source Resolution"
+			)
 			return []
 
 	def _resolve_document(self, source, context):
@@ -114,12 +168,17 @@ class FrappeSourceResolver(SourceResolver):
 				return None
 
 			return frappe.get_cached_doc(source.entity, docs[0].name).as_dict()
-		except Exception:
-			frappe.log_error(f"Failed to resolve document source: {source.entity}")
+		except Exception as e:
+			frappe.log_error(f"Failed to resolve document: {source.entity} - {e!s}", "FHIR Source Resolution")
 			return None
 
 
 class ValueResolver:
+	"""Resolves values for FHIR elements"""
+
+	def __init__(self, contained_handler=None):
+		self.contained_handler = contained_handler
+
 	def resolve(self, element, sources_data):
 		source_data = sources_data.get(element.source_key)
 
@@ -130,7 +189,7 @@ class ValueResolver:
 		value = self._apply_default(element, value)
 		value = self._apply_pattern(element, value)
 
-		# Build reference if this is a reference element
+		# build reference if this is a reference element
 		if element.is_reference() and value is not None:
 			value = self._build_reference(element, value, source_data)
 		else:
@@ -198,7 +257,7 @@ class ValueResolver:
 				"True": True,
 				"False": False,
 			}
-			return eval(expression, {"__builtins__": {}}, allowed_names)
+			return frappe.safe_eval(expression, eval_locals=allowed_names)
 		except Exception:
 			return None
 
@@ -228,14 +287,26 @@ class ValueResolver:
 		return value
 
 	def _build_reference(self, element, value, source_data):
+		# https://stackoverflow.com/a/67247388
+		# https://build.fhir.org/references.html#reference
+
 		if value is None or value == "":
 			return None
 
-		# Contained reference uses # prefix
+		# full contained resource generation
+		if element.is_full_contained_reference() and self.contained_handler:
+			contained_id = self.contained_handler(
+				element.contained_resource_map, value, element.contained_id_field
+			)
+			if contained_id:
+				return {"reference": f"#{contained_id}"}
+			return None
+
+		# simple contained reference uses # prefix
 		if element.is_contained_reference:
 			return {"reference": f"#{value}"}
 
-		# Build full reference
+		# build full reference
 		reference = {}
 
 		if element.reference_type:
@@ -244,7 +315,7 @@ class ValueResolver:
 		else:
 			reference["reference"] = str(value)
 
-		# Add display if configured
+		# add display if configured
 		if element.reference_display_field:
 			display = self._get_field_value(element.reference_display_field, source_data)
 			if display:
@@ -323,20 +394,166 @@ class ValueResolver:
 
 
 class FHIRRuntime:
+	"""Executes compiled FHIR Resource Maps"""
+
 	def __init__(self, source_resolver):
 		self.source_resolver = source_resolver
-		self.value_resolver = ValueResolver()
+		self.value_resolver = ValueResolver(contained_handler=self._handle_contained_resource)
+		self.errors = []
+		self.contained_resources = []
+		self.contained_ids = set()
+		self.compiled_cache = {}
+
+	def _handle_contained_resource(self, resource_map_name, primary_id, id_field=None):
+		"""Generate a contained resource and return its local ID"""
+		if not resource_map_name or not primary_id:
+			return None
+
+		# generate a local ID
+		local_id = self._generate_contained_id(primary_id, id_field)
+
+		# skip if already generated
+		if local_id in self.contained_ids:
+			return local_id
+
+		try:
+			# get compiled resource map (with caching)
+			compiled = self._get_compiled_resource_map(resource_map_name)
+			if not compiled:
+				self.errors.append(
+					{
+						"type": "contained_resource_error",
+						"message": f"Resource map not found: {resource_map_name}",
+						"primary_id": primary_id,
+					}
+				)
+				return None
+
+			# generate the contained resource using a fresh runtime
+			# to avoid circular dependencies
+			contained_runtime = FHIRRuntime(self.source_resolver)
+			contained_runtime.value_resolver = ValueResolver()  # no nested contained
+
+			resource = contained_runtime.generate(compiled, primary_id)
+
+			# set the local ID
+			resource["id"] = local_id
+
+			# add to contained list
+			self.contained_resources.append(resource)
+			self.contained_ids.add(local_id)
+
+			return local_id
+
+		except Exception as e:
+			self.errors.append(
+				{
+					"type": "contained_resource_error",
+					"message": f"Failed to generate contained resource: {e!s}",
+					"resource_map": resource_map_name,
+					"primary_id": primary_id,
+				}
+			)
+			return None
+
+	def _generate_contained_id(self, primary_id, id_field=None):
+		"""Generate a unique local ID for contained resource"""
+		# use a sanitized version of the primary_id
+		local_id = str(primary_id).replace(" ", "-").replace("/", "-")
+
+		# ensure uniqueness
+		base_id = local_id
+		counter = 1
+		while local_id in self.contained_ids:
+			local_id = f"{base_id}-{counter}"
+			counter += 1
+
+		return local_id
+
+	def _get_compiled_resource_map(self, resource_map_name):
+		"""Get compiled resource map with caching"""
+		if resource_map_name in self.compiled_cache:
+			return self.compiled_cache[resource_map_name]
+
+		try:
+			resource_map = frappe.get_doc("FHIR Resource Map", resource_map_name)
+			# check for pre-compiled output
+			if resource_map.compiled_mapping:
+				compiled = CompiledResource.from_dict(json.loads(resource_map.compiled_mapping))
+			else:
+				# compile on the fly
+				compiler = FHIRCompiler(resource_map)
+				compiled = compiler.compile()
+
+			self.compiled_cache[resource_map_name] = compiled
+			return compiled
+
+		except frappe.DoesNotExistError:
+			return None
+		except Exception as e:
+			self.errors.append(
+				{
+					"type": "compilation_error",
+					"message": f"Failed to compile resource map: {e!s}",
+					"resource_map": resource_map_name,
+				}
+			)
+			return None
 
 	def generate(self, compiled, primary_id):
-		sources_data = self._load_sources(compiled, primary_id)
+		"""Generate a FHIR resource from compiled map and primary document ID"""
+		self.errors = []
+		self.contained_resources = []
+		self.contained_ids = set()
+
+		try:
+			sources_data = self._load_sources(compiled, primary_id)
+		except Exception as e:
+			raise FHIRGenerationError(
+				"Failed to load sources", details={"primary_id": primary_id, "error": str(e)}
+			)
+
 		resolved_values = self._resolve_values(compiled, sources_data)
 		extensions = self._resolve_extensions(compiled, sources_data)
 		slices = self._resolve_slices(compiled, sources_data)
 		result = self._build_resource(compiled, resolved_values, extensions, slices)
+
+		# add contained resources with proper FHIR ordering
+		if self.contained_resources:
+			result = self._insert_contained(result)
+
 		result = self._prune(result)
 		return result
 
+	def _insert_contained(self, resource):
+		"""Insert contained array in proper FHIR position (after id, before other fields)"""
+		ordered = {}
+
+		# FHIR ordering: resourceType, id, meta, implicitRules, language, text, contained, ...
+		priority_fields = ["resourceType", "id", "meta", "implicitRules", "language", "text"]
+
+		for field in priority_fields:
+			if field in resource:
+				ordered[field] = resource[field]
+
+		ordered["contained"] = self.contained_resources
+
+		for key, value in resource.items():
+			if key not in ordered:
+				ordered[key] = value
+
+		return ordered
+
+	def get_errors(self):
+		"""Return generation errors"""
+		return self.errors
+
 	def _load_sources(self, compiled, primary_id):
+		"""Load all source data"""
+		if self.source_resolver is None:
+			# for testing without source resolver
+			return {}
+
 		context = {"primary_id": primary_id}
 		sources_data = {}
 
@@ -357,6 +574,7 @@ class FHIRRuntime:
 		return sources_data
 
 	def _resolve_values(self, compiled, sources_data):
+		"""Resolve values for all non-extension, non-slice elements"""
 		resolved = {}
 
 		for element in compiled.elements:
@@ -368,7 +586,7 @@ class FHIRRuntime:
 
 			source_data = sources_data.get(element.source_key)
 
-			# Check for child table field (dot notation)
+			# check for child table field (dot notation)
 			if element.field and "." in element.field.split("|")[0]:
 				values = self._resolve_child_table_field(element, source_data)
 				if values:
@@ -392,7 +610,43 @@ class FHIRRuntime:
 
 		return resolved
 
+	def _resolve_child_table_field(self, element, source_data):
+		"""Resolve field from child table (e.g., 'custom_telecom.phone')"""
+		if not source_data:
+			return []
+
+		field_name = element.field.split("|")[0].strip()
+		parts = field_name.split(".")
+
+		if len(parts) != 2:
+			return []
+
+		child_table_field = parts[0]
+		child_field = parts[1]
+
+		child_table = source_data.get(child_table_field, [])
+		if not isinstance(child_table, list):
+			return []
+
+		values = []
+		for row in child_table:
+			if isinstance(row, dict):
+				value = row.get(child_field)
+				if value is not None:
+					# handle reference elements in child tables
+					if element.is_reference():
+						ref_value = self.value_resolver._build_reference(element, value, row)
+						if ref_value is not None:
+							values.append(ref_value)
+					else:
+						transformed = self.value_resolver._apply_transformer(element.transformer, value)
+						if transformed is not None:
+							values.append(transformed)
+
+		return values
+
 	def _resolve_extensions(self, compiled, sources_data):
+		"""Resolve extension elements"""
 		extensions = {}
 
 		for element in compiled.elements:
@@ -420,8 +674,9 @@ class FHIRRuntime:
 		return extensions
 
 	def _build_extension_object(self, element, source_data, sources_data):
+		"""Build a single extension object"""
 		if source_data is None:
-			return None
+			source_data = {}
 
 		item_sources = dict(sources_data)
 		item_sources[element.source_key] = source_data
@@ -434,11 +689,13 @@ class FHIRRuntime:
 		return {"url": element.extension_url, element.extension_value_type: value}
 
 	def _get_extension_key(self, element):
+		"""Get extension grouping key"""
 		parent_path = element.parent_path
 		ext_type = "modifierExtension" if element.is_modifier_extension else "extension"
 		return (parent_path, ext_type)
 
 	def _resolve_slices(self, compiled, sources_data):
+		"""Resolve slice elements"""
 		slices = {}
 
 		for element in compiled.elements:
@@ -469,6 +726,7 @@ class FHIRRuntime:
 		return slices
 
 	def _build_slice_object(self, element, source_data, sources_data):
+		"""Build a single slice object"""
 		if source_data is None:
 			return None
 
@@ -499,6 +757,7 @@ class FHIRRuntime:
 		return slice_obj
 
 	def _get_simple_field_value(self, field, source_data):
+		"""Get simple field value without child table handling"""
 		if not field or not source_data:
 			return None
 
@@ -517,52 +776,21 @@ class FHIRRuntime:
 		return value
 
 	def _deep_copy(self, obj):
+		"""Deep copy a dict/list structure"""
 		if isinstance(obj, dict):
 			return {k: self._deep_copy(v) for k, v in obj.items()}
 		if isinstance(obj, list):
 			return [self._deep_copy(item) for item in obj]
 		return obj
 
-	def _resolve_child_table_field(self, element, source_data):
-		if not source_data:
-			return []
-
-		field_name = element.field.split("|")[0].strip()
-		parts = field_name.split(".")
-
-		if len(parts) != 2:
-			return []
-
-		child_table_field = parts[0]
-		child_field = parts[1]
-
-		child_table = source_data.get(child_table_field, [])
-		if not isinstance(child_table, list):
-			return []
-
-		values = []
-		for row in child_table:
-			if isinstance(row, dict):
-				value = row.get(child_field)
-				if value is not None:
-					# Handle reference elements in child tables
-					if element.is_reference():
-						ref_value = self.value_resolver._build_reference(element, value, row)
-						if ref_value is not None:
-							values.append(ref_value)
-					else:
-						transformed = self.value_resolver._apply_transformer(element.transformer, value)
-						if transformed is not None:
-							values.append(transformed)
-
-		return values
-
 	def _build_resource(self, compiled, resolved_values, extensions, slices):
+		"""Build the final FHIR resource"""
 		resource_type = compiled.metadata.resource_type
 		result = {"resourceType": resource_type}
 
 		child_table_parents = self._detect_child_table_parents(compiled.elements, resolved_values)
 
+		# add root extensions
 		root_ext_key = (resource_type, "extension")
 		if root_ext_key in extensions:
 			result["extension"] = extensions[root_ext_key]
@@ -571,28 +799,41 @@ class FHIRRuntime:
 		if root_mod_ext_key in extensions:
 			result["modifierExtension"] = extensions[root_mod_ext_key]
 
-		for child in compiled.resource_tree.children:
-			if child.name in ("extension", "modifierExtension"):
-				continue
+		# build from tree
+		if compiled.resource_tree:
+			for child in compiled.resource_tree.children:
+				if child.name in ("extension", "modifierExtension"):
+					continue
 
-			path = resource_type + "." + child.name
-			value = self._build_node(child, path, resolved_values, extensions, slices, child_table_parents)
+				path = resource_type + "." + child.name
+				value = self._build_node(
+					child, path, resolved_values, extensions, slices, child_table_parents
+				)
 
-			if path in slices:
-				slice_items = slices[path]
-				if value is None:
-					value = slice_items
-				elif isinstance(value, list):
-					value = value + slice_items
-				else:
-					value = [value] + slice_items
+				if path in slices:
+					slice_items = slices[path]
+					if value is None:
+						value = slice_items
+					elif isinstance(value, list):
+						value = value + slice_items
+					else:
+						value = [value, *slice_items]
 
-			if value is not None:
-				result[child.name] = value
+				if value is not None:
+					result[child.name] = value
+
+		# handle slices not in tree
+		for slice_path, slice_items in slices.items():
+			parts = slice_path.split(".")
+			if len(parts) == 2 and parts[0] == resource_type:
+				field_name = parts[1]
+				if field_name not in result:
+					result[field_name] = slice_items
 
 		return result
 
 	def _detect_child_table_parents(self, elements, resolved_values):
+		"""Detect parent paths that should be spread arrays"""
 		parents = {}
 
 		for element in elements:
@@ -610,27 +851,34 @@ class FHIRRuntime:
 		return parents
 
 	def _build_node(self, node, path, resolved_values, extensions, slices, child_table_parents):
+		"""Build a tree node into FHIR structure"""
 		if path in child_table_parents:
 			return self._build_spread_array(
 				node, path, resolved_values, extensions, slices, child_table_parents
 			)
 
-		if node.is_primitive:
-			value = resolved_values.get(path)
-			if value is None:
-				return None
-			if node.is_array and not isinstance(value, list):
-				return [value]
-			if not node.is_array and isinstance(value, list):
-				return value[0] if value else None
-			return value
-
+		# check for direct value first (handles primitives AND reference objects)
 		direct_value = resolved_values.get(path)
-		if direct_value is not None and isinstance(direct_value, dict):
-			if node.is_array:
+
+		if node.is_primitive:
+			if direct_value is None:
+				return None
+			if node.is_array and not isinstance(direct_value, list):
 				return [direct_value]
+			if not node.is_array and isinstance(direct_value, list):
+				return direct_value[0] if direct_value else None
 			return direct_value
 
+		# handle direct dict/list values (like Reference objects)
+		if direct_value is not None:
+			if isinstance(direct_value, dict):
+				if node.is_array:
+					return [direct_value]
+				return direct_value
+			if isinstance(direct_value, list):
+				return direct_value
+
+		# build complex type from children
 		result = {}
 
 		ext_key = (path, "extension")
@@ -657,7 +905,7 @@ class FHIRRuntime:
 				elif isinstance(child_value, list):
 					child_value = child_value + slice_items
 				else:
-					child_value = [child_value] + slice_items
+					child_value = [child_value, *slice_items]
 
 			if child_value is not None:
 				result[child.name] = child_value
@@ -671,6 +919,7 @@ class FHIRRuntime:
 		return result
 
 	def _build_spread_array(self, node, path, resolved_values, extensions, slices, child_table_parents):
+		"""Build array by spreading child values"""
 		count = child_table_parents[path]
 		items = []
 
@@ -696,6 +945,7 @@ class FHIRRuntime:
 		return items if items else None
 
 	def _prune(self, obj):
+		"""Remove empty values from resource"""
 		if isinstance(obj, dict):
 			pruned = {}
 			for key, value in obj.items():
