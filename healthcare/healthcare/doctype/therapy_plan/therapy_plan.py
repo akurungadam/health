@@ -151,6 +151,7 @@ def make_sales_invoice(reference_name, patient, company, therapy_plan_template):
 			"customer": si.customer,
 			"selling_price_list": price_list,
 			"price_list_currency": price_list_currency,
+			"currency": price_list_currency,
 			"plc_conversion_rate": 1.0,
 			"conversion_rate": 1.0,
 		}

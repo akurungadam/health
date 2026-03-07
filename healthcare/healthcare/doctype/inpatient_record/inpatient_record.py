@@ -200,7 +200,6 @@ class InpatientRecord(Document):
 							"Selling Price List not found. Please configure a valid Price List in the document."
 						)
 					)
-
 				ctx: ItemDetailsCtx = ItemDetailsCtx(
 					{
 						"doctype": "Sales Invoice",
@@ -209,6 +208,7 @@ class InpatientRecord(Document):
 						"customer": frappe.db.get_value("Patient", self.patient, "customer"),
 						"selling_price_list": self.price_list or price_list,
 						"price_list_currency": self.currency or price_list_currency,
+						"currency": self.currency or price_list_currency,
 						"plc_conversion_rate": 1.0,
 						"conversion_rate": 1.0,
 					}
