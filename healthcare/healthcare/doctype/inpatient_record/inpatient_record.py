@@ -214,7 +214,6 @@ class InpatientRecord(Document):
 					}
 				)
 				item_details = get_item_details(ctx)
-
 				if not item_details.get("price_list_rate") or int(item_details.get("price_list_rate")) == 0:
 					frappe.throw(
 						_(
@@ -581,7 +580,7 @@ def admit_patient(
 	inpatient_record.admitted_datetime = check_in
 	inpatient_record.status = "Admitted"
 	inpatient_record.expected_discharge = expected_discharge
-	inpatient_record.currency = currency
+	inpatient_record.currency = currency or inpatient_record.currency
 	inpatient_record.price_list = price_list
 
 	inpatient_record.set("inpatient_occupancies", [])
