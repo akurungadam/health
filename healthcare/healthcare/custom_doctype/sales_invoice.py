@@ -11,7 +11,7 @@ class HealthcareSalesInvoice(SalesInvoice):
 		self.calculate_patient_insurance_coverage()
 
 	@frappe.whitelist()
-	def set_healthcare_services(self, checked_values):
+	def set_healthcare_services(self, checked_values: list[dict]) -> None:
 		for checked_item in checked_values:
 			item_line = self.append("items", {})
 			price_list, price_list_currency = frappe.db.get_values(

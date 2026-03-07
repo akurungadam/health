@@ -42,7 +42,7 @@ class TherapyPlan(Document):
 		self.db_set("total_sessions_completed", total_sessions_completed)
 
 	@frappe.whitelist()
-	def set_therapy_details_from_template(self):
+	def set_therapy_details_from_template(self) -> object:
 		# Add therapy types in the child table
 		self.set("therapy_plan_details", [])
 		therapy_plan_template = frappe.get_doc("Therapy Plan Template", self.therapy_plan_template)
@@ -61,14 +61,14 @@ class TherapyPlan(Document):
 
 @frappe.whitelist()
 def make_therapy_session(
-	patient,
-	therapy_type,
-	company,
-	therapy_plan=None,
-	appointment=None,
-	service_request=None,
-	practitioner=None,
-):
+	patient: str,
+	therapy_type: str,
+	company: str,
+	therapy_plan: str | None = None,
+	appointment: str | None = None,
+	service_request: str | None = None,
+	practitioner: str | None = None,
+) -> dict:
 	sr_doc = None
 	if service_request:
 		if (
@@ -133,7 +133,7 @@ def make_therapy_session(
 
 
 @frappe.whitelist()
-def make_sales_invoice(reference_name, patient, company, therapy_plan_template):
+def make_sales_invoice(reference_name: str, patient: str, company: str, therapy_plan_template: str) -> dict:
 	si = frappe.new_doc("Sales Invoice")
 	si.company = company
 	si.patient = patient
