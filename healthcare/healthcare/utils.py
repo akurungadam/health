@@ -1504,7 +1504,7 @@ def before_tests():
 				"full_name": "Test User",
 				"company_name": "Frappe Care LLC",
 				"timezone": "America/New_York",
-				"company_abbr": "WP",
+				"company_abbr": "FC",
 				"industry": "Healthcare",
 				"country": "United States",
 				"fy_start_date": f"{current_year}-01-01",
