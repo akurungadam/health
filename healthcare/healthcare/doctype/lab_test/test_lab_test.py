@@ -102,7 +102,7 @@ class TestLabTest(IntegrationTestCase):
 
 
 def create_lab_test_template(test_sensitivity=0, sample_collection=1):
-	medical_department = create_medical_department()
+	medical_department = "_Test Medical Department"
 	if frappe.db.exists("Lab Test Template", "Insulin Resistance"):
 		return frappe.get_doc("Lab Test Template", "Insulin Resistance")
 	template = frappe.new_doc("Lab Test Template")
@@ -129,17 +129,6 @@ def create_lab_test_template(test_sensitivity=0, sample_collection=1):
 
 	template.save()
 	return template
-
-
-def create_medical_department():
-	medical_department = frappe.db.exists("Medical Department", "_Test Medical Department")
-	if not medical_department:
-		medical_department = frappe.new_doc("Medical Department")
-		medical_department.department = "_Test Medical Department"
-		medical_department.save()
-		medical_department = medical_department.name
-
-	return medical_department
 
 
 def create_lab_test(lab_template):
@@ -169,7 +158,7 @@ def create_lab_test_sample():
 
 def create_sales_invoice():
 	patient = create_patient()
-	medical_department = create_medical_department()
+	medical_department = "_Test Medical Department"
 	insulin_resistance_template = create_lab_test_template()
 	blood_test_template = create_blood_test_template(medical_department)
 
@@ -205,7 +194,7 @@ def create_sales_invoice():
 
 def create_patient_encounter():
 	patient = create_patient()
-	medical_department = create_medical_department()
+	medical_department = "_Test Medical Department"
 	insulin_resistance_template = create_lab_test_template()
 	blood_test_template = create_blood_test_template(medical_department)
 
