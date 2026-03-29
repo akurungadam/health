@@ -285,6 +285,7 @@ def get_healthcare_service_unit(unit_name=None):
 		if not service_unit_parent_name:
 			parent_service_unit = frappe.new_doc("Healthcare Service Unit")
 			parent_service_unit.healthcare_service_unit_name = "_Test All Healthcare Service Units"
+			parent_service_unit.company = "_Test Company"
 			parent_service_unit.is_group = 1
 			parent_service_unit.save(ignore_permissions=True)
 			service_unit.parent_healthcare_service_unit = parent_service_unit.name
