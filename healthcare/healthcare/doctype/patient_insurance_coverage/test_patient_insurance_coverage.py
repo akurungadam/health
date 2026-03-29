@@ -21,7 +21,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_appointment_type,
 	create_healthcare_docs,
 	create_healthcare_service_items,
-	create_medical_department,
 )
 from healthcare.healthcare.doctype.patient_insurance_policy.test_patient_insurance_policy import (
 	get_new_insurance_policy,
@@ -59,7 +58,7 @@ def create_insurance_test_docs():
 	contract.submit()
 	insurance_policy = get_new_insurance_policy(patient, eligibility_plan)
 	insurance_policy.submit()
-	medical_department = create_medical_department()
+	medical_department = "_Test Medical Department"
 	args = {
 		"medical_department": medical_department,
 	}
@@ -116,7 +115,7 @@ def create_appointment(patient, practitioner, appointment_date, appointment_type
 	appointment.patient = patient
 	appointment.practitioner = practitioner
 	appointment.appointment_type = appointment_type
-	appointment.department = create_medical_department()
+	appointment.department = "_Test Medical Department"
 	appointment.appointment_date = appointment_date
 	appointment.appointment_time = nowtime()
 	appointment.company = "_Test Company"

@@ -181,6 +181,7 @@ def create_encounter(
 	patient_encounter.practitioner = practitioner
 	patient_encounter.encounter_date = getdate()
 	patient_encounter.encounter_time = nowtime()
+	patient_encounter.company = "_Test Company"
 	if not obs:
 		if type == "lab_test_prescription":
 			patient_encounter.append(

@@ -10,7 +10,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_appointment,
 	create_appointment_type,
 	create_healthcare_docs,
-	create_medical_department,
 	create_patient,
 )
 from healthcare.healthcare.doctype.therapy_plan.therapy_plan import (
@@ -23,7 +22,7 @@ from healthcare.healthcare.doctype.therapy_type.test_therapy_type import create_
 class TestTherapyPlan(IntegrationTestCase):
 	def test_creation_on_encounter_submission(self):
 		patient, practitioner = create_healthcare_docs()
-		medical_department = create_medical_department()
+		medical_department = "_Test Medical Department"
 		encounter = create_encounter(patient, medical_department, practitioner)
 		self.assertTrue(
 			frappe.db.exists(
