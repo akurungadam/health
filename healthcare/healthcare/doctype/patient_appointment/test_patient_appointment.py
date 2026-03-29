@@ -140,7 +140,7 @@ class TestPatientAppointment(IntegrationTestCase):
 				"inpatient_visit_charge": 0,
 			},
 		)
-		medical_department = create_medical_department()
+		medical_department = "_Test Medical Department"
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 		appointment_type = create_appointment_type(
@@ -173,7 +173,7 @@ class TestPatientAppointment(IntegrationTestCase):
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 		item = create_healthcare_service_items()
-		department_name = create_medical_department(id=111)  # "_Test Medical Department 111"
+		department_name = "_Test Medical Department"
 		items = [
 			{
 				"dt": "Medical Department",
@@ -319,17 +319,17 @@ class TestPatientAppointment(IntegrationTestCase):
 	def test_department_appointment_cancel_with_fee_validity_setting_on(self):
 		patient, _practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
-		depatment = create_medical_department(123)
+		department = "_Test Medical Department"
 		appointment_type = create_appointment_type(
 			{
 				"name": "Department Appointment Type",
 				"allow_booking_for": "Department",
-				"medical_department": depatment,
+				"medical_department": department,
 			}
 		)
 		appointment = create_appointment(
 			patient=patient,
-			department=depatment,
+			department=department,
 			appointment_for="Department",
 			appointment_type=appointment_type.name,
 		)
@@ -589,7 +589,7 @@ class TestPatientAppointment(IntegrationTestCase):
 				"duration": 15,
 			}
 		)
-		medical_department = create_medical_department(id=2)
+		medical_department = "_Test Medical Department 0"
 		dept_appointment = create_appointment(
 			patient,
 			None,
@@ -932,16 +932,6 @@ def create_patient(id=0, patient_name=None, email=None, mobile=None, customer=No
 	return patient.name
 
 
-def create_medical_department(id=0):
-	if frappe.db.exists("Medical Department", f"_Test Medical Department {id!s}"):
-		return f"_Test Medical Department {id!s}"
-
-	medical_department = frappe.new_doc("Medical Department")
-	medical_department.department = f"_Test Medical Department {id!s}"
-	medical_department.save(ignore_permissions=True)
-	return medical_department.name
-
-
 def create_practitioner(id=0, medical_department=None):
 	if frappe.db.exists("Healthcare Practitioner", {"firstname": f"_Test Healthcare Practitioner {id!s}"}):
 		practitioner = frappe.db.get_value(
@@ -952,7 +942,7 @@ def create_practitioner(id=0, medical_department=None):
 	practitioner = frappe.new_doc("Healthcare Practitioner")
 	practitioner.first_name = f"_Test Healthcare Practitioner {id!s}"
 	practitioner.gender = "Female"
-	practitioner.department = medical_department or create_medical_department(id)
+	practitioner.department = medical_department or "_Test Medical Department"
 	practitioner.op_consulting_charge = 500
 	practitioner.inpatient_visit_charge = 500
 	practitioner.save(ignore_permissions=True)
@@ -1014,7 +1004,7 @@ def create_appointment(
 	appointment.patient = patient
 	appointment.practitioner = practitioner
 	appointment.appointment_for = appointment_for or "Practitioner"
-	appointment.department = department or create_medical_department()
+	appointment.department = department or "_Test Medical Department"
 	appointment.appointment_date = appointment_date or nowdate()
 	appointment.company = "_Test Company"
 	appointment.duration = duration
@@ -1089,7 +1079,7 @@ def create_appointment_type(args=None):  # nosemgrep
 		items = [
 			{
 				"dt": "Medical Department",
-				"dn": args.get("medical_department") or create_medical_department(),
+				"dn": args.get("medical_department") or "_Test Medical Department",
 				"op_consulting_charge_item": item,
 				"op_consulting_charge": args.get("op_consulting_charge", 200),
 			}

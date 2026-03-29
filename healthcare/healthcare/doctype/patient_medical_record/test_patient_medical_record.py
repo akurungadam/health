@@ -13,7 +13,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_clinical_procedure_template,
 	create_encounter,
 	create_healthcare_docs,
-	create_medical_department,
 )
 
 
@@ -25,7 +24,7 @@ class TestPatientMedicalRecord(IntegrationTestCase):
 
 	def test_medical_record(self):
 		patient, practitioner = create_healthcare_docs()
-		medical_department = create_medical_department()
+		medical_department = "_Test Medical Department"
 		appointment = create_appointment(patient, practitioner, nowdate(), invoice=1)
 		encounter = create_encounter(appointment)
 
