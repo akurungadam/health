@@ -30,6 +30,7 @@ def create_therapy_session(patient, therapy_type, therapy_plan, duration=0, star
 	therapy_session.therapy_plan = therapy_plan
 	therapy_session.duration = duration
 	therapy_session.start_date = start_date
+	therapy_session.company = "_Test Company"
 	therapy_session.save()
 
 	return therapy_session
