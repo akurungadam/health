@@ -311,6 +311,7 @@ def create_observation(patient, service_request, obs_template):
 	observation.patient = patient
 	observation.service_request = service_request
 	observation.observation_template = obs_template
+	observation.company = "_Test Company"
 	observation.insert()
 	return observation
 
