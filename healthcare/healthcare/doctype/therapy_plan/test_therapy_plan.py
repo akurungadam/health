@@ -77,6 +77,7 @@ def create_therapy_plan(template=None, patient=None):
 	plan = frappe.new_doc("Therapy Plan")
 	plan.patient = patient
 	plan.start_date = getdate()
+	plan.company = "_Test Company"
 
 	if template:
 		plan.therapy_plan_template = template
@@ -97,6 +98,7 @@ def create_encounter(patient, medical_department, practitioner, submit=True):
 	encounter.source = "Direct"
 	therapy_type = create_therapy_type()
 	encounter.append("therapies", {"therapy_type": therapy_type.name, "no_of_sessions": 2})
+	encounter.company = "_Test Company"
 	encounter.save()
 	if submit:
 		encounter.submit()

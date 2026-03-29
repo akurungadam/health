@@ -1146,6 +1146,7 @@ def create_service_unit(id=0, service_unit_type=None, service_unit_capacity=0):
 	service_unit.healthcare_service_unit_name = f"_Test Service Unit {id!s}"
 	service_unit.service_unit_type = service_unit_type or create_service_unit_type(id)
 	service_unit.service_unit_capacity = service_unit_capacity
+	service_unit.company = "_Test Company"
 	service_unit.save(ignore_permissions=True)
 
 	return service_unit.name

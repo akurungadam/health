@@ -148,6 +148,7 @@ def create_lab_test(lab_template):
 	lab_test.template = lab_template.name
 	lab_test.patient = patient
 	lab_test.patient_sex = "Female"
+	lab_test.company = "_Test Company"
 	lab_test.save()
 
 	return lab_test
