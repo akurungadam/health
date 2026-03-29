@@ -11,7 +11,6 @@ from healthcare.healthcare.doctype.item_insurance_eligibility.item_insurance_eli
 )
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment_type,
-	create_medical_department,
 )
 
 
@@ -20,7 +19,7 @@ class TestItemInsuranceEligibility(IntegrationTestCase):
 		frappe.db.sql("""delete from `tabAppointment Type` where name = '_Test Appointment'""")
 		frappe.db.sql("""delete from `tabItem Insurance Eligibility`""")
 
-		medical_department = create_medical_department()
+		medical_department = "_Test Medical Department"
 		args = {
 			"medical_department": medical_department,
 		}
@@ -53,7 +52,7 @@ class TestItemInsuranceEligibility(IntegrationTestCase):
 		item_insurance_eligibility = create_insurance_eligibility(**args).insert()
 		self.assertTrue(item_insurance_eligibility)
 
-		# create an overlaping eligibility
+		# create an overlapping eligibility
 		args["valid_till"] = add_to_date(getdate(), months=1)
 
 		with self.assertRaises(CoverageOverlapError):
@@ -62,7 +61,7 @@ class TestItemInsuranceEligibility(IntegrationTestCase):
 	def test_item_insurance_eligibility(self):
 		frappe.db.sql("""delete from `tabItem Insurance Eligibility`""")
 
-		medical_department = create_medical_department()
+		medical_department = "_Test Medical Department"
 		args = {
 			"medical_department": medical_department,
 		}
