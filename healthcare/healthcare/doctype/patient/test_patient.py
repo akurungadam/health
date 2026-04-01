@@ -32,6 +32,7 @@ class TestPatient(IntegrationTestCase):
 		patient = frappe.get_doc("Patient", patient)
 		self.assertEqual(patient.status, "Disabled")
 
+		frappe.db.set_single_value("Global Defaults", "default_company", "_Test Company")
 		# check sales invoice and patient status
 		result = patient.invoice_patient_registration()
 		self.assertTrue(frappe.db.exists("Sales Invoice", result.get("name")))
