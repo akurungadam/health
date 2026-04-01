@@ -328,6 +328,7 @@ def make_therapy_session(service_request):
 	therapy_session.duration = 1
 	therapy_session.start_date = start_date
 	therapy_session.service_request = service_request
+	therapy_session.company = "_Test Company"
 	therapy_session.save()
 
 	return therapy_session
