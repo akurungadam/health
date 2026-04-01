@@ -27,9 +27,6 @@ class TestPatientAppointment(IntegrationTestCase):
 		frappe.db.sql("""delete from `tabPatient Encounter`""")
 		make_pos_profile()
 		frappe.db.sql("""delete from `tabHealthcare Service Unit` where name like '_Test %'""")
-		frappe.db.sql(
-			"""delete from `tabHealthcare Service Unit` where name like '_Test Service Unit Type%'"""
-		)
 		frappe.db.sql("DELETE FROM `tabPractitioner Availability`")
 
 	def test_status(self):
@@ -143,16 +140,13 @@ class TestPatientAppointment(IntegrationTestCase):
 		medical_department = "_Test Medical Department"
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment_type = create_appointment_type(
-			{"medical_department": medical_department, "op_consulting_charge": 200}
-		)
 
 		appointment = create_appointment(
 			patient,
 			practitioner,
 			add_days(nowdate(), 2),
 			invoice=1,
-			appointment_type=appointment_type.name,
+			appointment_type="_Test Appointment Type with Items",
 			department=medical_department,
 		)
 		appointment.reload()
