@@ -19,7 +19,7 @@ class BootStrapTestData:
 		self.make_service_units()
 		self.make_users()
 
-	def make_user(self):
+	def make_users(self):
 		records = [
 			{
 				"doctype": "User",
@@ -42,6 +42,7 @@ class BootStrapTestData:
 				"doctype": "Healthcare Service Unit",
 				"healthcare_service_unit_name": "_Test HSU - Appointments",
 				"service_unit_type": "_Test Service Unit Type - Appointments",
+				"company": "_Test Company",
 				"allow_appointments": 1,
 				"overlap_appointments": 0,
 			},
@@ -49,6 +50,7 @@ class BootStrapTestData:
 				"doctype": "Healthcare Service Unit",
 				"healthcare_service_unit_name": "_Test HSU - Overlapping Appointments",
 				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
+				"company": "_Test Company",
 				"allow_appointments": 1,
 				"overlap_appointments": 1,
 				"service_unit_capacity": 10,
@@ -57,6 +59,7 @@ class BootStrapTestData:
 				"doctype": "Healthcare Service Unit",
 				"healthcare_service_unit_name": "_Test HSU - Occupancy",
 				"service_unit_type": "_Test Service Unit Type - Occupancy",
+				"company": "_Test Company",
 				"inpatient_occupancy": 1,
 			},
 		]
