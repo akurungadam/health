@@ -18,6 +18,73 @@ class BootStrapTestData:
 		self.make_service_unit_types()
 		self.make_service_units()
 		self.make_users()
+		self.make_lab_test_sample()
+		self.make_lab_test_template()
+
+	def make_lab_test_template(self):
+		records = [
+			{
+				"doctype": "Lab Test Template",
+				"lab_test_name": "_Test Lab Test - with Sample",
+				"lab_test_template_type": "Descriptive",
+				"lab_test_description": "Insulin Resistance",
+				"lab_test_code": "_Test Lab Test - with Sample",
+				"lab_test_group": "Services",
+				"department": "_Test Medical Department",
+				"is_billable": 1,
+				"lab_test_rate": 2000,
+				"sample": "_Test Sample - Blood Sample",
+				"sample_qty": "5.0",
+				"descriptive_test_templates": [],
+			},
+			{
+				"doctype": "Lab Test Template",
+				"lab_test_name": "_Test Lab Test - without Sample",
+				"lab_test_template_type": "Descriptive",
+				"lab_test_description": "Insulin Resistance",
+				"lab_test_code": "_Test Lab Test - without Sample",
+				"lab_test_group": "Services",
+				"department": "_Test Medical Department",
+				"is_billable": 1,
+				"lab_test_rate": 2000,
+				"descriptive_test_templates": [],
+			},
+			{
+				"doctype": "Lab Test Template",
+				"lab_test_name": "_Test Lab Test - Sensitivity",
+				"lab_test_template_type": "Descriptive",
+				"lab_test_description": "Insulin Resistance",
+				"lab_test_code": "_Test Lab Test - Sensitivity",
+				"lab_test_group": "Services",
+				"department": "_Test Medical Department",
+				"is_billable": 1,
+				"lab_test_rate": 2000,
+				"sensitivity": 1,
+				"descriptive_test_templates": [],
+			},
+		]
+		for r in records:
+			for entry in ["FBS", "Insulin", "IR"]:
+				r["descriptive_test_templates"].append(
+					{"particulars": entry, "allow_blank": 1 if entry == "IR" else 0},
+				)
+
+		self.make_records(["lab_test_name", "lab_test_code"], records)
+
+	def make_lab_test_sample(self):
+		records = [
+			{
+				"doctype": "Lab Test Sample",
+				"sample": "_Test Sample - Blood Sample",
+				"sample_uom": "U/ml",
+			},
+			{
+				"doctype": "Lab Test Sample",
+				"sample": "_Test Sample - Urine",
+				"sample_uom": "U/ml",
+			},
+		]
+		self.make_records(["sample"], records)
 
 	def make_users(self):
 		records = [
