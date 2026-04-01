@@ -1,6 +1,5 @@
 import frappe
 
-# from frappe.tests.utils import load_test_records_for
 from erpnext.tests.utils import ERPNextTestSuite
 
 
@@ -10,14 +9,82 @@ class BootStrapTestData:
 
 	def make_master_data(self):
 		self.make_company()
-		self.make_medical_department()
-		self.make_practitioner()
-		self.make_patient()
+		self.make_medical_departments()
+		self.make_practitioners()
+		self.make_patients()
 		self.make_service_items()
 		self.make_appointment_types()
-		self.make_clinical_procedure_template()
+		self.make_clinical_procedure_templates()
+		self.make_service_unit_types()
+		self.make_service_units()
+		self.make_users()
 
-	def make_clinical_procedure_template(self):
+	def make_user(self):
+		records = [
+			{
+				"doctype": "User",
+				"email": "test_user@marleyhealth.io",
+				"first_name": "test_user",
+				"password": "password",
+			},
+			{
+				"doctype": "User",
+				"email": "test_user_0@marleyhealth.io",
+				"first_name": "test_user_0",
+				"password": "password",
+			},
+		]
+		self.make_records(["email"], records)
+
+	def make_service_units(self):
+		records = [
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Appointments",
+				"service_unit_type": "_Test Service Unit Type - Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 0,
+			},
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Overlapping Appointments",
+				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 1,
+				"service_unit_capacity": 10,
+			},
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Occupancy",
+				"service_unit_type": "_Test Service Unit Type - Occupancy",
+				"inpatient_occupancy": 1,
+			},
+		]
+		self.make_records(["healthcare_service_unit_name"], records)
+
+	def make_service_unit_types(self):
+		records = [
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 0,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 1,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Occupancy",
+				"inpatient_occupancy": 1,
+			},
+		]
+		self.make_records(["service_unit_type"], records)
+
+	def make_clinical_procedure_templates(self):
 		records = [
 			{
 				"doctype": "Clinical Procedure Template",
@@ -27,6 +94,15 @@ class BootStrapTestData:
 				"description": "Knee Surgery and Rehab",
 				"is_billable": 1,
 				"rate": 50000,
+			},
+			{
+				"doctype": "Clinical Procedure Template",
+				"template": "_Test Procedure - Wound Inspection and Cleaning",
+				"item_code": "_Test Procedure - Wound Inspection and Cleaning",
+				"item_group": "Services",
+				"description": "Wound Inspection and Cleaning",
+				"is_billable": 1,
+				"rate": 1000,
 			},
 		]
 		self.make_records(["template", "item_code"], records)
@@ -86,17 +162,27 @@ class BootStrapTestData:
 		]
 		self.make_records(["item_code"], records)
 
-	def make_patient(self):
+	def make_patients(self):
 		records = [
 			{
 				"doctype": "Patient",
 				"first_name": "_Test Patient",
+				"sex": "Female",
+			},
+			{
+				"doctype": "Patient",
+				"first_name": "_Test Patient 0",
+				"sex": "Male",
+			},
+			{
+				"doctype": "Patient",
+				"first_name": "_Test Patient 1",
 				"sex": "Male",
 			},
 		]
 		self.make_records(["first_name"], records)
 
-	def make_practitioner(self):
+	def make_practitioners(self):
 		records = [
 			{
 				"doctype": "Healthcare Practitioner",
@@ -106,10 +192,26 @@ class BootStrapTestData:
 				"op_consulting_charge": 500,
 				"inpatient_visit_charge": 500,
 			},
+			{
+				"doctype": "Healthcare Practitioner",
+				"first_name": "_Test Healthcare Practitioner 0",
+				"gender": "Male",
+				"department": "_Test Medical Department 0",
+				"op_consulting_charge": 500,
+				"inpatient_visit_charge": 500,
+			},
+			{
+				"doctype": "Healthcare Practitioner",
+				"first_name": "_Test Healthcare Practitioner 1",
+				"gender": "Male",
+				"department": "_Test Medical Department 1",
+				"op_consulting_charge": 300,
+				"inpatient_visit_charge": 300,
+			},
 		]
 		self.make_records(["first_name"], records)
 
-	def make_medical_department(self):
+	def make_medical_departments(self):
 		records = [
 			{
 				"doctype": "Medical Department",
