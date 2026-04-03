@@ -253,10 +253,12 @@ class BootStrapTestData:
 		self.make_records(["first_name"], records)
 
 	def make_practitioners(self):
+		# TODO: practitioner naming
 		records = [
 			{
 				"doctype": "Healthcare Practitioner",
-				"first_name": "_Test Healthcare Practitioner",
+				"first_name": "_Test",
+				"practitioner_name": "Healthcare Practitioner 0",
 				"gender": "Female",
 				"department": "_Test Medical Department",
 				"op_consulting_charge": 500,
@@ -264,7 +266,8 @@ class BootStrapTestData:
 			},
 			{
 				"doctype": "Healthcare Practitioner",
-				"first_name": "_Test Healthcare Practitioner 0",
+				"first_name": "_Test",
+				"practitioner_name": "Healthcare Practitioner 1",
 				"gender": "Male",
 				"department": "_Test Medical Department 0",
 				"op_consulting_charge": 500,
@@ -272,14 +275,15 @@ class BootStrapTestData:
 			},
 			{
 				"doctype": "Healthcare Practitioner",
-				"first_name": "_Test Healthcare Practitioner 1",
+				"first_name": "_Test",
+				"practitioner_name": "Healthcare Practitioner 2",
 				"gender": "Male",
 				"department": "_Test Medical Department 1",
 				"op_consulting_charge": 300,
 				"inpatient_visit_charge": 300,
 			},
 		]
-		self.make_records(["first_name"], records)
+		self.make_records(["practitioner_name"], records)
 
 	def make_medical_departments(self):
 		records = [
