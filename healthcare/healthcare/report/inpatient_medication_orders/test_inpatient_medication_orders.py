@@ -5,7 +5,6 @@
 import datetime
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate, now_datetime
 
 from healthcare.healthcare.doctype.inpatient_medication_order.test_inpatient_medication_order import (
@@ -26,9 +25,10 @@ from healthcare.healthcare.doctype.inpatient_record.test_inpatient_record import
 from healthcare.healthcare.report.inpatient_medication_orders.inpatient_medication_orders import (
 	execute,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestInpatientMedicationOrders(IntegrationTestCase):
+class TestInpatientMedicationOrders(HealthcareTestSuite):
 	@classmethod
 	def setUpClass(self):
 		frappe.db.sql("delete from `tabInpatient Medication Order` where company='_Test Company'")

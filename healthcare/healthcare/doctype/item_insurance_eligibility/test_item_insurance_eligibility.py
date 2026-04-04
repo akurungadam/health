@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, getdate
 
 from healthcare.healthcare.doctype.item_insurance_eligibility.item_insurance_eligibility import (
@@ -12,9 +11,10 @@ from healthcare.healthcare.doctype.item_insurance_eligibility.item_insurance_eli
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment_type,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestItemInsuranceEligibility(IntegrationTestCase):
+class TestItemInsuranceEligibility(HealthcareTestSuite):
 	def test_validate_overlap(self):
 		frappe.db.sql("""delete from `tabAppointment Type` where name = '_Test Appointment'""")
 		frappe.db.sql("""delete from `tabItem Insurance Eligibility`""")

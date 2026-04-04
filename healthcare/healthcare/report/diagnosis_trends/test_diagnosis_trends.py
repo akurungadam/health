@@ -1,6 +1,5 @@
 import frappe
 from frappe import DuplicateEntryError
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, add_months, getdate
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
@@ -9,11 +8,12 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 )
 from healthcare.healthcare.doctype.therapy_plan.test_therapy_plan import create_encounter
 from healthcare.healthcare.report.diagnosis_trends.diagnosis_trends import execute
+from healthcare.tests.utils import HealthcareTestSuite
 
 months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-class TestDiagnosisTrends(IntegrationTestCase):
+class TestDiagnosisTrends(HealthcareTestSuite):
 	@classmethod
 	def setUpClass(cls):
 		cls.create_diagnosis()

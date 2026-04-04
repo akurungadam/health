@@ -2,10 +2,11 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
+
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestHealthcarePractitioner(IntegrationTestCase):
+class TestHealthcarePractitioner(HealthcareTestSuite):
 	def test_practitioner_mandatory_charges(self):
 		fieldnames = ["op_consulting_charge", "inpatient_visit_charge"]
 		for idx, fieldname in enumerate(fieldnames):
