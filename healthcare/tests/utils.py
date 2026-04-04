@@ -9,19 +9,69 @@ class BootStrapTestData:
 
 	def make_master_data(self):
 		self.make_company()
+		self.make_service_items()
+		self.make_diagnoses()
 		self.make_medical_departments()
 		self.make_practitioners()
 		self.make_patients()
-		self.make_service_items()
 		self.make_appointment_types()
 		self.make_clinical_procedure_templates()
 		self.make_service_unit_types()
 		self.make_service_units()
 		self.make_users()
-		self.make_lab_test_sample()
-		self.make_lab_test_template()
+		self.make_lab_test_samples()
+		self.make_lab_test_templates()
+		self.make_observation_templates()
 
-	def make_lab_test_template(self):
+	def make_observation_templates(self):
+		records = [
+			{
+				"doctype": "Observation Template",
+				"observation": "_Test Observation with Sample",
+				"abbr": "OWS",
+				"item_code": "_Test Observation with Sample",
+				"observation_category": "Laboratory",
+				"permitted_data_type": "Quantity",
+				"permitted_unit": "mg / dl",
+				"item_group": "Services",
+				"sample_collection_required": 1,
+				"is_billable": 1,
+				"rate": 300,
+			},
+			{
+				"doctype": "Observation Template",
+				"observation": "_Test Observation without Sample",
+				"abbr": "OWOS",
+				"item_code": "_Test Observation without Sample",
+				"observation_category": "Laboratory",
+				"permitted_data_type": "Quantity",
+				"permitted_unit": "mg / dl",
+				"item_group": "Services",
+				"sample_collection_required": 0,
+				"is_billable": 1,
+				"rate": 300,
+			},
+			{
+				"doctype": "Observation Template",
+				"observation": "_Test Observation Grouped",
+				"abbr": "OG",
+				"item_code": "_Test Observation Grouped",
+				"has_component": 1,
+				"observation_category": "Laboratory",
+				"permitted_data_type": "Quantity",
+				"permitted_unit": "mg / dl",
+				"item_group": "Services",
+				"sample_collection_required": 1,
+				"is_billable": 1,
+				"rate": 300,
+				"observation_component": [  # FIXME: observation_components
+					{"observation_template": "_Test Observation without Sample", "abbr": "OWOS"}
+				],
+			},
+		]
+		self.make_records(["observation"], records)
+
+	def make_lab_test_templates(self):
 		records = [
 			{
 				"doctype": "Lab Test Template",
@@ -71,7 +121,7 @@ class BootStrapTestData:
 
 		self.make_records(["lab_test_name", "lab_test_code"], records)
 
-	def make_lab_test_sample(self):
+	def make_lab_test_samples(self):
 		records = [
 			{
 				"doctype": "Lab Test Sample",
@@ -205,32 +255,13 @@ class BootStrapTestData:
 						"dn": "_Test Medical Department",
 						"op_consulting_charge_item": "HLC-SI-001",
 						"op_consulting_charge": 200,
+						"inpatient_visit_charge_item": "HLC-SI-002",
+						"ip_consulting_charge": 200,
 					},
 				],
 			},
 		]
 		self.make_records(["appointment_type"], records)
-
-	def make_service_items(self):
-		records = [
-			{
-				"doctype": "Item",
-				"item_code": "HLC-SI-001",
-				"item_name": "OP Consulting Charges",
-				"item_group": "Services",
-				"is_stock_item": 0,
-				"stock_uom": "Nos",
-			},
-			{
-				"doctype": "Item",
-				"item_code": "HLC-SI-002",
-				"item_name": "IP Consulting Charges",
-				"item_group": "Services",
-				"is_stock_item": 0,
-				"stock_uom": "Nos",
-			},
-		]
-		self.make_records(["item_code"], records)
 
 	def make_patients(self):
 		records = [
@@ -253,37 +284,43 @@ class BootStrapTestData:
 		self.make_records(["first_name"], records)
 
 	def make_practitioners(self):
-		# TODO: practitioner naming
+		# TODO: fix practitioner naming
 		records = [
 			{
 				"doctype": "Healthcare Practitioner",
 				"first_name": "_Test",
-				"practitioner_name": "Healthcare Practitioner 0",
+				"last_name": "Healthcare Practitioner 0",
 				"gender": "Female",
 				"department": "_Test Medical Department",
+				"op_consulting_charge_item": "HLC-SI-001",
 				"op_consulting_charge": 500,
+				"inpatient_visit_charge_item": "HLC-SI-002",
 				"inpatient_visit_charge": 500,
 			},
 			{
 				"doctype": "Healthcare Practitioner",
 				"first_name": "_Test",
-				"practitioner_name": "Healthcare Practitioner 1",
+				"last_name": "Healthcare Practitioner 1",
 				"gender": "Male",
 				"department": "_Test Medical Department 0",
+				"op_consulting_charge_item": "HLC-SI-001",
 				"op_consulting_charge": 500,
+				"inpatient_visit_charge_item": "HLC-SI-002",
 				"inpatient_visit_charge": 500,
 			},
 			{
 				"doctype": "Healthcare Practitioner",
 				"first_name": "_Test",
-				"practitioner_name": "Healthcare Practitioner 2",
+				"last_name": "Healthcare Practitioner 2",
 				"gender": "Male",
 				"department": "_Test Medical Department 1",
+				"op_consulting_charge_item": "HLC-SI-001",
 				"op_consulting_charge": 300,
+				"inpatient_visit_charge_item": "HLC-SI-002",
 				"inpatient_visit_charge": 300,
 			},
 		]
-		self.make_records(["practitioner_name"], records)
+		self.make_records(["last_name"], records)
 
 	def make_medical_departments(self):
 		records = [
@@ -305,6 +342,40 @@ class BootStrapTestData:
 			},
 		]
 		self.make_records(["department"], records)
+
+	def make_diagnoses(self):
+		records = [
+			{
+				"doctype": "Diagnosis",
+				"diagnosis": "Fever",
+			},
+			{
+				"doctype": "Diagnosis",
+				"diagnosis": "Heart Attack",
+			},
+		]
+		self.make_records(["diagnosis"], records)
+
+	def make_service_items(self):
+		records = [
+			{
+				"doctype": "Item",
+				"item_code": "HLC-SI-001",
+				"item_name": "OP Consulting Charges",
+				"item_group": "Services",
+				"is_stock_item": 0,
+				"stock_uom": "Nos",
+			},
+			{
+				"doctype": "Item",
+				"item_code": "HLC-SI-002",
+				"item_name": "IP Consulting Charges",
+				"item_group": "Services",
+				"is_stock_item": 0,
+				"stock_uom": "Nos",
+			},
+		]
+		self.make_records(["item_code"], records)
 
 	def make_company(self):
 		records = [
