@@ -34,10 +34,8 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestNursingTask(HealthcareTestSuite):
 	def setUp(self) -> None:
-		self.activity = frappe.get_doc(self.globalTestRecords["Nursing Checklist Template"][0]).insert(
-			ignore_if_duplicate=True
-		)
-		self.nc_template = frappe.get_doc(self.globalTestRecords["Nursing Checklist Template"][1]).insert(
+		self.load_test_records("Nursing Checklist Template")
+		self.nc_template = frappe.get_doc(self.globalTestRecords["Nursing Checklist Template"][0]).insert(
 			ignore_if_duplicate=True
 		)
 
