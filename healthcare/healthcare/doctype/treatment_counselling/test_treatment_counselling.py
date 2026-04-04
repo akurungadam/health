@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils.data import getdate, nowtime
 
 from healthcare.healthcare.doctype.inpatient_record.inpatient_record import schedule_inpatient
@@ -11,9 +10,10 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_appointment_type,
 	create_patient,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestTreatmentCounselling(IntegrationTestCase):
+class TestTreatmentCounselling(HealthcareTestSuite):
 	def test_insert_treatment_counselling(self):
 		frappe.db.sql("""delete from `tabTreatment Counselling`""")
 		frappe.db.sql(

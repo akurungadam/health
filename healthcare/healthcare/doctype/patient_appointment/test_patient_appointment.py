@@ -5,7 +5,6 @@
 import datetime
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, flt, get_time, getdate, now_datetime, nowdate, nowtime
 
 from erpnext.accounts.doctype.pos_profile.test_pos_profile import make_pos_profile
@@ -18,9 +17,10 @@ from healthcare.healthcare.doctype.patient_appointment.patient_appointment impor
 	update_status,
 )
 from healthcare.healthcare.doctype.service_request.service_request import make_clinical_procedure
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestPatientAppointment(IntegrationTestCase):
+class TestPatientAppointment(HealthcareTestSuite):
 	def setUp(self):
 		frappe.db.sql("""delete from `tabPatient Appointment`""")
 		frappe.db.sql("""delete from `tabFee Validity`""")
@@ -231,7 +231,8 @@ class TestPatientAppointment(IntegrationTestCase):
 			}
 		)
 		appointment = frappe.new_doc("Patient Appointment")
-		appointment.patient = create_patient()
+		appointment.patient = "_Test Patient 0"
+		appointment.practitioner = "Healthcare Practitioner 0"
 		appointment.appointment_type = appointment_type.name
 		appointment.service_unit = service_unit
 		appointment.appointment_date = add_days(nowdate(), 3)

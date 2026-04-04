@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_years, today
 
 from erpnext.accounts.party import get_dashboard_info
@@ -15,9 +14,10 @@ from healthcare.healthcare.doctype.insurance_payor_contract.test_insurance_payor
 from healthcare.healthcare.doctype.patient_insurance_coverage.test_patient_insurance_coverage import (
 	create_insurance_test_docs,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestInsuranceClaim(IntegrationTestCase):
+class TestInsuranceClaim(HealthcareTestSuite):
 	def test_insurance_claim(self):
 		frappe.db.sql("""delete from `tabAppointment Type` where name = '_Test Appointment'""")
 		frappe.db.sql("""delete from `tabPatient Appointment` where appointment_type = '_Test Appointment'""")

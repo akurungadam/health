@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import now_datetime
 
 from healthcare.healthcare.doctype.clinical_procedure.test_clinical_procedure import (
@@ -30,9 +29,10 @@ from healthcare.healthcare.doctype.therapy_session.test_therapy_session import (
 	create_therapy_session,
 )
 from healthcare.healthcare.doctype.therapy_type.test_therapy_type import create_therapy_type
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestNursingTask(IntegrationTestCase):
+class TestNursingTask(HealthcareTestSuite):
 	def setUp(self) -> None:
 		self.activity = frappe.get_doc(self.globalTestRecords["Nursing Checklist Template"][0]).insert(
 			ignore_if_duplicate=True

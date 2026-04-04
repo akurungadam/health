@@ -3,7 +3,6 @@
 
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate, nowtime
 
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
@@ -18,9 +17,10 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 from healthcare.healthcare.doctype.patient_medical_record.test_patient_medical_record import (
 	create_lab_test_template as create_blood_test_template,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestLabTest(IntegrationTestCase):
+class TestLabTest(HealthcareTestSuite):
 	def test_lab_test_item(self):
 		lab_template = create_lab_test_template()
 		self.assertTrue(frappe.db.exists("Item", lab_template.item))
