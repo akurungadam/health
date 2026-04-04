@@ -327,35 +327,34 @@ def edit_observation(observation, data_type, result):
 	observation_doc = frappe.get_doc("Observation", observation)
 	if data_type in ["Range", "Ratio", "Quantity", "Numeric"]:
 		observation_doc.result_data = result
-	# elif data_type in ["Quantity", "Numeric"]:
-	# 	observation_doc.result_float = result
+
 	elif data_type == "Text":
 		observation_doc.result_text = result
 	observation_doc.save()
 
 
 @frappe.whitelist()
-def add_observation(**args):
+def add_observation(**kwargs):
 	observation_doc = frappe.new_doc("Observation")
 	observation_doc.posting_datetime = now_datetime()
-	observation_doc.patient = args.get("patient")
-	observation_doc.observation_template = args.get("template")
-	observation_doc.permitted_data_type = args.get("data_type")
-	observation_doc.reference_doctype = args.get("doc")
-	observation_doc.reference_docname = args.get("docname")
-	observation_doc.sales_invoice = args.get("invoice")
-	observation_doc.healthcare_practitioner = args.get("practitioner")
-	observation_doc.specimen = args.get("specimen")
-	if args.get("data_type") in ["Range", "Ratio", "Quantity", "Numeric"]:
-		observation_doc.result_data = args.get("result")
-	# elif data_type in ["Quantity", "Numeric"]:
-	# 	observation_doc.result_float = result
-	elif args.get("data_type") == "Text":
-		observation_doc.result_text = args.get("result")
-	if args.get("parent"):
-		observation_doc.parent_observation = args.get("parent")
-	observation_doc.sales_invoice_item = args.get("child") if args.get("child") else ""
-	observation_doc.service_request = args.get("service_request")
+	observation_doc.patient = kwargs.get("patient")
+	observation_doc.observation_template = kwargs.get("template")
+	observation_doc.permitted_data_type = kwargs.get("data_type")
+	observation_doc.reference_doctype = kwargs.get("doc")
+	observation_doc.reference_docname = kwargs.get("docname")
+	observation_doc.sales_invoice = kwargs.get("invoice")
+	observation_doc.healthcare_practitioner = kwargs.get("practitioner")
+	observation_doc.specimen = kwargs.get("specimen")
+	observation_doc.company = kwargs.get("company")
+	if kwargs.get("data_type") in ["Range", "Ratio", "Quantity", "Numeric"]:
+		observation_doc.result_data = kwargs.get("result")
+
+	elif kwargs.get("data_type") == "Text":
+		observation_doc.result_text = kwargs.get("result")
+	if kwargs.get("parent"):
+		observation_doc.parent_observation = kwargs.get("parent")
+	observation_doc.sales_invoice_item = kwargs.get("child") if kwargs.get("child") else ""
+	observation_doc.service_request = kwargs.get("service_request")
 	observation_doc.insert(ignore_permissions=True)
 	return observation_doc.name
 
