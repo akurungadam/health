@@ -3,7 +3,6 @@
 
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import flt, getdate, nowdate
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
@@ -17,9 +16,10 @@ from healthcare.healthcare.doctype.therapy_plan.therapy_plan import (
 	make_therapy_session,
 )
 from healthcare.healthcare.doctype.therapy_type.test_therapy_type import create_therapy_type
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestTherapyPlan(IntegrationTestCase):
+class TestTherapyPlan(HealthcareTestSuite):
 	def test_creation_on_encounter_submission(self):
 		patient, practitioner = create_healthcare_docs()
 		medical_department = "_Test Medical Department"

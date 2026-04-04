@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, today
 
 from healthcare.healthcare.doctype.insurance_payor_contract.test_insurance_payor_contract import (
@@ -14,9 +13,10 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 from healthcare.healthcare.doctype.patient_insurance_policy.patient_insurance_policy import (
 	OverlapError,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestPatientInsurancePolicy(IntegrationTestCase):
+class TestPatientInsurancePolicy(HealthcareTestSuite):
 	def test_policy(self):
 		patient = create_patient()
 		insurance_policy = get_new_insurance_policy(patient)

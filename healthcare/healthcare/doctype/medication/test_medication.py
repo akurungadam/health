@@ -2,10 +2,11 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
+
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestMedication(IntegrationTestCase):
+class TestMedication(HealthcareTestSuite):
 	def test_medication_item(self):
 		price_list = get_price_list()
 		frappe.db.set_single_value("Selling Settings", "selling_price_list", price_list)

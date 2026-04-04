@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate, nowdate, nowtime
 
 import erpnext
@@ -33,9 +32,10 @@ from healthcare.healthcare.doctype.therapy_plan.test_therapy_plan import (
 	create_therapy_plan,
 	create_therapy_type,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestServiceRequest(IntegrationTestCase):
+class TestServiceRequest(HealthcareTestSuite):
 	def test_service_request_creation_on_encounter_submission(self):
 		patient, practitioner = create_healthcare_docs()
 		insulin_resistance_template = create_lab_test_template()

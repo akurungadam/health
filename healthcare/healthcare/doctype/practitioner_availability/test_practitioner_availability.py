@@ -2,7 +2,6 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import nowdate
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
@@ -10,9 +9,10 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_patient,
 	create_practitioner,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class IntegrationTestPractitionerAvailability(IntegrationTestCase):
+class IntegrationTestPractitionerAvailability(HealthcareTestSuite):
 	"""
 	Integration tests for Practitioner Availability.
 	Use this class for testing interactions between multiple components.

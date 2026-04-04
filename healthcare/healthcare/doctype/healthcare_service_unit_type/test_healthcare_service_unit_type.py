@@ -3,10 +3,11 @@
 
 
 import frappe
-from frappe.tests import IntegrationTestCase
+
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestHealthcareServiceUnitType(IntegrationTestCase):
+class TestHealthcareServiceUnitType(HealthcareTestSuite):
 	def test_item_creation(self):
 		unit_type = get_unit_type()
 		self.assertTrue(frappe.db.exists("Item", unit_type.item))
