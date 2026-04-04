@@ -5,15 +5,15 @@
 import json
 
 import frappe
-from frappe.tests import IntegrationTestCase
 from frappe.utils import getdate, strip_html
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_patient,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 
-class TestPatientHistorySettings(IntegrationTestCase):
+class TestPatientHistorySettings(HealthcareTestSuite):
 	def setUp(self):
 		dt = create_custom_doctype()
 		settings = frappe.get_single("Patient History Settings")

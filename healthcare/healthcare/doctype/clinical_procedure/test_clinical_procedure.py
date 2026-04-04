@@ -3,17 +3,17 @@
 
 
 import frappe
-from frappe.tests import IntegrationTestCase
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_clinical_procedure_template,
 	create_healthcare_docs,
 )
+from healthcare.tests.utils import HealthcareTestSuite
 
 EXTRA_TEST_RECORD_DEPENDENCIES = ["Item"]
 
 
-class TestClinicalProcedure(IntegrationTestCase):
+class TestClinicalProcedure(HealthcareTestSuite):
 	def test_disable_procedure_template_item(self):
 		procedure_template = create_clinical_procedure_template()
 		self.assertTrue(frappe.db.exists("Item", procedure_template.item))
