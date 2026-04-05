@@ -22,9 +22,6 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 
 class TestObservation(HealthcareTestSuite):
-	def setUp(self):
-		clear_table()
-
 	def test_single_observation_from_invoice(self):
 		frappe.db.set_single_value("Healthcare Settings", "create_observation_on_si_submit", 1)
 		obs_name = "Total Cholesterol"
@@ -312,7 +309,6 @@ def observation_with_formula(**kwargs):
 
 
 def with_correct_formula(self, **kwargs):
-	clear_table()
 	custom_formula = ""
 	if kwargs.get("patient_custom_formula"):
 		custom_formula = kwargs.get("patient_custom_formula")
@@ -340,7 +336,6 @@ def with_correct_formula(self, **kwargs):
 
 
 def with_incorrect_operand(self, patient):
-	clear_table()
 	input_value_1 = "a"
 	input_value_2 = 8
 	operator = "*"
@@ -357,7 +352,6 @@ def with_incorrect_operand(self, patient):
 
 
 def with_custom_field_in_patient(self, patient):
-	clear_table()
 	custom_fields = {
 		"Patient": [
 			dict(
@@ -375,7 +369,6 @@ def with_custom_field_in_patient(self, patient):
 
 
 def with_condition_patient(self, patient):
-	clear_table()
 	condition1 = "gender=='Male'"
 	condition2 = "gender=='Female'"
 	result = with_correct_formula(
@@ -383,27 +376,3 @@ def with_condition_patient(self, patient):
 	)
 	# equation is 7-5 result must be 2 for Female as Patient is Female
 	self.assertEqual(flt(result), 2)
-
-
-def clear_table():
-	frappe.db.sql("""delete from `tabObservation Template`""")
-	frappe.db.sql("""delete from `tabObservation`""")
-	frappe.db.sql("""delete from `tabObservation Component`""")
-	frappe.db.sql(
-		"""
-		delete from `tabItem`
-		where
-			name like '%Observation%'
-			or name like '%CBC%'
-			or name like '%Cholesterol%'
-	"""
-	)
-	frappe.db.sql(
-		"""
-		delete from `tabItem Price`
-		where
-			item_code like '%Observation%'
-			or item_code like '%CBC%'
-			or item_code like '%Cholesterol%'
-	"""
-	)
