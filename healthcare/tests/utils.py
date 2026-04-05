@@ -24,11 +24,11 @@ class BootStrapTestData:
 		self.make_observation_templates()
 		self.make_care_activity()
 		self.make_nursing_checklist_templates()
-		self.make_exercise_type()
-		self.make_therapy_type()
-		self.make_therapy_plan_template()
+		self.make_exercise_types()
+		self.make_therapy_types()
+		self.make_therapy_plan_templates()
 
-	def make_therapy_plan_template(self):
+	def make_therapy_plan_templates(self):
 		records = [
 			{
 				"doctype": "Therapy Plan Template",
@@ -50,7 +50,7 @@ class BootStrapTestData:
 		]
 		self.make_records(["plan_name"], records)
 
-	def make_therapy_type(self):
+	def make_therapy_types(self):
 		records = [
 			{
 				"doctype": "Therapy Type",
@@ -72,7 +72,7 @@ class BootStrapTestData:
 		]
 		self.make_records(["therapy_type"], records)
 
-	def make_exercise_type(self):
+	def make_exercise_types(self):
 		records = [
 			{
 				"doctype": "Exercise Type",

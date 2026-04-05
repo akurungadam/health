@@ -23,8 +23,11 @@ class TestClinicalProcedure(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("Item", procedure_template.item, "disabled"), 1)
 
 	def test_consumables(self):
-		patient, practitioner = create_healthcare_docs()
-		procedure_template = create_clinical_procedure_template()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+
+		procedure_template = frappe.get_list("Clinical Procedure Template", pluck="name")[0]
+		procedure_template = frappe.get_doc("Clinical Procedure Template", procedure_template)
 		procedure_template.consume_stock = True
 		consumable = create_consumable()
 		procedure_template.append(
@@ -54,7 +57,9 @@ class TestClinicalProcedure(HealthcareTestSuite):
 		procedure_template.default_duration = 3600
 		procedure_template.consume_stock = False
 		procedure_template.save()
-		patient, practitioner = create_healthcare_docs()
+
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 
 		procedure = create_procedure(procedure_template, patient, practitioner)
 		self.assertTrue(procedure.planned_end_datetime)
