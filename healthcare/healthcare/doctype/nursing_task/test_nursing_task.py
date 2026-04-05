@@ -17,36 +17,28 @@ from healthcare.healthcare.doctype.inpatient_record.test_inpatient_record import
 )
 from healthcare.healthcare.doctype.lab_test.test_lab_test import (
 	create_lab_test,
-	create_lab_test_template,
 )
 from healthcare.healthcare.doctype.nursing_task.nursing_task import NursingTask
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_clinical_procedure_template,
-	create_healthcare_docs,
-)
 from healthcare.healthcare.doctype.therapy_plan.test_therapy_plan import create_therapy_plan
 from healthcare.healthcare.doctype.therapy_session.test_therapy_session import (
 	create_therapy_session,
 )
-from healthcare.healthcare.doctype.therapy_type.test_therapy_type import create_therapy_type
 from healthcare.tests.utils import HealthcareTestSuite
 
 
 class TestNursingTask(HealthcareTestSuite):
 	def setUp(self) -> None:
-		self.load_test_records("Nursing Checklist Template")
-		self.nc_template = frappe.get_doc(self.globalTestRecords["Nursing Checklist Template"][0]).insert(
-			ignore_if_duplicate=True
-		)
-
 		self.settings = frappe.get_single("Healthcare Settings")
 		self.settings.validate_nursing_checklists = 1
 		self.settings.save()
-
-		self.patient, self.practitioner = create_healthcare_docs()
+		self.nc_template = frappe.get_doc(
+			"Nursing Checklist Template", frappe.get_list("Nursing Checklist Template")[0].name
+		)
+		self.patient = frappe.get_list("Patient")[0].name
+		self.practitioner = frappe.get_list("Healthcare Practitioner")[0].name
 
 	def test_lab_test_submission_should_validate_pending_nursing_tasks(self):
-		self.lt_template = create_lab_test_template()
+		self.lt_template = frappe.get_doc("Lab Test Template", frappe.get_list("Lab Test Template")[0])
 		self.lt_template.nursing_checklist_template = self.nc_template.name
 		self.lt_template.save()
 
@@ -64,7 +56,9 @@ class TestNursingTask(HealthcareTestSuite):
 		lab_test.submit()
 
 	def test_start_clinical_procedure_should_validate_pending_nursing_tasks(self):
-		procedure_template = create_clinical_procedure_template()
+		procedure_template = frappe.get_doc(
+			"Clinical Procedure Template", frappe.get_list("Clinical Procedure Template")[0].name
+		)
 		procedure_template.allow_stock_consumption = 1
 		procedure_template.pre_op_nursing_checklist_template = self.nc_template.name
 		procedure_template.save()
@@ -115,7 +109,7 @@ class TestNursingTask(HealthcareTestSuite):
 		discharge_patient(ip_record)
 
 	def test_submit_therapy_session_should_validate_pending_nursing_tasks(self):
-		therapy_type = create_therapy_type()
+		therapy_type = frappe.get_doc("Therapy Type", frappe.get_list("Therapy Type")[0])
 		therapy_type.nursing_checklist_template = self.nc_template.name
 		therapy_type.save()
 
