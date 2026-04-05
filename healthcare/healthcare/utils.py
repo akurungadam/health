@@ -1708,6 +1708,7 @@ def insert_observation_and_sample_collection(
 		current_parent_observation = add_observation(
 			patient=patient,
 			template=grp.get("name"),
+			company=doc.company,
 			practitioner=doc.ref_practitioner,
 			invoice=doc.name,
 			child=child if child else "",
@@ -1764,12 +1765,13 @@ def insert_observation_and_sample_collection(
 					add_observation(
 						patient=patient,
 						template=comp,
+						company=doc.company,
 						practitioner=doc.ref_practitioner,
 						parent=current_parent_observation,
 						invoice=doc.name,
 						child=child if child else "",
 					)
-		# create sample_colleciton child row for sample_collection_reqd grouped templates
+		# create sample_collection child row for sample_collection_reqd grouped templates
 		if len(sample_reqd_component_obs) > 0:
 			for comp in sample_reqd_component_obs:
 				comp_details = frappe.get_value(
@@ -1805,6 +1807,7 @@ def insert_observation_and_sample_collection(
 			add_observation(
 				patient=patient,
 				template=grp.get("name"),
+				company=doc.company,
 				practitioner=doc.ref_practitioner,
 				invoice=doc.name,
 				child=child if child else "",
