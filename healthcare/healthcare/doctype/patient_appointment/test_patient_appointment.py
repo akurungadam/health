@@ -219,7 +219,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 				"dt": "Healthcare Service Unit",
 				"dn": service_unit,
 				"op_consulting_charge_item": item,
-				"op_consulting_charge": 2000,
+				"op_consulting_charge": 300,
 			}
 		]
 		appointment_type = create_appointment_type(
@@ -231,8 +231,8 @@ class TestPatientAppointment(HealthcareTestSuite):
 			}
 		)
 		appointment = frappe.new_doc("Patient Appointment")
-		appointment.patient = "_Test Patient 0"
-		appointment.practitioner = "Healthcare Practitioner 0"
+		appointment.patient = frappe.get_list("Patient")[0].name
+		appointment.practitioner = frappe.get_list("Healthcare Practitioner")[0].name
 		appointment.appointment_type = appointment_type.name
 		appointment.service_unit = service_unit
 		appointment.appointment_date = add_days(nowdate(), 3)
@@ -245,7 +245,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		self.assertEqual(appointment.invoiced, 1)
 		self.assertEqual(appointment.billing_item, item)
-		self.assertEqual(appointment.paid_amount, 2000)
+		self.assertEqual(appointment.paid_amount, 300)
 
 		sales_invoice_name = frappe.db.get_value(
 			"Sales Invoice Item", {"reference_dn": appointment.name}, "parent"
