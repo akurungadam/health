@@ -22,6 +22,105 @@ class BootStrapTestData:
 		self.make_lab_test_samples()
 		self.make_lab_test_templates()
 		self.make_observation_templates()
+		self.make_care_activity()
+		self.make_nursing_checklist_templates()
+		self.make_exercise_type()
+		self.make_therapy_type()
+		self.make_therapy_plan_template()
+
+	def make_therapy_plan_template(self):
+		records = [
+			{
+				"doctype": "Therapy Plan Template",
+				"plan_name": "Complete Rehab",
+				"item_code": "Complete Rehab",
+				"item_name": "Complete Rehab",
+				"is_billable": 1,
+				"rate": 5000,
+				"item_group": "Services",
+				"therapy_types": [
+					{
+						"therapy_type": "Basic Rehab",
+						"no_of_sessions": 2,
+						"rate": 5000,
+						"amount": 2 * 5000,
+					},
+				],
+			},
+		]
+		self.make_records(["plan_name"], records)
+
+	def make_therapy_type(self):
+		records = [
+			{
+				"doctype": "Therapy Type",
+				"therapy_type": "Basic Rehab",
+				"default_duration": 30,
+				"is_billable": 1,
+				"rate": 5000,
+				"item_code": "Basic Rehab",
+				"item_name": "Basic Rehab",
+				"item_group": "Services",
+				"exercises": [
+					{
+						"exercise_type": "Sit to Stand",
+						"counts_target": 10,
+						"assistance_level": "Passive",
+					},
+				],
+			},
+		]
+		self.make_records(["therapy_type"], records)
+
+	def make_exercise_type(self):
+		records = [
+			{
+				"doctype": "Exercise Type",
+				"exercise_name": "Sit to Stand",
+				"steps_table": [
+					{
+						"title": "Step 1",
+						"description": "Squat and Rise",
+					},
+				],
+			}
+		]
+		self.make_records(["exercise_name"], records)
+
+	def make_nursing_checklist_templates(self):
+		records = [
+			{
+				"doctype": "Nursing Checklist Template",
+				"name": "Discharge checklist",
+				"title": "Discharge checklist",
+				"tasks": [
+					{
+						"doctype": "Nursing Checklist Template Task",
+						"activity": "BP Check",
+						"mandatory": 1,
+						"task_duration": 60,
+						"parent": "Discharge checklist",
+						"parentfield": "tasks",
+						"parenttype": "Nursing Checklist Template",
+					},
+				],
+			},
+		]
+		self.make_records(["name"], records)
+
+	def make_care_activity(self):
+		records = [
+			{
+				"doctype": "Healthcare Activity",
+				"name": "BP Check",
+				"activity": "BP Check",
+				"description": "BP Check",
+				"activity_duration": 60,
+				"role": "Nursing User",
+				"task_doctype": "Vital Signs",
+			},
+		]
+		self.make_records(["name"], records)
 
 	def make_observation_templates(self):
 		records = [
@@ -65,7 +164,10 @@ class BootStrapTestData:
 				"is_billable": 1,
 				"rate": 300,
 				"observation_component": [  # FIXME: observation_components
-					{"observation_template": "_Test Observation without Sample", "abbr": "OWOS"}
+					{
+						"observation_template": "_Test Observation without Sample",
+						"abbr": "OWOS",
+					},
 				],
 			},
 		]
@@ -403,6 +505,8 @@ class BootStrapTestData:
 			filters = get_filters(x)
 			if not frappe.db.exists(doctype, filters):
 				frappe.get_doc(x).insert()
+
+		frappe.db.commit()
 
 
 BootStrapTestData()
