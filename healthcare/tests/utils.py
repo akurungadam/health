@@ -415,14 +415,14 @@ class BootStrapTestData:
 				"first_name": "_Test",
 				"last_name": "Healthcare Practitioner 2",
 				"gender": "Male",
-				"department": "_Test Medical Department 1",
+				"department": "Cardiology",
 				"op_consulting_charge_item": "HLC-SI-001",
 				"op_consulting_charge": 300,
 				"inpatient_visit_charge_item": "HLC-SI-002",
 				"inpatient_visit_charge": 300,
 			},
 		]
-		self.make_records(["last_name"], records)
+		self.make_records(["last_name", "department"], records)
 
 	def make_medical_departments(self):
 		records = [
@@ -440,7 +440,7 @@ class BootStrapTestData:
 			},
 			{
 				"doctype": "Medical Department",
-				"department": "_Test Medical Department 2",
+				"department": "Cardiology",
 			},
 		]
 		self.make_records(["department"], records)
