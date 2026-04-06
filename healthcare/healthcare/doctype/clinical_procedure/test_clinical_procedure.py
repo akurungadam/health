@@ -10,8 +10,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
-EXTRA_TEST_RECORD_DEPENDENCIES = ["Item"]
-
 
 class TestClinicalProcedure(HealthcareTestSuite):
 	def test_disable_procedure_template_item(self):
