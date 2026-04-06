@@ -9,24 +9,24 @@ from erpnext.accounts.doctype.pos_profile.test_pos_profile import make_pos_profi
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment,
-	create_healthcare_docs,
-	create_healthcare_service_items,
+	# create_healthcare_docs,
+	# create_healthcare_service_items,
 	update_status,
 )
 from healthcare.tests.utils import HealthcareTestSuite
-
-EXTRA_TEST_RECORD_DEPENDENCIES = ["Company"]
 
 
 class TestFeeValidity(HealthcareTestSuite):
 	def setUp(self):
 		frappe.db.sql("""delete from `tabPatient Appointment`""")
 		frappe.db.sql("""delete from `tabFee Validity`""")
-		frappe.db.sql("""delete from `tabPatient`""")
 		make_pos_profile()
 
 	def test_fee_validity(self):
-		item = create_healthcare_service_items()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+		item = "HLC-SI-001"
+
 		healthcare_settings = frappe.get_single("Healthcare Settings")
 		healthcare_settings.enable_free_follow_ups = 1
 		healthcare_settings.max_visits = 1
@@ -34,7 +34,6 @@ class TestFeeValidity(HealthcareTestSuite):
 		healthcare_settings.show_payment_popup = 1
 		healthcare_settings.op_consulting_charge_item = item
 		healthcare_settings.save(ignore_permissions=True)
-		patient, practitioner = create_healthcare_docs()
 
 		# For first appointment, invoice is generated. First appointment not considered in fee validity
 		appointment = create_appointment(patient, practitioner, nowdate())
@@ -84,8 +83,10 @@ class TestFeeValidity(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("Fee Validity", fee_validity, "status"), "Cancelled")
 
 	def test_practitioner_fee_validity(self):
-		self.setUp()
-		item = create_healthcare_service_items()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+		item = "HLC-SI-001"
+
 		healthcare_settings = frappe.get_single("Healthcare Settings")
 		healthcare_settings.enable_free_follow_ups = 1
 		healthcare_settings.max_visits = 1
@@ -93,7 +94,7 @@ class TestFeeValidity(HealthcareTestSuite):
 		healthcare_settings.show_payment_popup = 1
 		healthcare_settings.op_consulting_charge_item = item
 		healthcare_settings.save(ignore_permissions=True)
-		patient, practitioner = create_healthcare_docs()
+
 		frappe.db.set_value(
 			"Healthcare Practitioner",
 			practitioner,
