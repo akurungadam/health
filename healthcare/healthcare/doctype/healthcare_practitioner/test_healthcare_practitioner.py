@@ -60,11 +60,3 @@ class TestHealthcarePractitioner(HealthcareTestSuite):
 			)
 		else:
 			return item_code
-
-	@classmethod
-	def tearDown(cls):
-		frappe.delete_doc_if_exists("Item", "__Test Stock Item", force=True)
-		frappe.delete_doc_if_exists("Item", "__Test Service Item", force=True)
-		frappe.db.sql(
-			"""delete from `tabHealthcare Practitioner` where name like '__Test Healthcare Practitioner%'"""
-		)
