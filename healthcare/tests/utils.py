@@ -303,6 +303,17 @@ class BootStrapTestData:
 				"service_unit_type": "_Test Service Unit Type - Occupancy",
 				"inpatient_occupancy": 1,
 			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "Inpatient Rooms",
+				"inpatient_occupancy": 1,
+				"is_billable": 1,
+				"item_code": "Inpatient Rooms",
+				"item_group": "Services",
+				"uom": "Hour",
+				"no_of_hours": 1,
+				"unit_type.rate": 4000,
+			},
 		]
 		self.make_records(["service_unit_type"], records)
 
