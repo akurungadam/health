@@ -6,9 +6,6 @@ from frappe.utils import get_time, now
 
 from erpnext.stock.doctype.item.test_item import create_item
 
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_healthcare_docs,
-)
 from healthcare.healthcare.doctype.service_request.test_service_request import (
 	create_encounter,
 	create_sales_invoice,
@@ -17,11 +14,9 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 
 class TestMedicationRequest(HealthcareTestSuite):
-	def setup(self):
-		frappe.db.sql("""delete from `tabMedication` where name = 'Capsule _Test Medication 500Unit'""")
-
 	def test_medication_request(self):
-		patient, practitioner = create_healthcare_docs()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 		medication = create_medication()
 		encounter = create_encounter(patient, practitioner, "drug_prescription", medication, submit=True)
 		self.assertTrue(frappe.db.exists("Medication Request", {"order_group": encounter.name}))
@@ -42,7 +37,8 @@ class TestMedicationRequest(HealthcareTestSuite):
 			)
 
 	def test_medication_qty_calculation(self):
-		patient, practitioner = create_healthcare_docs()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 		medication = create_medication()
 
 		# Create Medication Request
