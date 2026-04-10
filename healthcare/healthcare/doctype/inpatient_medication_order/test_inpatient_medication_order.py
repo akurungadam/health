@@ -12,7 +12,6 @@ from healthcare.healthcare.doctype.inpatient_record.inpatient_record import (
 )
 from healthcare.healthcare.doctype.inpatient_record.test_inpatient_record import (
 	create_inpatient,
-	create_patient,
 	get_healthcare_service_unit,
 	mark_invoiced_inpatient_occupancy,
 )
@@ -22,7 +21,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 class TestInpatientMedicationOrder(HealthcareTestSuite):
 	def setUp(self):
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		self.patient = create_patient()
+		self.patient = frappe.get_list("Patient", pluck="name")[0]
 
 		# Admit
 		ip_record = create_inpatient(self.patient)
