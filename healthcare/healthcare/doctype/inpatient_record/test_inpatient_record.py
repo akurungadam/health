@@ -163,7 +163,7 @@ class TestInpatientRecord(HealthcareTestSuite):
 		ip_record.save(ignore_permissions=True)
 
 		# Setup service unit and mark as billable
-		service_unit = get_healthcare_service_unit("_Test IPD Service Unit")
+		service_unit = get_healthcare_service_unit("_Test HSU - Occupancy")
 		service_unit_type = frappe.get_cached_value(
 			"Healthcare Service Unit", service_unit, "service_unit_type"
 		)
@@ -264,13 +264,13 @@ def get_healthcare_service_unit(unit_name=None):
 				return unit_exists
 		else:
 			su_exists = frappe.db.exists(
-				"Healthcare Service Unit", {"healthcare_service_unit_name": "_Test Service Unit Ip Occupancy"}
+				"Healthcare Service Unit", {"healthcare_service_unit_name": "_Test Service Unit IP Occupancy"}
 			)
 			if su_exists:
 				return su_exists
 
 		service_unit = frappe.new_doc("Healthcare Service Unit")
-		service_unit.healthcare_service_unit_name = unit_name or "_Test Service Unit Ip Occupancy"
+		service_unit.healthcare_service_unit_name = unit_name or "_Test Service Unit IP Occupancy"
 		service_unit.company = "_Test Company"
 		service_unit.service_unit_type = get_service_unit_type()
 		service_unit.inpatient_occupancy = 1
