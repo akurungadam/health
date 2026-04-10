@@ -10,6 +10,7 @@ class BootStrapTestData:
 	def make_master_data(self):
 		self.make_company()
 		self.make_service_items()
+		self.make_medication_items()
 		self.make_diagnoses()
 		self.make_medical_departments()
 		self.make_practitioners()
@@ -452,6 +453,11 @@ class BootStrapTestData:
 				"first_name": "_Test Patient 1",
 				"sex": "Male",
 			},
+			{
+				"doctype": "Patient",
+				"first_name": "_Test IPD Patient",
+				"sex": "Female",
+			},
 		]
 		self.make_records(["first_name"], records)
 
@@ -527,6 +533,21 @@ class BootStrapTestData:
 			},
 		]
 		self.make_records(["diagnosis"], records)
+
+	def make_medication_items(self):
+		records = [
+			{
+				"doctype": "Item",
+				"item_code": "Dextromethorphan",
+				"item_name": "Dextromethorphan",
+				"item_group": "Products",
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"valuation_rate": 50,
+				"opening_stock": 20,
+			},
+		]
+		self.make_records(["item_code"], records)
 
 	def make_service_items(self):
 		records = [
