@@ -362,6 +362,12 @@ class BootStrapTestData:
 				"doctype": "Healthcare Service Unit Type",
 				"service_unit_type": "_Test Service Unit Type - Occupancy",
 				"inpatient_occupancy": 1,
+				"is_billable": 1,
+				"item_code": "_Test Service Unit Type - Occupancy",
+				"item_group": "Services",
+				"uom": "Day",
+				"no_of_hours": 24,
+				"unit_type.rate": 4000,
 			},
 			{
 				"doctype": "Healthcare Service Unit Type",
