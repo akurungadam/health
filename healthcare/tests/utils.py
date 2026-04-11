@@ -28,6 +28,51 @@ class BootStrapTestData:
 		self.make_exercise_types()
 		self.make_therapy_types()
 		self.make_therapy_plan_templates()
+		self.make_medication_classes()
+		self.make_medication_items()
+
+	def make_medications(self):
+		records = [
+			{
+				"doctype": "Medication",
+				"generic_name": "Paracetamol",
+				"medication_class": "Analgesics",
+				"strength": 300,
+				"strength_uom": "Milligram",
+				"dosage_form": "Tablet",
+				"linked_items": {
+					"item_code": "Paracetamol",
+					"item_group": "Drug",
+					"is_billable": 1,
+					"rate": 25,
+				},
+			},
+		]
+		self.make_records(["generic_name"], records)
+
+	def make_dosage_forms(self):
+		records = [
+			{
+				"dosage_form": "Tablet",
+			},
+			{
+				"dosage_form": "Ointment",
+			},
+		]
+		self.make_records(["dosage_form"], records)
+
+	def make_medication_classes(self):
+		records = [
+			{
+				"doctype": "Medication Class",
+				"medication_class": "Analgesics",
+			},
+			{
+				"doctype": "Medication Class",
+				"medication_class": "Antibiotics",
+			},
+		]
+		self.make_records(["medication_class"], records)
 
 	def make_therapy_plan_templates(self):
 		records = [
