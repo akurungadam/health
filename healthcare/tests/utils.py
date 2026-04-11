@@ -10,7 +10,7 @@ class BootStrapTestData:
 	def make_master_data(self):
 		self.make_company()
 		self.make_service_items()
-		self.make_medication_items()
+		self.make_stock_items()
 		self.make_diagnoses()
 		self.make_medical_departments()
 		self.make_practitioners()
@@ -585,7 +585,7 @@ class BootStrapTestData:
 		]
 		self.make_records(["diagnosis"], records)
 
-	def make_medication_items(self):
+	def make_stock_items(self):
 		records = [
 			{
 				"doctype": "Item",
@@ -594,6 +594,16 @@ class BootStrapTestData:
 				"item_group": "Products",
 				"stock_uom": "Nos",
 				"is_stock_item": 1,
+				"valuation_rate": 50,
+				"opening_stock": 20,
+			},
+			{
+				"doctype": "Item",
+				"item_code": "_Test_Stock_Item",
+				"item_name": "_Test_Stock_Item",
+				"item_group": "Services",
+				"is_stock_item": 1,
+				"stock_uom": "Nos",
 				"valuation_rate": 50,
 				"opening_stock": 20,
 			},
@@ -614,6 +624,14 @@ class BootStrapTestData:
 				"doctype": "Item",
 				"item_code": "HLC-SI-002",
 				"item_name": "IP Consulting Charges",
+				"item_group": "Services",
+				"is_stock_item": 0,
+				"stock_uom": "Nos",
+			},
+			{
+				"doctype": "Item",
+				"item_code": "_Test_Service_Item",
+				"item_name": "_Test_Service_Item",
 				"item_group": "Services",
 				"is_stock_item": 0,
 				"stock_uom": "Nos",
