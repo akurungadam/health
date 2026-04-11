@@ -272,7 +272,7 @@ def get_healthcare_service_unit(unit_name=None):
 		service_unit = frappe.new_doc("Healthcare Service Unit")
 		service_unit.healthcare_service_unit_name = unit_name or "_Test Service Unit IP Occupancy"
 		service_unit.company = "_Test Company"
-		service_unit.service_unit_type = get_service_unit_type()
+		service_unit.service_unit_type = get_random("Healthcare Service Unit Type", filters={"inpatient_occupancy": 1})
 		service_unit.inpatient_occupancy = 1
 		service_unit.occupancy_status = "Vacant"
 		service_unit.is_group = 0
@@ -295,20 +295,3 @@ def get_healthcare_service_unit(unit_name=None):
 		service_unit.save(ignore_permissions=True)
 		return service_unit.name
 	return service_unit
-
-
-def get_service_unit_type():
-	return get_random("Healthcare Service Unit Type", filters={"inpatient_occupancy": 1})
-
-
-def create_patient(patient_name=None):
-	if not patient_name:
-		patient_name = "_Test IPD Patient"
-	patient = frappe.db.exists("Patient", patient_name)
-	if not patient:
-		patient = frappe.new_doc("Patient")
-		patient.first_name = patient_name
-		patient.sex = "Female"
-		patient.save(ignore_permissions=True)
-		patient = patient.name
-	return patient
