@@ -17,7 +17,7 @@ class TestHealthcarePractitioner(HealthcareTestSuite):
 					"doctype": "Healthcare Practitioner",
 					"first_name": f"__Test Healthcare Practitioner {idx}",
 					"gender": "Female",
-					item_fieldname: self.get_item(is_stock_item=False),
+					item_fieldname: "HLC-SI-002",
 					charge_fieldname: 0,
 				}
 			)
@@ -33,30 +33,8 @@ class TestHealthcarePractitioner(HealthcareTestSuite):
 					"doctype": "Healthcare Practitioner",
 					"first_name": f"__Test Healthcare Practitioner {idx}",
 					"gender": "Male",
-					item_fieldname: self.get_item(is_stock_item=True),
+					item_fieldname: "HLC-SI-001",
 					charge_fieldname: 0,
 				}
 			)
 			self.assertRaises(frappe.ValidationError, practitioner.insert)
-
-	def get_item(self, is_stock_item=False):
-		item_code = "__Test Stock Item" if is_stock_item else "__Test Service Item"
-
-		if not frappe.db.exists("Item", item_code):
-			return (
-				frappe.get_doc(
-					{
-						"doctype": "Item",
-						"name": item_code,
-						"item_code": item_code,
-						"item_name": item_code,
-						"is_stock_item": is_stock_item,
-						"item_group": "All Item Groups",
-						"stock_uom": "Nos",
-					}
-				)
-				.insert()
-				.name
-			)
-		else:
-			return item_code
