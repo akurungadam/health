@@ -7,17 +7,14 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 
 class TestPatient(HealthcareTestSuite):
-	@classmethod
-	def setUpClass(cls):
-		super().setUpClass()
-
+	def setUp(self):
 		doc = frappe.get_doc(
 			{
 				"doctype": "ABDM Settings",
 				"default": 1,
 				"auth_base_url": "https://dev.abdm.gov.in/gateway/",
 				"health_id_base_url": "https://healthidsbx.abdm.gov.in/api/",
-				"Company": frappe.defaults.get_user_default("Company"),
+				"company": frappe.defaults.get_user_default("Company"),
 			}
 		)
 		doc.insert()
