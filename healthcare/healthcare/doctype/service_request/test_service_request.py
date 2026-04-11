@@ -14,18 +14,11 @@ from healthcare.healthcare.doctype.lab_test.test_lab_test import (
 	create_lab_test,
 	create_lab_test_template,
 )
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-	create_patient,
-	create_practitioner,
-)
 from healthcare.healthcare.doctype.patient_encounter.patient_encounter import (
 	create_patient_referral,
 )
 from healthcare.healthcare.doctype.service_request.service_request import make_clinical_procedure
-from healthcare.healthcare.doctype.therapy_plan.test_therapy_plan import (
-	create_therapy_plan,
-)
+from healthcare.healthcare.doctype.therapy_plan.test_therapy_plan import create_therapy_plan
 from healthcare.tests.utils import HealthcareTestSuite
 
 
