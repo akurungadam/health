@@ -29,12 +29,14 @@ class TestPatientAppointment(HealthcareTestSuite):
 		frappe.db.sql("""delete from `tabHealthcare Service Unit` where name like '_Test %'""")
 		frappe.db.sql("DELETE FROM `tabPractitioner Availability`")
 
+		self.patient = frappe.get_list("Patient", pluck="name")[0]
+		self.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+
 	def test_status(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 0)
-		appointment = create_appointment(patient, practitioner, nowdate())
+		appointment = create_appointment(self.patient, self.practitioner, nowdate())
 		self.assertEqual(appointment.status, "Open")
-		appointment = create_appointment(patient, practitioner, add_days(nowdate(), 2))
+		appointment = create_appointment(self.patient, self.practitioner, add_days(nowdate(), 2))
 		self.assertEqual(appointment.status, "Scheduled")
 		encounter = create_encounter(appointment)
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "status"), "Closed")
@@ -42,9 +44,8 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "status"), "Open")
 
 	def test_start_encounter(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment = create_appointment(patient, practitioner, add_days(nowdate(), 4), invoice=1)
+		appointment = create_appointment(self.patient, self.practitioner, add_days(nowdate(), 4), invoice=1)
 		appointment.reload()
 		self.assertEqual(appointment.invoiced, 1)
 		encounter = make_encounter(appointment.name)
@@ -58,14 +59,13 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 	def test_auto_invoicing(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 0)
-		appointment = create_appointment(patient, practitioner, nowdate())
+		appointment = create_appointment(self.patient, self.practitioner, nowdate())
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "invoiced"), 0)
 
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment = create_appointment(patient, practitioner, add_days(nowdate(), 2), invoice=1)
+		appointment = create_appointment(self.patient, self.practitioner, add_days(nowdate(), 2), invoice=1)
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "invoiced"), 1)
 		sales_invoice_name = frappe.db.get_value(
 			"Sales Invoice Item", {"reference_dn": appointment.name}, "parent"
@@ -82,10 +82,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 	def test_auto_invoicing_with_discount_amount(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment = create_appointment(patient, practitioner, nowdate(), invoice=1, discount_amount=100)
+		appointment = create_appointment(
+			self.patient, self.practitioner, nowdate(), invoice=1, discount_amount=100
+		)
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "invoiced"), 1)
 		sales_invoice_name = frappe.db.get_value(
 			"Sales Invoice Item", {"reference_dn": appointment.name}, "parent"
@@ -105,10 +106,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 	def test_auto_invoicing_with_discount_percentage(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment = create_appointment(patient, practitioner, nowdate(), invoice=1, discount_percentage=10)
+		appointment = create_appointment(
+			self.patient, self.practitioner, nowdate(), invoice=1, discount_percentage=10
+		)
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "invoiced"), 1)
 		sales_invoice_name = frappe.db.get_value(
 			"Sales Invoice Item", {"reference_dn": appointment.name}, "parent"
