@@ -13,13 +13,13 @@ class BootStrapTestData:
 		self.make_stock_items()
 		self.make_diagnoses()
 		self.make_medical_departments()
-		self.make_practitioners()
+		self.make_users()
 		self.make_patients()
+		self.make_practitioners()
 		self.make_appointment_types()
 		self.make_clinical_procedure_templates()
 		self.make_service_unit_types()
 		self.make_service_units()
-		self.make_users()
 		self.make_lab_test_samples()
 		self.make_lab_test_templates()
 		self.make_observation_templates()
@@ -29,7 +29,24 @@ class BootStrapTestData:
 		self.make_therapy_types()
 		self.make_therapy_plan_templates()
 		self.make_medication_classes()
-		self.make_medication_items()
+		self.make_medications()
+		self.make_insurance_payors()
+
+	def make_insurance_payors(self):
+		records = [
+			{
+				"doctype": "Insurance Payor",
+				"insurance_payor_name": "_Test Insurance Payor",
+				"abbr": "HIC",
+				"default_currency": "INR",
+				"country": "India",
+				"claims_receivable_accounts": [{"company": "_Test Company", "account": "Debtors - _TC"}],
+				"rejected_claims_expense_accounts": [
+					{"company": "_Test Company", "account": "Debtors - _TC"},
+				],
+			},
+		]
+		self.make_records(["insurance_payor_name"], records)
 
 	def make_medications(self):
 		records = [
@@ -40,12 +57,14 @@ class BootStrapTestData:
 				"strength": 300,
 				"strength_uom": "Milligram",
 				"dosage_form": "Tablet",
-				"linked_items": {
-					"item_code": "Paracetamol",
-					"item_group": "Drug",
-					"is_billable": 1,
-					"rate": 25,
-				},
+				"linked_items": [
+					{
+						"item_code": "Paracetamol",
+						"item_group": "Drug",
+						"is_billable": 1,
+						"rate": 25,
+					},
+				],
 			},
 		]
 		self.make_records(["generic_name"], records)
@@ -343,23 +362,6 @@ class BootStrapTestData:
 		]
 		self.make_records(["sample"], records)
 
-	def make_users(self):
-		records = [
-			{
-				"doctype": "User",
-				"email": "test_user@marleyhealth.io",
-				"first_name": "test_user",
-				"password": "password",
-			},
-			{
-				"doctype": "User",
-				"email": "test_user_0@marleyhealth.io",
-				"first_name": "test_user_0",
-				"password": "password",
-			},
-		]
-		self.make_records(["email"], records)
-
 	def make_service_units(self):
 		records = [
 			{
@@ -486,6 +488,30 @@ class BootStrapTestData:
 			},
 		]
 		self.make_records(["appointment_type"], records)
+
+	def make_users(self):
+		records = [
+			{
+				"doctype": "User",
+				"email": "test_user@marleyhealth.io",
+				"first_name": "test_user",
+				"password": "password",
+			},
+			{
+				"doctype": "User",
+				"email": "test_user_0@marleyhealth.io",
+				"first_name": "test_user_0",
+				"password": "password",
+			},
+			{
+				"doctype": "User",
+				"email": "gp@marleyhealth.io",
+				"first_name": "gp",
+				"password": "password",
+				"roles": [{"doctype": "Has Role", "role": "Physician"}],
+			},
+		]
+		self.make_records(["email"], records)
 
 	def make_patients(self):
 		records = [
