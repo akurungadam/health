@@ -11,7 +11,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_appointment,
 	create_clinical_procedure_template,
 	create_encounter,
-	create_healthcare_docs,
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
@@ -23,7 +22,8 @@ class TestPatientMedicalRecord(HealthcareTestSuite):
 		make_pos_profile()
 
 	def test_medical_record(self):
-		patient, practitioner = create_healthcare_docs()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 		medical_department = "_Test Medical Department"
 		appointment = create_appointment(patient, practitioner, nowdate(), invoice=1)
 		encounter = create_encounter(appointment)
