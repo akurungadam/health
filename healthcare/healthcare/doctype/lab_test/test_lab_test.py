@@ -19,7 +19,8 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestLabTest(HealthcareTestSuite):
 	def test_lab_test_item(self):
-		lab_template = create_lab_test_template()  # ensure item is auto created on create lab test
+		# lab_template = create_lab_test_template()  # ensure item is auto created on create lab test
+		lab_template = frappe.get_doc("Lab Test Template", "_Test Lab Test - with Sample")
 		self.assertTrue(frappe.db.exists("Item", lab_template.item))
 		self.assertEqual(
 			frappe.db.get_value("Item Price", {"item_code": lab_template.item}, "price_list_rate"),
@@ -35,7 +36,7 @@ class TestLabTest(HealthcareTestSuite):
 		lab_template.disabled = 0
 		lab_template.save()
 
-	def test_descriptive_lab_test(self):
+	def test_reqd_result_lab_test_raises(self):
 		lab_template = frappe.get_doc("Lab Test Template", "_Test Lab Test - without Sample")
 
 		# blank result value not allowed as per template
