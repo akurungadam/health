@@ -24,7 +24,6 @@ class TestPatientMedicalRecord(HealthcareTestSuite):
 	def test_medical_record(self):
 		patient = frappe.get_list("Patient", pluck="name")[0]
 		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
-		medical_department = "_Test Medical Department"
 		appointment = create_appointment(patient, practitioner, nowdate(), invoice=1)
 		encounter = create_encounter(appointment)
 
@@ -41,7 +40,7 @@ class TestPatientMedicalRecord(HealthcareTestSuite):
 		)
 		self.assertTrue(medical_rec)
 
-		procedure_template = create_clinical_procedure_template().get("name")
+		procedure_template = "_Test Procedure - Knee Surgery and Rehab"
 		appointment = create_appointment(
 			patient, practitioner, add_days(nowdate(), 1), invoice=1, procedure_template=procedure_template
 		)
@@ -54,7 +53,8 @@ class TestPatientMedicalRecord(HealthcareTestSuite):
 		)
 		self.assertTrue(medical_rec)
 
-		template = create_lab_test_template(medical_department)
+		# template = create_lab_test_template(medical_department)
+		template = frappe.get_doc("Lab Test Template", "_Test Lab Test - with Sample")
 		lab_test = create_lab_test(template.name, patient)
 		# check for lab test
 		medical_rec = frappe.db.exists(
