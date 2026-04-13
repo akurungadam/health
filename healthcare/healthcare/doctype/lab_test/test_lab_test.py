@@ -19,7 +19,6 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestLabTest(HealthcareTestSuite):
 	def test_lab_test_item(self):
-		# lab_template = create_lab_test_template()  # ensure item is auto created on create lab test
 		lab_template = frappe.get_doc("Lab Test Template", "_Test Lab Test - with Sample")
 		self.assertTrue(frappe.db.exists("Item", lab_template.item))
 		self.assertEqual(
