@@ -303,7 +303,7 @@ class BootStrapTestData:
 				"doctype": "Lab Test Template",
 				"lab_test_name": "_Test Lab Test - with Sample",
 				"lab_test_template_type": "Descriptive",
-				"lab_test_description": "Insulin Resistance",
+				"lab_test_description": "Fasting Blood Sugar",
 				"lab_test_code": "_Test Lab Test - with Sample",
 				"lab_test_group": "Services",
 				"department": "_Test Medical Department",
@@ -311,7 +311,11 @@ class BootStrapTestData:
 				"lab_test_rate": 2000,
 				"sample": "_Test Sample - Blood Sample",
 				"sample_qty": "5.0",
-				"descriptive_test_templates": [],
+				"descriptive_test_templates": [
+					{"particulars": "FBS", "allow_blank": 1},
+					{"particulars": "Insulin", "allow_blank": 0},
+					{"particulars": "IR", "allow_blank": 1},
+				],
 			},
 			{
 				"doctype": "Lab Test Template",
@@ -323,7 +327,11 @@ class BootStrapTestData:
 				"department": "_Test Medical Department",
 				"is_billable": 1,
 				"lab_test_rate": 2000,
-				"descriptive_test_templates": [],
+				"descriptive_test_templates": [
+					{"particulars": "FBS", "allow_blank": 1},
+					{"particulars": "Insulin", "allow_blank": 0},
+					{"particulars": "IR", "allow_blank": 1},
+				],
 			},
 			{
 				"doctype": "Lab Test Template",
@@ -336,15 +344,13 @@ class BootStrapTestData:
 				"is_billable": 1,
 				"lab_test_rate": 2000,
 				"sensitivity": 1,
-				"descriptive_test_templates": [],
+				"descriptive_test_templates": [
+					{"particulars": "FBS", "allow_blank": 1},
+					{"particulars": "Insulin", "allow_blank": 0},
+					{"particulars": "IR", "allow_blank": 1},
+				],
 			},
 		]
-		for r in records:
-			for entry in ["FBS", "Insulin", "IR"]:
-				r["descriptive_test_templates"].append(
-					{"particulars": entry, "allow_blank": 1 if entry == "IR" else 0},
-				)
-
 		self.make_records(["lab_test_name", "lab_test_code"], records)
 
 	def make_lab_test_samples(self):
