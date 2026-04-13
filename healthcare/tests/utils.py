@@ -16,10 +16,10 @@ class BootStrapTestData:
 		self.make_users()
 		self.make_patients()
 		self.make_practitioners()
-		self.make_appointment_types()
-		self.make_clinical_procedure_templates()
 		self.make_service_unit_types()
 		self.make_service_units()
+		self.make_appointment_types()
+		self.make_clinical_procedure_templates()
 		self.make_lab_test_samples()
 		self.make_lab_test_templates()
 		self.make_observation_templates()
@@ -362,74 +362,6 @@ class BootStrapTestData:
 		]
 		self.make_records(["sample"], records)
 
-	def make_service_units(self):
-		records = [
-			{
-				"doctype": "Healthcare Service Unit",
-				"healthcare_service_unit_name": "_Test HSU - Appointments",
-				"service_unit_type": "_Test Service Unit Type - Appointments",
-				"company": "_Test Company",
-				"allow_appointments": 1,
-				"overlap_appointments": 0,
-			},
-			{
-				"doctype": "Healthcare Service Unit",
-				"healthcare_service_unit_name": "_Test HSU - Overlapping Appointments",
-				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
-				"company": "_Test Company",
-				"allow_appointments": 1,
-				"overlap_appointments": 1,
-				"service_unit_capacity": 10,
-			},
-			{
-				"doctype": "Healthcare Service Unit",
-				"healthcare_service_unit_name": "_Test HSU - Occupancy",
-				"service_unit_type": "_Test Service Unit Type - Occupancy",
-				"company": "_Test Company",
-				"inpatient_occupancy": 1,
-			},
-		]
-		self.make_records(["healthcare_service_unit_name"], records)
-
-	def make_service_unit_types(self):
-		records = [
-			{
-				"doctype": "Healthcare Service Unit Type",
-				"service_unit_type": "_Test Service Unit Type - Appointments",
-				"allow_appointments": 1,
-				"overlap_appointments": 0,
-			},
-			{
-				"doctype": "Healthcare Service Unit Type",
-				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
-				"allow_appointments": 1,
-				"overlap_appointments": 1,
-			},
-			{
-				"doctype": "Healthcare Service Unit Type",
-				"service_unit_type": "_Test Service Unit Type - Occupancy",
-				"inpatient_occupancy": 1,
-				"is_billable": 1,
-				"item_code": "_Test Service Unit Type - Occupancy",
-				"item_group": "Services",
-				"uom": "Day",
-				"no_of_hours": 24,
-				"unit_type.rate": 4000,
-			},
-			{
-				"doctype": "Healthcare Service Unit Type",
-				"service_unit_type": "Inpatient Rooms",
-				"inpatient_occupancy": 1,
-				"is_billable": 1,
-				"item_code": "Inpatient Rooms",
-				"item_group": "Services",
-				"uom": "Hour",
-				"no_of_hours": 1,
-				"unit_type.rate": 4000,
-			},
-		]
-		self.make_records(["service_unit_type"], records)
-
 	def make_clinical_procedure_templates(self):
 		records = [
 			{
@@ -486,8 +418,108 @@ class BootStrapTestData:
 					},
 				],
 			},
+			{
+				"doctype": "Appointment Type",
+				"appointment_type": "_Test Appointment Type with Items for Department",
+				"allow_booking_for": "Department",
+				"default_duration": 20,
+				"items": [
+					{
+						"dt": "Medical Department",
+						"dn": "_Test Medical Department",
+						"op_consulting_charge_item": "HLC-SI-001",
+						"op_consulting_charge": 1000,
+						"inpatient_visit_charge_item": "HLC-SI-002",
+						"ip_consulting_charge": 1000,
+					},
+				],
+			},
+			{
+				"doctype": "Appointment Type",
+				"appointment_type": "_Test Appointment Type with Items for Service Unit",
+				"allow_booking_for": "Service Unit",
+				"default_duration": 20,
+				"items": [
+					{
+						"dt": "Healthcare Service Unit",
+						"dn": "_Test HSU - Appointments - _TC",
+						"op_consulting_charge_item": "HLC-SI-001",
+						"op_consulting_charge": 1000,
+						"inpatient_visit_charge_item": "HLC-SI-002",
+						"ip_consulting_charge": 1000,
+					},
+				],
+			},
 		]
 		self.make_records(["appointment_type"], records)
+
+	def make_service_units(self):
+		records = [
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Appointments",
+				"service_unit_type": "_Test Service Unit Type - Appointments",
+				"company": "_Test Company",
+				"allow_appointments": 1,
+				"overlap_appointments": 0,
+			},
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Overlapping Appointments",
+				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
+				"company": "_Test Company",
+				"allow_appointments": 1,
+				"overlap_appointments": 1,
+				"service_unit_capacity": 10,
+			},
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - Occupancy",
+				"service_unit_type": "_Test Service Unit Type - Occupancy",
+				"company": "_Test Company",
+				"inpatient_occupancy": 1,
+			},
+		]
+		self.make_records(["healthcare_service_unit_name"], records)
+
+	def make_service_unit_types(self):
+		records = [
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 0,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
+				"allow_appointments": 1,
+				"overlap_appointments": 1,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Occupancy",
+				"inpatient_occupancy": 1,
+				"is_billable": 1,
+				"item_code": "_Test Service Unit Type - Occupancy",
+				"item_group": "Services",
+				"uom": "Day",
+				"no_of_hours": 24,
+				"unit_type.rate": 4000,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Inpatient Rooms",
+				"inpatient_occupancy": 1,
+				"is_billable": 1,
+				"item_code": "_Test Inpatient Rooms",
+				"item_group": "Services",
+				"uom": "Hour",
+				"no_of_hours": 1,
+				"unit_type.rate": 4000,
+			},
+		]
+		self.make_records(["service_unit_type"], records)
 
 	def make_users(self):
 		records = [
