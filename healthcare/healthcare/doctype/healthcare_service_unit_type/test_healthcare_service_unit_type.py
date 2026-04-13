@@ -9,7 +9,9 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestHealthcareServiceUnitType(HealthcareTestSuite):
 	def test_item_creation(self):
-		unit_type = frappe.get_doc("Healthcare Service Unit Type", {"service_unit_type": "Inpatient Rooms"})
+		unit_type = frappe.get_doc(
+			"Healthcare Service Unit Type", {"service_unit_type": "_Test Inpatient Rooms"}
+		)
 		self.assertTrue(frappe.db.exists("Item", unit_type.item))
 
 		# check item disabled
