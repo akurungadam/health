@@ -130,13 +130,18 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 	def test_auto_invoicing_based_on_practitioner_department(self):
-		patient, practitioner = create_healthcare_docs()
+		practitioner = frappe.get_list(
+			"Healthcare Practitioner", filters={"last_name": "Healthcare Practitioner 0"}, pluck="name"
+		)[0]
 		frappe.db.set_value(
 			"Healthcare Practitioner",
 			practitioner,
 			{
+				"department": "_Test Medical Department",
 				"op_consulting_charge": 0,
 				"inpatient_visit_charge": 0,
+				"op_consulting_charge_item": "",
+				"inpatient_visit_charge_item": "",
 			},
 		)
 		medical_department = "_Test Medical Department"
@@ -144,7 +149,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 
 		appointment = create_appointment(
-			patient,
+			self.patient,
 			practitioner,
 			add_days(nowdate(), 2),
 			invoice=1,
@@ -168,28 +173,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_auto_invoicing_based_on_department(self):
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		item = create_healthcare_service_items()
-		department_name = "_Test Medical Department"
-		items = [
-			{
-				"dt": "Medical Department",
-				"dn": department_name,
-				"op_consulting_charge_item": item,
-				"op_consulting_charge": 1000,
-			}
-		]
-		appointment_type = create_appointment_type(
-			args={
-				"name": "_Test General OP",
-				"allow_booking_for": "Department",
-				"items": items,
-				"duration": 15,
-			}
-		)
+
 		appointment = frappe.new_doc("Patient Appointment")
-		appointment.patient = create_patient()
-		appointment.appointment_type = appointment_type.name
-		appointment.department = department_name
+		appointment.patient = self.patient
+		appointment.appointment_type = "_Test Appointment Type with Items for Department"
+		appointment.department = "_Test Medical Department"
 		appointment.appointment_date = add_days(nowdate(), 2)
 		appointment.company = "_Test Company"
 
@@ -199,7 +187,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		appointment.reload()
 
 		self.assertEqual(appointment.invoiced, 1)
-		self.assertEqual(appointment.billing_item, item)
+		self.assertEqual(appointment.billing_item, "HLC-SI-001")
 		self.assertEqual(appointment.paid_amount, 1000)
 
 		sales_invoice_name = frappe.db.get_value(
@@ -210,32 +198,15 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_auto_invoicing_based_on_service_unit(self):
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		item = create_healthcare_service_items()
-		service_unit_type = create_service_unit_type(id=11, allow_appointments=1)
+
+		service_unit_type = "_Test Service Unit Type - Appointments"
 		service_unit = create_service_unit(
-			id=101,
 			service_unit_type=service_unit_type,
-		)
-		items = [
-			{
-				"dt": "Healthcare Service Unit",
-				"dn": service_unit,
-				"op_consulting_charge_item": item,
-				"op_consulting_charge": 300,
-			}
-		]
-		appointment_type = create_appointment_type(
-			args={
-				"name": "_Test XRay Modality",
-				"allow_booking_for": "Service Unit",
-				"items": items,
-				"duration": 15,
-			}
 		)
 		appointment = frappe.new_doc("Patient Appointment")
 		appointment.patient = frappe.get_list("Patient")[0].name
 		appointment.practitioner = frappe.get_list("Healthcare Practitioner")[0].name
-		appointment.appointment_type = appointment_type.name
+		appointment.appointment_type = "_Test Appointment Type with Items for Service Unit"
 		appointment.service_unit = service_unit
 		appointment.appointment_date = add_days(nowdate(), 3)
 		appointment.company = "_Test Company"
@@ -246,7 +217,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		appointment.reload()
 
 		self.assertEqual(appointment.invoiced, 1)
-		self.assertEqual(appointment.billing_item, item)
+		self.assertEqual(appointment.billing_item, "HLC-SI-001")
 		self.assertEqual(appointment.paid_amount, 300)
 
 		sales_invoice_name = frappe.db.get_value(
@@ -255,32 +226,31 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertTrue(sales_invoice_name)
 
 	def test_auto_invoicing_according_to_appointment_type_charge(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_value(
 			"Healthcare Practitioner",
-			practitioner,
+			self.practitioner,
 			{
 				"op_consulting_charge": 0,
 				"inpatient_visit_charge": 0,
+				"op_consulting_charge_item": "",
+				"inpatient_visit_charge_item": "",
 			},
 		)
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 
-		item = create_healthcare_service_items()
-		items = [{"op_consulting_charge_item": item, "op_consulting_charge": 300}]
-		appointment_type = create_appointment_type(
-			args={"name": "Generic Appointment Type charge", "items": items}
-		)
-
 		appointment = create_appointment(
-			patient, practitioner, add_days(nowdate(), 2), invoice=1, appointment_type=appointment_type.name
+			self.patient,
+			self.practitioner,
+			add_days(nowdate(), 2),
+			invoice=1,
+			appointment_type="_Test Appointment Type with Items",
 		)
 		appointment.reload()
 
 		self.assertEqual(appointment.invoiced, 1)
-		self.assertEqual(appointment.billing_item, item)
-		self.assertEqual(appointment.paid_amount, 300)
+		self.assertEqual(appointment.billing_item, "HLC-SI-001")
+		self.assertEqual(appointment.paid_amount, 200)
 
 		sales_invoice_name = frappe.db.get_value(
 			"Sales Invoice Item", {"reference_dn": appointment.name}, "parent"
@@ -288,15 +258,16 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertTrue(sales_invoice_name)
 
 	def test_appointment_cancel(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
-		appointment = create_appointment(patient, practitioner, nowdate())
-		fee_validity = frappe.db.get_value("Fee Validity", {"patient": patient, "practitioner": practitioner})
+		appointment = create_appointment(self.patient, self.practitioner, nowdate())
+		fee_validity = frappe.db.get_value(
+			"Fee Validity", {"patient": self.patient, "practitioner": self.practitioner}
+		)
 		# fee validity created
 		self.assertTrue(fee_validity)
 
 		# first follow up appointment
-		appointment = create_appointment(patient, practitioner, add_days(nowdate(), 1))
+		appointment = create_appointment(self.patient, self.practitioner, add_days(nowdate(), 1))
 		self.assertEqual(frappe.db.get_value("Fee Validity", fee_validity, "visited"), 1)
 
 		update_status(appointment.name, "Cancelled")
@@ -305,7 +276,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
-		appointment = create_appointment(patient, practitioner, add_days(nowdate(), 1), invoice=1)
+		appointment = create_appointment(self.patient, self.practitioner, add_days(nowdate(), 1), invoice=1)
 		update_status(appointment.name, "Cancelled")
 		# check invoice cancelled
 		sales_invoice_name = frappe.db.get_value(
@@ -314,19 +285,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("Sales Invoice", sales_invoice_name, "status"), "Cancelled")
 
 	def test_department_appointment_cancel_with_fee_validity_setting_on(self):
-		patient, _practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
-		department = "_Test Medical Department"
-		appointment_type = create_appointment_type(
-			{
-				"name": "Department Appointment Type",
-				"allow_booking_for": "Department",
-				"medical_department": department,
-			}
-		)
+		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Department")
 		appointment = create_appointment(
-			patient=patient,
-			department=department,
+			patient=self.patient,
+			department="_Test Medical Department",
 			appointment_for="Department",
 			appointment_type=appointment_type.name,
 		)
@@ -384,10 +347,8 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		patient, practitioner = create_healthcare_docs()
-		patient = create_patient()
 		# Schedule Admission
-		ip_record = create_inpatient(patient)
+		ip_record = create_inpatient(self.patient)
 		ip_record.expected_length_of_stay = 0
 		ip_record.save(ignore_permissions=True)
 
@@ -399,12 +360,12 @@ class TestPatientAppointment(HealthcareTestSuite):
 			"_Test Service Unit Ip Occupancy for Appointment"
 		)
 		appointment = create_appointment(
-			patient, practitioner, nowdate(), service_unit=appointment_service_unit, save=0
+			self.patient, self.practitioner, nowdate(), service_unit=appointment_service_unit, save=0
 		)
 		self.assertRaises(frappe.exceptions.ValidationError, appointment.save)
 
 		# Discharge
-		schedule_discharge(frappe.as_json({"patient": patient}))
+		schedule_discharge(frappe.as_json({"patient": self.patient}))
 		ip_record1 = frappe.get_doc("Inpatient Record", ip_record.name)
 		mark_invoiced_inpatient_occupancy(ip_record1)
 		discharge_patient(ip_record1)
@@ -415,31 +376,32 @@ class TestPatientAppointment(HealthcareTestSuite):
 		frappe.db.set_single_value("Healthcare Settings", "max_visits", 3)
 		frappe.db.set_single_value("Healthcare Settings", "valid_days", 30)
 
-		patient = create_patient()
-		assert check_is_new_patient(patient)
-		payment_required = check_payment_reqd(patient)
+		patient = frappe.new_doc("Patient")
+		patient.first_name = "_Test Patient 99"
+		patient.sex = "Female"
+		patient.save(ignore_permissions=True)
+		assert check_is_new_patient(patient.name)
+		payment_required = check_payment_reqd(patient.name)
 		assert payment_required is True
 
 	def test_sales_invoice_should_be_generated_for_new_patient_appointment(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 		invoice_count = frappe.db.count("Sales Invoice")
 
-		assert check_is_new_patient(patient)
-		create_appointment(patient, practitioner, nowdate())
+		assert check_is_new_patient(self.patient)
+		create_appointment(self.patient, self.practitioner, nowdate())
 		new_invoice_count = frappe.db.count("Sales Invoice")
 
 		assert new_invoice_count == invoice_count + 1
 
 	def test_patient_appointment_should_consider_permissions_while_fetching_appointments(self):
-		patient, practitioner = create_healthcare_docs()
-		create_appointment(patient, practitioner, nowdate())
+		create_appointment(self.patient, self.practitioner, nowdate())
 
-		patient, new_practitioner = create_healthcare_docs(id=5)
-		create_appointment(patient, new_practitioner, nowdate())
+		new_patient = frappe.get_list("Patient", pluck="name")[1]
+		new_practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[1]
+		create_appointment(new_patient, new_practitioner, nowdate())
 
-		roles = [{"doctype": "Has Role", "role": "Physician"}]
-		user = create_user(roles=roles)
+		user = frappe.get_doc("User", "gp@marleyhealth.io")
 		new_practitioner = frappe.get_doc("Healthcare Practitioner", new_practitioner)
 		new_practitioner.user_id = user.email
 		new_practitioner.save()
@@ -455,46 +417,51 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_overlap_appointment(self):
 		from healthcare.healthcare.doctype.patient_appointment.patient_appointment import OverlapError
 
-		patient, practitioner = create_healthcare_docs(id=1)
-		patient_1, practitioner_1 = create_healthcare_docs(id=2)
+		patient_1 = frappe.get_list("Patient", pluck="name")[1]
+		practitioner_1 = frappe.get_list("Healthcare Practitioner", pluck="name")[1]
+
 		service_unit = create_service_unit(id=0)
 		service_unit_1 = create_service_unit(id=1)
-		appointment = create_appointment(patient, practitioner, nowdate(), service_unit=service_unit)  # valid
+		appointment = create_appointment(
+			self.patient, self.practitioner, nowdate(), service_unit=service_unit
+		)  # valid
 
 		# patient and practitioner cannot have overlapping appointments
-		appointment = create_appointment(patient, practitioner, nowdate(), service_unit=service_unit, save=0)
+		appointment = create_appointment(
+			self.patient, self.practitioner, nowdate(), service_unit=service_unit, save=0
+		)
 		self.assertRaises(OverlapError, appointment.save)
 		appointment = create_appointment(
-			patient, practitioner, nowdate(), service_unit=service_unit_1, save=0
+			self.patient, self.practitioner, nowdate(), service_unit=service_unit_1, save=0
 		)  # diff service unit
 		self.assertRaises(OverlapError, appointment.save)
 		appointment = create_appointment(
-			patient, practitioner, nowdate(), save=0
+			self.patient, self.practitioner, nowdate(), save=0
 		)  # with no service unit link
 		self.assertRaises(OverlapError, appointment.save)
 
 		# patient cannot have overlapping appointments with other practitioners
 		appointment = create_appointment(
-			patient, practitioner_1, nowdate(), service_unit=service_unit, save=0
+			self.patient, practitioner_1, nowdate(), service_unit=service_unit, save=0
 		)
 		self.assertRaises(OverlapError, appointment.save)
 		appointment = create_appointment(
-			patient, practitioner_1, nowdate(), service_unit=service_unit_1, save=0
+			self.patient, practitioner_1, nowdate(), service_unit=service_unit_1, save=0
 		)
 		self.assertRaises(OverlapError, appointment.save)
-		appointment = create_appointment(patient, practitioner_1, nowdate(), save=0)
+		appointment = create_appointment(self.patient, practitioner_1, nowdate(), save=0)
 		self.assertRaises(OverlapError, appointment.save)
 
 		# practitioner cannot have overlapping appointments with other patients
 		appointment = create_appointment(
-			patient_1, practitioner, nowdate(), service_unit=service_unit, save=0
+			patient_1, self.practitioner, nowdate(), service_unit=service_unit, save=0
 		)
 		self.assertRaises(OverlapError, appointment.save)
 		appointment = create_appointment(
-			patient_1, practitioner, nowdate(), service_unit=service_unit_1, save=0
+			patient_1, self.practitioner, nowdate(), service_unit=service_unit_1, save=0
 		)
 		self.assertRaises(OverlapError, appointment.save)
-		appointment = create_appointment(patient_1, practitioner, nowdate(), save=0)
+		appointment = create_appointment(patient_1, self.practitioner, nowdate(), save=0)
 		self.assertRaises(OverlapError, appointment.save)
 
 	def test_service_unit_capacity(self):
@@ -503,11 +470,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 			OverlapError,
 		)
 
-		practitioner = create_practitioner()
+		patient = frappe.get_list("Patient", pluck="name")[1]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[1]
+
 		capacity = 3
-		overlap_service_unit_type = create_service_unit_type(
-			id=10, allow_appointments=1, overlap_appointments=1
-		)
+		overlap_service_unit_type = "_Test Service Unit Type - Overlapping Appointments"
 		overlap_service_unit = create_service_unit(
 			id=100, service_unit_type=overlap_service_unit_type, service_unit_capacity=capacity
 		)
@@ -527,8 +494,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertRaises(MaximumCapacityError, appointment.save)
 
 	def test_tele_consultation(self):
-		patient, practitioner = create_healthcare_docs()
-		appointment = create_appointment(patient, practitioner, nowdate())
+		appointment = create_appointment(self.patient, self.practitioner, nowdate())
 		self.assertTrue(appointment.event)
 		test_appointment_reschedule(self, appointment)
 		test_appointment_cancel(self, appointment)
@@ -536,8 +502,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_appointment_based_on_check_in(self):
 		from healthcare.healthcare.doctype.patient_appointment.patient_appointment import OverlapError
 
-		patient, practitioner = create_healthcare_docs(id=1)
-		patient_1, practitioner_1 = create_healthcare_docs(id=2)
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+
+		patient_1 = frappe.get_list("Patient", pluck="name")[1]
+		practitioner_1 = frappe.get_list("Healthcare Practitioner", pluck="name")[1]
 
 		create_appointment(
 			patient,
@@ -578,14 +547,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		# different practitioner can have multiple same time and date appointments for different patients
 		self.assertTrue(appointment_2.name)
 
-		# appointment booked for department
-		appointment_type = create_appointment_type(
-			args={
-				"name": "_Test Department",
-				"allow_booking_for": "Department",
-				"duration": 15,
-			}
-		)
+		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Department")
 		medical_department = "_Test Medical Department 0"
 		dept_appointment = create_appointment(
 			patient,
@@ -615,13 +577,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		# appointment booked for service unit
 		service_unit = create_service_unit(id=2)
-		appointment_type = create_appointment_type(
-			args={
-				"name": "_Test Service Unit",
-				"allow_booking_for": "Service Unit",
-				"duration": 15,
-			}
-		)
+		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Service Unit")
 		su_appointment = create_appointment(
 			patient,
 			None,
@@ -649,10 +605,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertEqual(su_appointment_1.position_in_queue, 2)
 
 	def test_appointment_against_an_order(self):
-		patient, practitioner = create_healthcare_docs()
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 0)
-		appointment = create_appointment(patient, practitioner, nowdate())
-		procedure_template = create_clinical_procedure_template()
+		appointment = create_appointment(self.patient, self.practitioner, nowdate())
+		procedure_template = frappe.get_doc(
+			"Clinical Procedure Template", "_Test Procedure - Knee Surgery and Rehab"
+		)
 		encounter = create_encounter(appointment, procedure_template=procedure_template)
 
 		service_request = frappe.db.exists(
@@ -666,97 +623,92 @@ class TestPatientAppointment(HealthcareTestSuite):
 		self.assertTrue(service_request)
 
 		appointment = create_appointment(
-			patient,
-			practitioner,
+			self.patient,
+			self.practitioner,
 			nowdate(),
 			procedure_template=procedure_template.name,
 			service_request=service_request,
 		)
-
-		_procedure = make_clinical_procedure(service_request, appointment.name).save()
+		make_clinical_procedure(service_request, appointment.name).save()
 
 		self.assertTrue(
 			frappe.db.exists(
 				"Clinical Procedure",
 				{
 					"service_request": service_request,
-					"patient": patient,
+					"patient": self.patient,
 					"docstatus": 0,
 				},
 			)
 		)
-
 		self.assertEqual(frappe.db.get_value("Patient Appointment", appointment.name, "status"), "Closed")
 
 	def test_overlap_with_unavailable_same_scope_is_blocked(self):
-		patient, practitioner = create_healthcare_docs()
 		create_practitioner_availability(
 			"09:00:00",
 			"12:00:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			service_unit="Service Unit-A",
 		)
 		create_practitioner_availability(
 			"10:15:00",
 			"10:45:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			service_unit="Service Unit-A",
 			type="Unavailable",
 		)
 		with self.assertRaises(frappe.ValidationError):
 			create_appointment(
-				patient,
-				practitioner,
+				self.patient,
+				self.practitioner,
 				service_unit="Service Unit-A",
 				appointment_date=nowdate(),
 				appointment_time="10:30:00",
 			)
 
 	def test_touching_unavailable_is_allowed(self):
-		patient, practitioner = create_healthcare_docs()
 		create_practitioner_availability(
 			"09:00:00",
 			"12:00:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			service_unit="Service Unit-A",
 		)
 		create_practitioner_availability(
 			"10:00:00",
 			"10:30:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			type="Unavailable",
 		)
 		create_appointment(
-			patient,
-			practitioner,
+			self.patient,
+			self.practitioner,
 			service_unit="Service Unit-A",
 			appointment_date=nowdate(),
 			appointment_time="10:30:00",
 		)
 
 	def test_after_unavailable_is_allowed(self):
-		patient, practitioner = create_healthcare_docs()
 		create_practitioner_availability(
 			"09:00:00",
 			"12:00:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			service_unit="Service Unit-A",
 		)
 		create_practitioner_availability(
 			"10:00:00",
 			"10:30:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			type="Unavailable",
 		)
 		create_appointment(
-			patient,
-			practitioner,
+			self.patient,
+			self.practitioner,
 			service_unit="Service Unit-A",
 			appointment_date=nowdate(),
 			appointment_time="10:31:00",
@@ -765,35 +717,33 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_different_scope_is_allowed(self):
 		create_practitioner_availability("09:00:00", "12:00:00", scope="A")
 		create_practitioner_availability("10:00:00", "10:30:00", scope="A", type="Unavailable")
-		patient, practitioner = create_healthcare_docs()
 		create_appointment(
-			patient,
-			practitioner,
+			self.patient,
+			self.practitioner,
 			service_unit="Service Unit-B",
 			appointment_date=nowdate(),
 			appointment_time="10:15:00",
 		)
 
 	def test_cancelled_unavailability_is_ignored(self):
-		patient, practitioner = create_healthcare_docs()
 		create_practitioner_availability(
 			"09:00:00",
 			"12:00:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			service_unit="Service Unit-A",
 		)
 		u = create_practitioner_availability(
 			"10:00:00",
 			"10:30:00",
-			scope=practitioner,
+			scope=self.practitioner,
 			scope_type="Healthcare Practitioner",
 			type="Unavailable",
 		)
 		u.submit().cancel()
 		create_appointment(
-			patient,
-			practitioner,
+			self.patient,
+			self.practitioner,
 			service_unit="Service Unit-A",
 			appointment_date=nowdate(),
 			appointment_time="10:15:00",
@@ -818,25 +768,24 @@ class TestPatientAppointment(HealthcareTestSuite):
 			doc.insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
 
 	def test_scope_priority_practitioner(self):
-		patient, practitioner = create_healthcare_docs()
 		create_practitioner_availability(
 			"09:00:00",
 			"12:00:00",
 			scope_type="Healthcare Practitioner",
-			scope=practitioner,
+			scope=self.practitioner,
 			service_unit="Service Unit-A",
 		)
 		create_practitioner_availability(
 			"10:00:00",
 			"10:30:00",
 			scope_type="Healthcare Practitioner",
-			scope=practitioner,
+			scope=self.practitioner,
 			type="Unavailable",
 		)
 		with self.assertRaises(frappe.ValidationError):
 			create_appointment(
-				patient,
-				practitioner,
+				self.patient,
+				self.practitioner,
 				department="Ortho",
 				service_unit="Service Unit-A",
 				appointment_date=nowdate(),
@@ -847,9 +796,8 @@ class TestPatientAppointment(HealthcareTestSuite):
 		create_practitioner_availability("13:00:00", "14:00:00", scope="Service Unit-A")
 		create_practitioner_availability("13:15:00", "13:30:00", scope="Service Unit-A", type="Unavailable")
 		with self.assertRaises(frappe.ValidationError):
-			patient, _practitioner = create_healthcare_docs()
 			create_appointment(
-				patient,
+				self.patient,
 				department="Ortho",
 				service_unit="Service Unit-A",
 				appointment_date=nowdate(),
@@ -859,11 +807,10 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_any_scope_field_matching_blocks(self):
 		create_practitioner_availability("09:00:00", "11:30:00", scope="Service Unit-A")
 		create_practitioner_availability("10:00:00", "10:30:00", scope="Service Unit-A", type="Unavailable")
-		patient, practitioner = create_healthcare_docs()
 		with self.assertRaises(frappe.ValidationError):
 			create_appointment(
-				patient,
-				practitioner,
+				self.patient,
+				self.practitioner,
 				department="Ortho",
 				service_unit="Service Unit-A",
 				appointment_date=nowdate(),
@@ -873,12 +820,11 @@ class TestPatientAppointment(HealthcareTestSuite):
 	def test_department_match_blocks_even_if_service_unit_differs(self):
 		create_practitioner_availability("13:00:00", "14:00:00", scope="Ortho")
 		create_practitioner_availability("13:15:00", "13:30:00", scope="Ortho", type="Unavailable")
-		patient, practitioner = create_healthcare_docs()
 		# department matches Unavailable scope; service_unit differs -> still blocked
 		with self.assertRaises(frappe.ValidationError):
 			create_appointment(
-				patient,
-				practitioner,
+				self.patient,
+				self.practitioner,
 				department="Ortho",
 				service_unit="Service Unit-A",
 				appointment_date=nowdate(),
@@ -1005,7 +951,7 @@ def create_appointment(
 	appointment.appointment_date = appointment_date or nowdate()
 	appointment.company = "_Test Company"
 	appointment.duration = duration
-	appointment.appointment_type = appointment_type or create_appointment_type().name
+	appointment.appointment_type = appointment_type or "_Test Appointment Type"
 
 	if service_unit:
 		appointment.service_unit = service_unit
@@ -1131,7 +1077,7 @@ def create_service_unit(id=0, service_unit_type=None, service_unit_capacity=0):
 	service_unit = frappe.new_doc("Healthcare Service Unit")
 	service_unit.is_group = 0
 	service_unit.healthcare_service_unit_name = f"_Test Service Unit {id!s}"
-	service_unit.service_unit_type = service_unit_type or create_service_unit_type(id)
+	service_unit.service_unit_type = service_unit_type or "_Test Service Unit Type - Appointments"
 	service_unit.service_unit_capacity = service_unit_capacity
 	service_unit.company = "_Test Company"
 	service_unit.save(ignore_permissions=True)
