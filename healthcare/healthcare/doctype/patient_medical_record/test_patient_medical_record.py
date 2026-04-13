@@ -53,7 +53,6 @@ class TestPatientMedicalRecord(HealthcareTestSuite):
 		)
 		self.assertTrue(medical_rec)
 
-		# template = create_lab_test_template(medical_department)
 		template = frappe.get_doc("Lab Test Template", "_Test Lab Test - with Sample")
 		lab_test = create_lab_test(template.name, patient)
 		# check for lab test
@@ -109,6 +108,10 @@ def create_lab_test(template, patient):
 	lab_test.patient = patient
 	lab_test.patient_sex = frappe.db.get_value("Patient", patient, "sex")
 	lab_test.template = template
+	lab_test.save()
+	lab_test.descriptive_test_items[0].result_value = 12
+	lab_test.descriptive_test_items[1].result_value = 1
+	lab_test.descriptive_test_items[2].result_value = 2.3
 	lab_test.save()
 	lab_test.submit()
 	return lab_test
