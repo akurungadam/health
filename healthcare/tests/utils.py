@@ -30,6 +30,7 @@ class BootStrapTestData:
 		self.make_therapy_plan_templates()
 		self.make_medication_classes()
 		self.make_medications()
+		self.make_treatment_plan_templates()
 		self.make_insurance_payors()
 
 	def make_insurance_payors(self):
@@ -47,6 +48,22 @@ class BootStrapTestData:
 			},
 		]
 		self.make_records(["insurance_payor_name"], records)
+
+	def make_treatment_plan_templates(self):
+		records = [
+			{
+				"doctype": "Treatment Plan Template",
+				"template_name": "COVID19",
+				"medical_department": "_Test Medical Department",
+				"disabled": 0,
+				"is_inpatient": 1,
+				"treatment_counselling_required_for_ip": 1,
+				"items":[
+					{"type": "Observation Template", "template": "_Test COVID RT PCR", "qty": 1},
+				]
+			},
+		]
+		self.make_records(["template_name"], records)
 
 	def make_medications(self):
 		records = [
@@ -286,6 +303,19 @@ class BootStrapTestData:
 				"observation": "_Test Observation Formula Result 2",
 				"abbr": "TFR2",
 				"item_code": "_Test Observation Formula Result 2",
+				"observation_category": "Laboratory",
+				"permitted_data_type": "Quantity",
+				"permitted_unit": "mg / dl",
+				"item_group": "Services",
+				"sample_collection_required": 0,
+				"is_billable": 1,
+				"rate": 300,
+			},
+			{
+				"doctype": "Observation Template",
+				"observation": "_Test COVID RT PCR",
+				"abbr": "RTPCR",
+				"item_code": "_Test COVID RT PCR",
 				"observation_category": "Laboratory",
 				"permitted_data_type": "Quantity",
 				"permitted_unit": "mg / dl",
