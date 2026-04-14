@@ -9,10 +9,6 @@ from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings impor
 	get_income_account,
 	get_receivable_account,
 )
-from healthcare.healthcare.doctype.lab_test.test_lab_test import create_practitioner
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -403,8 +399,8 @@ def create_sales_invoice(patient, item):
 def create_patient_encounter(patient, observation_template):
 	patient_encounter = frappe.new_doc("Patient Encounter")
 	patient_encounter.patient = patient
-	patient_encounter.practitioner = create_practitioner()
-	patient_encounter.appointment_type = create_appointment_type().name
+	patient_encounter.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+	patient_encounter.appointment_type = "_Test Appointment Type"
 	patient_encounter.encounter_date = getdate()
 	patient_encounter.encounter_time = nowtime()
 
