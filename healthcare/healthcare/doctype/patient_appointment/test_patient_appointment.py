@@ -286,7 +286,9 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 	def test_department_appointment_cancel_with_fee_validity_setting_on(self):
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 1)
-		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Department")
+		appointment_type = frappe.get_doc(
+			"Appointment Type", "_Test Appointment Type with Items for Department"
+		)
 		appointment = create_appointment(
 			patient=self.patient,
 			department="_Test Medical Department",
@@ -547,7 +549,9 @@ class TestPatientAppointment(HealthcareTestSuite):
 		# different practitioner can have multiple same time and date appointments for different patients
 		self.assertTrue(appointment_2.name)
 
-		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Department")
+		appointment_type = frappe.get_doc(
+			"Appointment Type", "_Test Appointment Type with Items for Department"
+		)
 		medical_department = "_Test Medical Department 0"
 		dept_appointment = create_appointment(
 			patient,
@@ -577,7 +581,9 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		# appointment booked for service unit
 		service_unit = create_service_unit(id=2)
-		appointment_type = frappe.get_doc("Appointment Type", "_Test Appointment Type with Items for Service Unit")
+		appointment_type = frappe.get_doc(
+			"Appointment Type", "_Test Appointment Type with Items for Service Unit"
+		)
 		su_appointment = create_appointment(
 			patient,
 			None,
@@ -1055,19 +1061,6 @@ def create_user(email=None, roles=None):
 			}
 		).insert()
 	return user
-
-
-def create_service_unit_type(id=0, allow_appointments=1, overlap_appointments=0):
-	if frappe.db.exists("Healthcare Service Unit Type", f"_Test Service Unit Type {id!s}"):
-		return f"_Test Service Unit Type {id!s}"
-
-	service_unit_type = frappe.new_doc("Healthcare Service Unit Type")
-	service_unit_type.service_unit_type = f"_Test Service Unit Type {id!s}"
-	service_unit_type.allow_appointments = allow_appointments
-	service_unit_type.overlap_appointments = overlap_appointments
-	service_unit_type.save(ignore_permissions=True)
-
-	return service_unit_type.name
 
 
 def create_service_unit(id=0, service_unit_type=None, service_unit_capacity=0):
