@@ -10,10 +10,6 @@ from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings impor
 	get_receivable_account,
 )
 from healthcare.healthcare.doctype.lab_test.lab_test import create_multiple
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-	create_patient,
-)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -127,7 +123,7 @@ def create_lab_test_template(test_sensitivity=0, sample_collection=1):
 
 
 def create_lab_test(lab_template):
-	patient = create_patient()
+	patient = frappe.get_list("Patient", pluck="name")[0]
 	lab_test = frappe.new_doc("Lab Test")
 	lab_test.template = lab_template.name
 	lab_test.patient = patient
@@ -192,9 +188,9 @@ def create_patient_encounter():
 	blood_test_template = frappe.get_doc("Lab Test Template", "_Test Lab Test - with Sample")
 
 	patient_encounter = frappe.new_doc("Patient Encounter")
-	patient_encounter.appointment_type = create_appointment_type().name
+	patient_encounter.appointment_type = "_Test Appointment Type"
 	patient_encounter.patient = patient
-	patient_encounter.practitioner = create_practitioner()
+	patient_encounter.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 	patient_encounter.encounter_date = getdate()
 	patient_encounter.encounter_time = nowtime()
 
@@ -206,18 +202,3 @@ def create_patient_encounter():
 
 	patient_encounter.submit()
 	return patient_encounter
-
-
-def create_practitioner():
-	practitioner = frappe.db.exists("Healthcare Practitioner", "_Test Healthcare Practitioner")
-
-	if not practitioner:
-		practitioner = frappe.new_doc("Healthcare Practitioner")
-		practitioner.first_name = "_Test Healthcare Practitioner"
-		practitioner.gender = "Female"
-		practitioner.op_consulting_charge = 500
-		practitioner.inpatient_visit_charge = 500
-		practitioner.save(ignore_permissions=True)
-		practitioner = practitioner.name
-
-	return practitioner
