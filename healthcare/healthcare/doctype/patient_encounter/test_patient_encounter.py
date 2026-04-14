@@ -13,12 +13,8 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatientEncounter(HealthcareTestSuite):
 	def setUp(self):
-		try:
-			gender_m = frappe.get_doc({"doctype": "Gender", "gender": "MALE"}).insert()
-			gender_f = frappe.get_doc({"doctype": "Gender", "gender": "FEMALE"}).insert()
-		except frappe.exceptions.DuplicateEntryError:
-			gender_m = frappe.get_doc({"doctype": "Gender", "gender": "MALE"})
-			gender_f = frappe.get_doc({"doctype": "Gender", "gender": "FEMALE"})
+		gender_m = frappe.get_doc({"doctype": "Gender", "gender": "Male"})
+		gender_f = frappe.get_doc({"doctype": "Gender", "gender": "Female"})
 
 		self.patient_male = frappe.get_doc(
 			{
@@ -38,7 +34,7 @@ class TestPatientEncounter(HealthcareTestSuite):
 			{
 				"doctype": "Healthcare Practitioner",
 				"first_name": "Doc",
-				"sex": "MALE",
+				"sex": "Male",
 			}
 		).insert()
 		try:
