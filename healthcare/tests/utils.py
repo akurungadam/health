@@ -58,9 +58,9 @@ class BootStrapTestData:
 				"disabled": 0,
 				"is_inpatient": 1,
 				"treatment_counselling_required_for_ip": 1,
-				"items":[
+				"items": [
 					{"type": "Observation Template", "template": "_Test COVID RT PCR", "qty": 1},
-				]
+				],
 			},
 		]
 		self.make_records(["template_name"], records)
@@ -726,6 +726,14 @@ class BootStrapTestData:
 				"doctype": "Item",
 				"item_code": "_Test_Service_Item",
 				"item_name": "_Test_Service_Item",
+				"item_group": "Services",
+				"is_stock_item": 0,
+				"stock_uom": "Nos",
+			},
+			{
+				"doctype": "Item",
+				"item_code": "_Test Registration",
+				"item_name": "_Test Registration",
 				"item_group": "Services",
 				"is_stock_item": 0,
 				"stock_uom": "Nos",
