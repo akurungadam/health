@@ -15,7 +15,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 class TestPatient(HealthcareTestSuite):
 	def test_customer_created(self):
 		frappe.db.set_single_value("Healthcare Settings", "link_customer_to_patient", 1)
-		patient = frappe.get_list("Patient", pluck="name")[0]
+		patient = "_Test Patient"
 		self.assertTrue(frappe.db.get_value("Patient", patient, "customer"))
 
 	def test_patient_registration(self):
