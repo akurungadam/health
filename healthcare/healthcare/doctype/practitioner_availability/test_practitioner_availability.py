@@ -6,8 +6,6 @@ from frappe.utils import nowdate
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment,
-	create_patient,
-	create_practitioner,
 )
 from healthcare.tests.utils import HealthcareTestSuite
 

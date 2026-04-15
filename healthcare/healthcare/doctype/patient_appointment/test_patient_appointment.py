@@ -314,8 +314,8 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		patient = create_patient()
-		practitioner = create_practitioner()
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 		# Schedule Admission
 		ip_record = create_inpatient(patient)
 		ip_record.expected_length_of_stay = 0
@@ -482,14 +482,14 @@ class TestPatientAppointment(HealthcareTestSuite):
 		)
 
 		for i in range(0, capacity):
-			patient = create_patient(id=i)
+			patient = frappe.get_list("Patient", pluck="name")[i]
 			create_appointment(patient, practitioner, nowdate(), service_unit=overlap_service_unit)  # valid
 			appointment = create_appointment(
 				patient, practitioner, nowdate(), service_unit=overlap_service_unit, save=0
 			)  # overlap
 			self.assertRaises(OverlapError, appointment.save)
 
-		patient = create_patient(id=capacity)
+		patient = frappe.get_list("Patient", pluck="name")[5]
 		appointment = create_appointment(
 			patient, practitioner, nowdate(), service_unit=overlap_service_unit, save=0
 		)
@@ -857,13 +857,6 @@ def create_practitioner_availability(
 	).insert(ignore_permissions=True, ignore_links=True, ignore_if_duplicate=True)
 
 
-def create_healthcare_docs(id=0):
-	patient = create_patient(id)
-	practitioner = create_practitioner(id)
-
-	return patient, practitioner
-
-
 def create_patient(id=0, patient_name=None, email=None, mobile=None, customer=None, create_user=False):
 	if frappe.db.exists("Patient", {"firstname": f"_Test Patient {id!s}"}):
 		patient = frappe.db.get_value("Patient", {"first_name": f"_Test Patient {id!s}"}, ["name"])
@@ -946,7 +939,7 @@ def create_appointment(
 	service_request=None,
 	duration=15,
 ):
-	item = create_healthcare_service_items()
+	item = "HLC-SI-001"
 	frappe.db.set_single_value("Healthcare Settings", "inpatient_visit_charge_item", item)
 	frappe.db.set_single_value("Healthcare Settings", "op_consulting_charge_item", item)
 	appointment = frappe.new_doc("Patient Appointment")
@@ -981,86 +974,6 @@ def create_appointment(
 			invoice_appointment(appointment.name, discount_percentage, discount_amount)
 
 	return appointment
-
-
-def create_healthcare_service_items():
-	if frappe.db.exists("Item", "HLC-SI-001"):
-		return "HLC-SI-001"
-
-	item = frappe.new_doc("Item")
-	item.item_code = "HLC-SI-001"
-	item.item_name = "Consulting Charges"
-	item.item_group = "Services"
-	item.is_stock_item = 0
-	item.stock_uom = "Nos"
-	item.save()
-
-	return item.name
-
-
-def create_clinical_procedure_template():
-	if frappe.db.exists("Clinical Procedure Template", "Knee Surgery and Rehab"):
-		return frappe.get_doc("Clinical Procedure Template", "Knee Surgery and Rehab")
-
-	template = frappe.new_doc("Clinical Procedure Template")
-	template.template = "Knee Surgery and Rehab"
-	template.item_code = "Knee Surgery and Rehab"
-	template.item_group = "Services"
-	template.is_billable = 1
-	template.description = "Knee Surgery and Rehab"
-	template.rate = 50000
-	template.save()
-
-	return template
-
-
-def create_appointment_type(args=None):  # nosemgrep
-	if not args:
-		args = frappe.local.form_dict
-
-	name = args.get("name", "_Test Appointment Type")
-
-	if frappe.db.exists("Appointment Type", name):
-		return frappe.get_doc("Appointment Type", name)
-
-	else:
-		item = create_healthcare_service_items()
-		items = [
-			{
-				"dt": "Medical Department",
-				"dn": args.get("medical_department") or "_Test Medical Department",
-				"op_consulting_charge_item": item,
-				"op_consulting_charge": args.get("op_consulting_charge", 200),
-			}
-		]
-		return frappe.get_doc(
-			{
-				"doctype": "Appointment Type",
-				"appointment_type": name,
-				"allow_booking_for": args.get("allow_booking_for", "Practitioner"),
-				"default_duration": args.get("default_duration", 20),
-				"color": args.get("color", "#7575ff"),
-				"price_list": args.get("price_list") or frappe.db.get_value("Price List", {"selling": 1}),
-				"items": args.get("items") or items,
-			}
-		).insert()
-
-
-def create_user(email=None, roles=None):
-	if not email:
-		email = f"{frappe.utils.random_string(10)}@frappe.com"
-	user = frappe.db.exists("User", email)
-	if not user:
-		user = frappe.get_doc(
-			{
-				"doctype": "User",
-				"email": email,
-				"first_name": "test_user",
-				"password": "password",
-				"roles": roles,
-			}
-		).insert()
-	return user
 
 
 def create_service_unit(id=0, service_unit_type=None, service_unit_capacity=0):
