@@ -8,14 +8,11 @@ from healthcare.healthcare.doctype.item_insurance_eligibility.item_insurance_eli
 	CoverageOverlapError,
 	get_insurance_eligibility,
 )
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
 class TestItemInsuranceEligibility(HealthcareTestSuite):
-	def test_validate_overlap(self):
+	def test_validate_eligibility_overlap(self):
 		frappe.db.sql("""delete from `tabAppointment Type` where name = '_Test Appointment'""")
 		frappe.db.sql("""delete from `tabItem Insurance Eligibility`""")
 
@@ -23,7 +20,7 @@ class TestItemInsuranceEligibility(HealthcareTestSuite):
 		args = {
 			"medical_department": medical_department,
 		}
-		appointment_type = create_appointment_type(args).name
+		appointment_type = "_Test Appointment Type"
 
 		args = frappe._dict(
 			{
@@ -65,7 +62,7 @@ class TestItemInsuranceEligibility(HealthcareTestSuite):
 		args = {
 			"medical_department": medical_department,
 		}
-		appointment_type = create_appointment_type(args).name
+		appointment_type = "_Test Appointment Type"
 
 		args = frappe._dict(
 			{
