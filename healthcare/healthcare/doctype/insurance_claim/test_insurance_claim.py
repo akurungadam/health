@@ -23,6 +23,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestInsuranceClaim(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		self.patient = frappe.get_list("Patient", pluck="name")[0]
 		self.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 

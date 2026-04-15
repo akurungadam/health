@@ -22,6 +22,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatientAppointment(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		frappe.db.sql("""delete from `tabPatient Appointment`""")
 		frappe.db.sql("""delete from `tabFee Validity`""")
 		frappe.db.sql("""delete from `tabPatient Encounter`""")

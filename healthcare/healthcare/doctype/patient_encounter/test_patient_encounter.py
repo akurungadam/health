@@ -10,6 +10,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatientEncounter(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		gender_m = frappe.get_doc({"doctype": "Gender", "gender": "Male"})
 		gender_f = frappe.get_doc({"doctype": "Gender", "gender": "Female"})
 
