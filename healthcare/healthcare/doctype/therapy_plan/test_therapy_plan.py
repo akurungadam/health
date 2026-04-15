@@ -113,7 +113,7 @@ def create_therapy_plan_template():
 		rate = frappe.db.get_value("Therapy Type", therapy_type, "rate")
 		template.append(
 			"therapy_types",
-			{"therapy_type": therapy_type.name, "no_of_sessions": 2, "rate": rate, "amount": 2 * flt(rate)},
+			{"therapy_type": therapy_type, "no_of_sessions": 2, "rate": rate, "amount": 2 * flt(rate)},
 		)
 		template.save()
 		template_name = template.name
