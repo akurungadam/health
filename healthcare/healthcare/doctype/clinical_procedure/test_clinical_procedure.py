@@ -4,9 +4,6 @@
 
 import frappe
 
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_clinical_procedure_template,
-)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -95,3 +92,19 @@ def create_procedure(procedure_template, patient, practitioner):
 	procedure.start_time = frappe.utils.nowtime()
 	procedure.submit()
 	return procedure
+
+
+def create_clinical_procedure_template():
+	if frappe.db.exists("Clinical Procedure Template", "Knee Surgery and Rehab"):
+		return frappe.get_doc("Clinical Procedure Template", "Knee Surgery and Rehab")
+
+	template = frappe.new_doc("Clinical Procedure Template")
+	template.template = "Knee Surgery and Rehab"
+	template.item_code = "Knee Surgery and Rehab"
+	template.item_group = "Services"
+	template.is_billable = 1
+	template.description = "Knee Surgery and Rehab"
+	template.rate = 50000
+	template.save()
+
+	return template

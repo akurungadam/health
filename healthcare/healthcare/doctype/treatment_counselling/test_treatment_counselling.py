@@ -5,9 +5,6 @@ import frappe
 from frappe.utils.data import getdate, nowtime
 
 from healthcare.healthcare.doctype.inpatient_record.inpatient_record import schedule_inpatient
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -55,9 +52,10 @@ class TestTreatmentCounselling(HealthcareTestSuite):
 			),
 		)
 
+
 def create_patient_encounter(patient):
 	patient_encounter = frappe.new_doc("Patient Encounter")
-	patient_encounter.appointment_type = create_appointment_type().name
+	patient_encounter.appointment_type = "_Test Appointment Type"
 	patient_encounter.patient = patient
 	patient_encounter.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 	patient_encounter.encounter_date = getdate()
