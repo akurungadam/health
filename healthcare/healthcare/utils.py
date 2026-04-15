@@ -1491,34 +1491,34 @@ def update_patient_email_and_phone_numbers(contact, method):
 				frappe.db.set_value("Patient", link.get("link_name"), "phone", contact.phone)
 
 
-def before_tests():
-	# complete setup if missing
-	from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
+# def before_tests():
+# 	# complete setup if missing
+# 	from frappe.desk.page.setup_wizard.setup_wizard import setup_complete
 
-	current_year = frappe.utils.now_datetime().year
+# 	current_year = frappe.utils.now_datetime().year
 
-	if not frappe.get_list("Company"):
-		setup_complete(
-			{
-				"currency": "INR",
-				"full_name": "Test User",
-				"company_name": "Frappe Care LLC",
-				"timezone": "America/New_York",
-				"company_abbr": "WP",
-				"industry": "Healthcare",
-				"country": "United States",
-				"fy_start_date": f"{current_year}-01-01",
-				"fy_end_date": f"{current_year}-12-31",
-				"language": "english",
-				"company_tagline": "Testing",
-				"email": "test@erpnext.com",
-				"password": "test",
-				"chart_of_accounts": "Standard",
-				"domains": ["Healthcare"],
-			}
-		)
+# 	if not frappe.get_list("Company"):
+# 		setup_complete(
+# 			{
+# 				"currency": "INR",
+# 				"full_name": "Test User",
+# 				"company_name": "Frappe Care LLC",
+# 				"timezone": "America/New_York",
+# 				"company_abbr": "FC",
+# 				"industry": "Healthcare",
+# 				"country": "United States",
+# 				"fy_start_date": f"{current_year}-01-01",
+# 				"fy_end_date": f"{current_year}-12-31",
+# 				"language": "english",
+# 				"company_tagline": "Testing",
+# 				"email": "test@erpnext.com",
+# 				"password": "test",
+# 				"chart_of_accounts": "Standard",
+# 				"domains": ["Healthcare"],
+# 			}
+# 		)
 
-		setup_healthcare()
+# 		setup_healthcare()
 
 
 def create_healthcare_service_unit_tree_root(doc, method=None):
