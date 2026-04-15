@@ -174,7 +174,7 @@ scheduler_events = {
 # Testing
 # -------
 
-before_tests = "healthcare.healthcare.utils.before_tests"
+# before_tests = "healthcare.healthcare.utils.before_tests"
 
 # Overriding Methods
 # ------------------------------
