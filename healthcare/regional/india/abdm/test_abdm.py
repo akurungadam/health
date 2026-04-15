@@ -8,6 +8,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatient(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		doc = frappe.get_doc(
 			{
 				"doctype": "ABDM Settings",
