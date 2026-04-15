@@ -4,9 +4,6 @@
 
 import frappe
 
-from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
-	create_appointment_type,
-)
 from healthcare.healthcare.doctype.patient_encounter.patient_encounter import PatientEncounter
 from healthcare.tests.utils import HealthcareTestSuite
 
@@ -74,7 +71,7 @@ class TestPatientEncounter(HealthcareTestSuite):
 				"doctype": "Patient Encounter",
 				"patient": self.patient_male.name,
 				"practitioner": self.practitioner.name,
-				"appointment_type": create_appointment_type().name,
+				"appointment_type": "_Test Appointment Type",
 			}
 		).insert()
 		plans = PatientEncounter.get_applicable_treatment_plans(encounter.as_dict())
@@ -85,7 +82,7 @@ class TestPatientEncounter(HealthcareTestSuite):
 				"doctype": "Patient Encounter",
 				"patient": self.patient_female.name,
 				"practitioner": self.practitioner.name,
-				"appointment_type": create_appointment_type().name,
+				"appointment_type": "_Test Appointment Type",
 			}
 		).insert()
 		plans = PatientEncounter.get_applicable_treatment_plans(encounter.as_dict())
