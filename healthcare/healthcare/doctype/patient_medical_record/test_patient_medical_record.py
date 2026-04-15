@@ -9,7 +9,6 @@ from erpnext.accounts.doctype.pos_profile.test_pos_profile import make_pos_profi
 
 from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment import (
 	create_appointment,
-	create_clinical_procedure_template,
 	create_encounter,
 )
 from healthcare.tests.utils import HealthcareTestSuite
