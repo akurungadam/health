@@ -323,7 +323,7 @@ def set_reference_string(child):
 
 
 @frappe.whitelist()
-def edit_observation(observation, data_type, result):
+def edit_observation(observation: str, data_type: str, result: str) -> None:
 	observation_doc = frappe.get_doc("Observation", observation)
 	if data_type in ["Range", "Ratio", "Quantity", "Numeric"]:
 		observation_doc.result_data = result
