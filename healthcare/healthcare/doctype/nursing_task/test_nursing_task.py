@@ -32,10 +32,10 @@ class TestNursingTask(HealthcareTestSuite):
 		self.settings.validate_nursing_checklists = 1
 		self.settings.save()
 		self.nc_template = frappe.get_doc(
-			"Nursing Checklist Template", frappe.get_list("Nursing Checklist Template")[0].name
+			"Nursing Checklist Template", frappe.get_list("Nursing Checklist Template", pluck="name")[0]
 		)
-		self.patient = frappe.get_list("Patient")[0].name
-		self.practitioner = frappe.get_list("Healthcare Practitioner")[0].name
+		self.patient = frappe.get_list("Patient", pluck="name")[0]
+		self.practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
 
 	def test_lab_test_submission_should_validate_pending_nursing_tasks(self):
 		self.lt_template = frappe.get_doc("Lab Test Template", frappe.get_list("Lab Test Template")[0])
@@ -57,7 +57,7 @@ class TestNursingTask(HealthcareTestSuite):
 
 	def test_start_clinical_procedure_should_validate_pending_nursing_tasks(self):
 		procedure_template = frappe.get_doc(
-			"Clinical Procedure Template", frappe.get_list("Clinical Procedure Template")[0].name
+			"Clinical Procedure Template", frappe.get_list("Clinical Procedure Template", pluck="name")[0]
 		)
 		procedure_template.allow_stock_consumption = 1
 		procedure_template.pre_op_nursing_checklist_template = self.nc_template.name
