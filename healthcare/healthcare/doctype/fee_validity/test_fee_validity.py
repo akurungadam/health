@@ -16,6 +16,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestFeeValidity(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		frappe.db.sql("""delete from `tabPatient Appointment`""")
 		frappe.db.sql("""delete from `tabFee Validity`""")
 		make_pos_profile()

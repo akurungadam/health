@@ -20,6 +20,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestInpatientMedicationOrder(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		frappe.db.sql("""delete from `tabInpatient Record`""")
 		self.patient = frappe.get_list("Patient", pluck="name")[0]
 

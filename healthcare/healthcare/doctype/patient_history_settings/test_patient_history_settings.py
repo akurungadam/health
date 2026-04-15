@@ -12,6 +12,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatientHistorySettings(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		dt = create_custom_doctype()
 		settings = frappe.get_single("Patient History Settings")
 		settings.append(
