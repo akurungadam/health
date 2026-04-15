@@ -17,6 +17,7 @@ class IntegrationTestPractitionerAvailability(HealthcareTestSuite):
 	"""
 
 	def setUp(self):
+		super().setUp()
 		frappe.db.sql("DELETE FROM `tabPractitioner Availability`")
 		frappe.db.sql("DELETE FROM `tabPatient Appointment`")
 

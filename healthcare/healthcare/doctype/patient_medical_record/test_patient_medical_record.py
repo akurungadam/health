@@ -16,6 +16,7 @@ from healthcare.tests.utils import HealthcareTestSuite
 
 class TestPatientMedicalRecord(HealthcareTestSuite):
 	def setUp(self):
+		super().setUp()
 		frappe.db.set_single_value("Healthcare Settings", "enable_free_follow_ups", 0)
 		frappe.db.set_single_value("Healthcare Settings", "show_payment_popup", 1)
 		make_pos_profile()
