@@ -103,6 +103,7 @@ class TestPatient(HealthcareTestSuite):
 				"email": "test-patient-user@example.com",
 				"mobile": "+91 0000000009",
 				"invite_user": 1,
+				"customer_group": "Individual",
 			}
 		)
 

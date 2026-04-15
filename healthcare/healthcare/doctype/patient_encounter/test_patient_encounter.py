@@ -18,6 +18,7 @@ class TestPatientEncounter(HealthcareTestSuite):
 				"doctype": "Patient",
 				"first_name": "John",
 				"sex": gender_m.gender,
+				"customer_group": "Individual",
 			}
 		).insert()
 		self.patient_female = frappe.get_doc(
@@ -25,6 +26,7 @@ class TestPatientEncounter(HealthcareTestSuite):
 				"doctype": "Patient",
 				"first_name": "Curie",
 				"sex": gender_f.gender,
+				"customer_group": "Individual",
 			}
 		).insert()
 		self.practitioner = frappe.get_doc(
