@@ -587,31 +587,37 @@ class BootStrapTestData:
 				"doctype": "Patient",
 				"first_name": "_Test Patient",
 				"sex": "Female",
+				"customer_group": "Individual",
 			},
 			{
 				"doctype": "Patient",
 				"first_name": "_Test Patient 0",
 				"sex": "Male",
+				"customer_group": "Individual",
 			},
 			{
 				"doctype": "Patient",
 				"first_name": "_Test Patient 1",
 				"sex": "Male",
+				"customer_group": "Individual",
 			},
 			{
 				"doctype": "Patient",
 				"first_name": "_Test IPD Patient",
 				"sex": "Female",
+				"customer_group": "Individual",
 			},
 			{
 				"doctype": "Patient",
 				"first_name": "_Test Patient 2",
 				"sex": "Female",
+				"customer_group": "Individual",
 			},
 			{
 				"doctype": "Patient",
 				"first_name": "_Test Patient 3",
 				"sex": "Female",
+				"customer_group": "Individual",
 			},
 		]
 		self.make_records(["first_name"], records)
