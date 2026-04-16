@@ -33,8 +33,8 @@ class TestInpatientMedicationEntry(HealthcareTestSuite):
 		frappe.db.sql("""delete from `tabInpatient Record`""")
 		frappe.db.sql("""delete from `tabInpatient Medication Order`""")
 		frappe.db.sql("""delete from `tabInpatient Medication Entry`""")
-		self.patient = frappe.get_list("Patient", pluck="name")[0]
 
+		self.patient = "_Test IPD Patient"
 		# Admit
 		ip_record = create_inpatient(self.patient)
 		ip_record.expected_length_of_stay = 0
