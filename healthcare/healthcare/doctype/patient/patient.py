@@ -80,7 +80,7 @@ class Patient(Document):
 		if not self.customer_group:
 			self.customer_group = frappe.db.get_single_value(
 				"Selling Settings", "customer_group"
-			) or get_root_of("Customer Group")
+			) or frappe.db.exists("Customer Group", "Individual")
 		if not self.territory:
 			self.territory = frappe.db.get_single_value("Selling Settings", "territory") or get_root_of(
 				"Territory"
