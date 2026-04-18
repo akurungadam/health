@@ -393,6 +393,7 @@
    "fieldname": "customer_group",
    "fieldtype": "Link",
    "label": "Customer Group",
+   "link_filters": "[[\"Customer Group\",\"is_group\",\"=\",0]]",
    "options": "Customer Group"
   },
   {
@@ -591,7 +592,11 @@
   }
  ],
  "max_attachments": 50,
+<<<<<<< HEAD
  "modified": "2025-09-02 13:04:27.771400",
+=======
+ "modified": "2026-04-18 12:02:00.596085",
+>>>>>>> f868b85 (fix: only nongroup items are allowed in upstream Customer)
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient",
