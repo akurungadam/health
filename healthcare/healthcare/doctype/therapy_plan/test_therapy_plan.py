@@ -78,9 +78,7 @@ def create_therapy_plan(template=None, patient=None):
 	plan.start_date = getdate()
 	plan.company = "_Test Company"
 	plan.practitioner = practitioner
-	plan.practitioner_name = frappe.db.get_value(
-		"Healthcare Practitioner", practitioner, "practitioner_name"
-	)
+	plan.practitioner_name = frappe.db.get_value("Healthcare Practitioner", practitioner, "practitioner_name")
 
 	if template:
 		plan.therapy_plan_template = template
