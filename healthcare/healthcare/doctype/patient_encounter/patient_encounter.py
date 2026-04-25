@@ -414,6 +414,8 @@ def create_therapy_plan(encounter):
 		doc.source_doc = encounter.doctype
 		doc.order_group = encounter.name
 		doc.company = encounter.company
+		doc.practitioner = encounter.practitioner
+		doc.practitioner_name = encounter.practitioner_name
 		for entry in encounter.therapies:
 			doc.append(
 				"therapy_plan_details",
