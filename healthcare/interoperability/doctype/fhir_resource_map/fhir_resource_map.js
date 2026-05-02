@@ -10,12 +10,6 @@
 const API_METHODS = {
 	load_structure_definition_elements:
 		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.load_structure_definition_elements",
-	resolve_fhir_values:
-		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.resolve_fhir_values",
-	preview_fhir_resource:
-		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.preview_fhir_resource",
-	validate_fhir_mapping:
-		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.validate_fhir_mapping",
 };
 
 const SKIP_FIELDTYPES = new Set([
@@ -100,16 +94,37 @@ const FormState = {
 const FormButtons = {
 	setup(frm) {
 		frm.clear_custom_buttons();
-		this._addLoadStructureDefinitionButton(frm);
-		this._addValidateMappingButton(frm);
-		this._addResolvedValuesButton(frm);
-		this._addPreviewButton(frm);
+		this._addLoadFromProfileButton(frm);
 	},
 
-	_addLoadStructureDefinitionButton(frm) {
-		frm.add_custom_button(__("Load Structure Definition"), async () => {
-			if (!frm.doc.base_structure_definition) {
-				frappe.throw(__("Please select Base Structure Definition"));
+	_addLoadFromProfileButton(frm) {
+		frm.add_custom_button(__("Load from Profile"), async () => {
+			if (!this._hasProfileSource(frm)) {
+				frappe.throw(
+					__("Please add at least one FHIR Profile before loading elements."),
+				);
+			}
+
+			if (!frm.doc.name || frm.is_new()) {
+				frappe.msgprint({
+					title: __("Save Required"),
+					message: __(
+						"Please save the FHIR Resource Map before loading elements from profile.",
+					),
+					indicator: "orange",
+				});
+				return;
+			}
+
+			if (frm.is_dirty()) {
+				frappe.msgprint({
+					title: __("Unsaved Changes"),
+					message: __(
+						"Please save changes before loading elements from profile.",
+					),
+					indicator: "orange",
+				});
+				return;
 			}
 
 			frm.disable_save();
@@ -118,7 +133,7 @@ const FormButtons = {
 					method: API_METHODS.load_structure_definition_elements,
 					args: { fhir_resource_map: frm.doc.name },
 					freeze: true,
-					freeze_message: __("Loading Structure Definition..."),
+					freeze_message: __("Loading elements from profile..."),
 				});
 
 				const elements = res.message || [];
@@ -135,110 +150,23 @@ const FormButtons = {
 
 				frm.refresh_field("element_maps");
 				ElementsMapUI.render(frm);
+				frappe.show_alert({
+					message: __("FHIR elements loaded from profile."),
+					indicator: "green",
+				});
 			} finally {
 				frm.enable_save();
 			}
 		});
 	},
 
-	_addValidateMappingButton(frm) {
-		frm.add_custom_button(
-			__("Validate Mapping"),
-			async () => {
-				if (!frm.doc.name || frm.is_new()) {
-					frappe.msgprint({
-						title: __("Save Required"),
-						message: __("Please save the document before validating."),
-						indicator: "orange",
-					});
-					return;
-				}
-
-				if (frm.is_dirty()) {
-					frappe.msgprint({
-						title: __("Unsaved Changes"),
-						message: __("Please save the document before validating."),
-						indicator: "orange",
-					});
-					return;
-				}
-
-				const res = await frappe.call({
-					method: API_METHODS.validate_fhir_mapping,
-					args: { fhir_resource_map: frm.doc.name },
-					freeze: true,
-					freeze_message: __("Validating mapping..."),
-				});
-
-				Dialogs.showValidationResults(res.message || {});
-			},
-			__("Actions"),
-		);
-	},
-
-	_addResolvedValuesButton(frm) {
-		frm.add_custom_button(
-			__("Get Resolved Values"),
-			async () => {
-				const primaryDoctype = this._getPrimaryDoctype(frm);
-				if (!primaryDoctype) return;
-
-				const primaryName = await Dialogs.promptPrimaryName(primaryDoctype);
-				if (!primaryName) return;
-
-				const res = await frappe.call({
-					method: API_METHODS.resolve_fhir_values,
-					args: {
-						fhir_resource_map: frm.doc.name,
-						primary_name: primaryName,
-					},
-					freeze: true,
-					freeze_message: __("Resolving values..."),
-				});
-
-				Dialogs.showJson(__("Resolved Values"), res.message || {});
-			},
-			__("Actions"),
-		);
-	},
-
-	_addPreviewButton(frm) {
-		frm.add_custom_button(
-			__("Preview FHIR Resource"),
-			async () => {
-				const primaryDoctype = this._getPrimaryDoctype(frm);
-				if (!primaryDoctype) return;
-
-				const primaryName = await Dialogs.promptPrimaryName(primaryDoctype);
-				if (!primaryName) return;
-
-				const response = await frappe.call({
-					method: API_METHODS.preview_fhir_resource,
-					args: {
-						fhir_resource_map: frm.doc.name,
-						primary_name: primaryName,
-					},
-					freeze: true,
-					freeze_message: __("Building FHIR preview..."),
-				});
-
-				Dialogs.showFhirPreview(frm, response.message || response);
-			},
-			__("Actions"),
-		);
-	},
-
-	_getPrimaryDoctype(frm) {
-		const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
-		if (!primaryDoctype) {
-			frappe.msgprint({
-				title: __("Missing config"),
-				message: __("Set Primary DocType first."),
-				indicator: "red",
-			});
-			return null;
-		}
-		return primaryDoctype;
+	_hasProfileSource(frm) {
+		return (frm.doc.profiles || []).some(row => {
+			return (
+				String(row.fhir_structure_definition || "").trim() ||
+				String(row.fhir_profile || "").trim()
+			);
+		});
 	},
 };
 

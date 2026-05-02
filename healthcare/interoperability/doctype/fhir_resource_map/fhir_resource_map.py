@@ -18,6 +18,7 @@ from healthcare.interoperability.doctype.fhir_resource_map.fhir_runtime import (
 )
 from healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import FHIRStructureDefinitionLoader
 from healthcare.interoperability.doctype.fhir_resource_map.validator import FHIRMappingValidator
+from healthcare.interoperability.fhir_engine.fhir_compiler import compile_fhir_resource_map
 
 
 class FHIRResourceMap(Document):
@@ -28,25 +29,15 @@ class FHIRResourceMap(Document):
 			self.name = f"{self.resource_type}"
 
 	def validate(self):
-		compiled = self.compile_mapping()
-		compiled_json = json.dumps(
-			compiled.to_dict(),
-			sort_keys=True,
-			separators=(",", ":"),
-			ensure_ascii=False,
-			indent=2,
-		)
+		self.compile_mapping()
+		# pass
+
+	def compile_mapping(self):
+		compiled_json, compiled_hash = compile_fhir_resource_map(self)
 
 		self.compiled_mapping = compiled_json
-		self.compiled_hash = hashlib.sha256(compiled_json.encode("utf-8")).hexdigest()
+		self.compiled_hash = compiled_hash
 		self.compiled_at = now_datetime()
-
-	@frappe.whitelist()
-	def compile_mapping(self):
-		# return FHIRMappingCompiler(resource_map=self).compile()
-
-		compiler = FHIRCompiler(self)
-		return compiler.compile()
 
 	@frappe.whitelist()
 	def load_structure_definition_elements(self):
@@ -55,39 +46,6 @@ class FHIRResourceMap(Document):
 		Same merge used by compiler (repeating_containers).
 		"""
 		return FHIRStructureDefinitionLoader(resource_map=self).load_merged_elements()
-
-
-# =========================================================
-# API
-# =========================================================
-
-
-@frappe.whitelist()
-def validate_fhir_mapping(fhir_resource_map):
-	fhir_resource_map = (fhir_resource_map or "").strip()
-	if not fhir_resource_map:
-		frappe.throw("fhir_resource_map is required")
-
-	resource_map = frappe.get_doc("FHIR Resource Map", fhir_resource_map)
-
-	compiled_map = resource_map.compiled_mapping
-	if isinstance(compiled_map, str):
-		compiled_map = frappe.parse_json(compiled_map)
-
-	if not compiled_map:
-		return {
-			"is_valid": False,
-			"errors": [
-				{"type": "no_compiled_map", "message": "No compiled mapping found. Save the document first."}
-			],
-			"warnings": [],
-			"error_count": 1,
-			"warning_count": 0,
-		}
-
-	sd_elements = resource_map.load_structure_definition_elements()
-	validator = FHIRMappingValidator(compiled_map, sd_elements)
-	return validator.validate()
 
 
 @frappe.whitelist()
@@ -100,18 +58,15 @@ def load_structure_definition_elements(fhir_resource_map):
 	return doc.load_structure_definition_elements()
 
 
+from healthcare.interoperability.fhir_engine.fhir_generator import FHIRRuntimeGenerator
+
+
 @frappe.whitelist()
-def preview_fhir_resource(fhir_resource_map, primary_name):
-	"""
-	Preview the FHIR resource that would be generated.
-	"""
-	doc = frappe.get_doc("FHIR Resource Map", fhir_resource_map)
-	compiled_data = json.loads(doc.compiled_mapping)
-	compiled = CompiledResource.from_dict(compiled_data)
+def generate_fhir_resource(resource_map_name, docname):
+	resource_map = frappe.get_doc("FHIR Resource Map", resource_map_name)
 
-	# Generate FHIR resource
-	resolver = FrappeSourceResolver()
-	runtime = FHIRRuntime(resolver)
-	fhir_resource = runtime.generate(compiled, primary_name)
+	compiled = json.loads(resource_map.compiled_mapping)
 
-	return fhir_resource
+	generator = FHIRRuntimeGenerator(compiled, docname)
+
+	return generator.generate()

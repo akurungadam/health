@@ -66,10 +66,8 @@
   {
    "fieldname": "element_maps",
    "fieldtype": "Table",
-   "hidden": 1,
    "label": "Elements",
-   "options": "FHIR Resource Element Map",
-   "read_only": 1
+   "options": "FHIR Resource Element Map"
   },
   {
    "fieldname": "base_structure_definition",
@@ -143,7 +141,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-01 18:54:28.487715",
+ "modified": "2026-05-02 14:31:07.130929",
  "modified_by": "Administrator",
  "module": "Interoperability",
  "name": "FHIR Resource Map",
