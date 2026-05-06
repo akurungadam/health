@@ -108,7 +108,7 @@ after_uninstall = "healthcare.uninstall.after_uninstall"
 # ---------------
 # Override standard doctype classes
 
-override_doctype_class = {
+extend_doctype_class = {
 	"Sales Invoice": "healthcare.healthcare.custom_doctype.sales_invoice.HealthcareSalesInvoice",
 }
 
