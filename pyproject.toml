@@ -61,3 +61,7 @@ section-order = [
     "first-party",
     "local-folder",
 ]
+
+[tool.bench.frappe-dependencies]
+frappe = ">=17.0.0-dev,<18.0.0"
+erpnext = ">=17.0.0-dev,<18.0.0"
