@@ -72,7 +72,7 @@ class HealthcarePractitioner(Document):
 
 	def set_full_name(self):
 		if self.last_name:
-			self.practitioner_name = " ".join(filter(None, [self.first_name, self.last_name]))
+			self.practitioner_name = f"{self.first_name} {self.last_name}"
 		else:
 			self.practitioner_name = self.first_name
 
