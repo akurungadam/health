@@ -355,7 +355,7 @@ def make_procedure(source_name, target_doc=None):
 			if source.service_unit:
 				warehouse = frappe.db.get_value("Healthcare Service Unit", source.service_unit, "warehouse")
 			if not warehouse:
-				warehouse = frappe.db.get_value("Stock Settings", None, "default_warehouse")
+				warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
 			if warehouse:
 				target.warehouse = warehouse
 
