@@ -35,7 +35,7 @@ class LabTest(Document):
 			set_service_request_status(self.service_request, "active-Request Status")
 		self.reload()
 
-	def on_update(self):
+	def before_save(self):
 		if self.sensitivity_test_items:
 			sensitivity = sorted(self.sensitivity_test_items, key=lambda x: x.antibiotic_sensitivity)
 			for i, item in enumerate(sensitivity):
