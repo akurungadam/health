@@ -5,7 +5,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.stock.get_item_details import ItemDetailsCtx, get_item_details
 
 
-class HealthcareSalesInvoice(SalesInvoice):
+class SalesInvoiceMixin:
 	def validate(self):
 		super().validate()
 		self.calculate_patient_insurance_coverage()

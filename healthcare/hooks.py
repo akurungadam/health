@@ -109,7 +109,7 @@ after_uninstall = "healthcare.uninstall.after_uninstall"
 # Override standard doctype classes
 
 extend_doctype_class = {
-	"Sales Invoice": "healthcare.healthcare.custom_doctype.sales_invoice.HealthcareSalesInvoice",
+	"Sales Invoice": "healthcare.healthcare.custom_doctype.sales_invoice.SalesInvoiceMixin",
 }
 
 # Document Events
