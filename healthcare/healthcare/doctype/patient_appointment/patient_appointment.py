@@ -201,13 +201,15 @@ class PatientAppointment(Document):
 				["overlap_appointments", "service_unit_capacity"],
 			)
 			if allow_overlap:
-				service_unit_appointments = list(
-					filter(
-						lambda appointment: appointment["service_unit"] == self.service_unit
-						and appointment["patient"] != self.patient,
-						overlapping_appointments,
+				service_unit_appointments = [
+					appointment
+					for appointment in overlapping_appointments
+					if (
+						appointment["service_unit"] == self.service_unit
+						and appointment["patient"] != self.patient
 					)
-				)  # if same patient already booked, it should be an overlap
+				]
+
 				if len(service_unit_appointments) >= (service_unit_capacity or 1):
 					frappe.throw(
 						_("Not allowed, {} cannot exceed maximum capacity {}").format(
@@ -215,7 +217,7 @@ class PatientAppointment(Document):
 						),
 						MaximumCapacityError,
 					)
-				else:  # service_unit_appointments within capacity, remove from overlapping_appointments
+				else:
 					overlapping_appointments = [
 						appointment
 						for appointment in overlapping_appointments
