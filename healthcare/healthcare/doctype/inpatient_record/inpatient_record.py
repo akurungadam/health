@@ -98,14 +98,15 @@ class InpatientRecord(Document):
 				)
 
 	def validate_already_scheduled_or_admitted(self):
-		query = """
-			select name, status
-			from `tabInpatient Record`
-			where (status = 'Admitted' or status = 'Admission Scheduled')
-			and name != %(name)s and patient = %(patient)s
-			"""
+		inpatient_record = frappe.qb.DocType("Inpatient Record")
 
-		ip_record = frappe.db.sql(query, {"name": self.name, "patient": self.patient}, as_dict=1)
+		ip_record = (
+			frappe.qb.from_(inpatient_record)
+			.select(inpatient_record.name, inpatient_record.status)
+			.where(inpatient_record.status.isin(["Admitted", "Admission Scheduled"]))
+			.where(inpatient_record.name != self.name)
+			.where(inpatient_record.patient == self.patient)
+		).run(as_dict=True)
 
 		if ip_record:
 			msg = _(
