@@ -670,10 +670,12 @@ def eval_condition_and_formula(d, data):
 
 	except Exception as err:
 		description = _("This error can be due to invalid formula.")
+		error_message = str(err)
 		message = _(
 			"""Error while evaluating the {0} {1} at row {2}. <br><br> <b>Error:</b> {3}
 			<br><br> <b>Hint:</b> {4}"""
-		).format(d.parenttype, get_link_to_form(d.parenttype, d.parent), d.idx, err, description)
+		).format(d.parenttype, get_link_to_form(d.parenttype, d.parent), d.idx, error_message, description)
+
 		frappe.throw(message, title=_("Error in formula"))
 
 
