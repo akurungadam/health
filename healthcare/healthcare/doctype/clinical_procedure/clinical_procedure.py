@@ -292,7 +292,7 @@ def get_stock_qty(item_code, warehouse):
 
 
 @frappe.whitelist()
-def get_procedure_consumables(procedure_template):
+def get_procedure_consumables(procedure_template: str) -> list:
 	return get_items("Clinical Procedure Item", procedure_template, "Clinical Procedure Template")
 
 
@@ -344,7 +344,7 @@ def make_stock_entry(doc):
 
 
 @frappe.whitelist()
-def make_procedure(source_name, target_doc=None):
+def make_procedure(source_name: str, target_doc: Document | None = None) -> Document:
 	def set_missing_values(source, target):
 		consume_stock = frappe.db.get_value(
 			"Clinical Procedure Template", source.procedure_template, "consume_stock"
@@ -355,7 +355,7 @@ def make_procedure(source_name, target_doc=None):
 			if source.service_unit:
 				warehouse = frappe.db.get_value("Healthcare Service Unit", source.service_unit, "warehouse")
 			if not warehouse:
-				warehouse = frappe.db.get_value("Stock Settings", None, "default_warehouse")
+				warehouse = frappe.db.get_single_value("Stock Settings", "default_warehouse")
 			if warehouse:
 				target.warehouse = warehouse
 
@@ -393,7 +393,7 @@ def make_procedure(source_name, target_doc=None):
 
 
 @frappe.whitelist()
-def get_procedure_prescribed(patient, encounter=False):
+def get_procedure_prescribed(patient: str) -> Document:
 	hso = frappe.qb.DocType("Service Request")
 	return (
 		frappe.qb.from_(hso)
