@@ -94,25 +94,29 @@ class InpatientMedicationEntry(Document):
 
 	def update_medication_orders(self, on_cancel=False):
 		orders, order_entry_map = self.get_order_entry_map()
-		# mark completion status
-		is_completed = 1
-		if on_cancel:
-			is_completed = 0
 
-		frappe.db.sql(
-			"""
-			UPDATE `tabInpatient Medication Order Entry`
-			SET is_completed = %(is_completed)s
-			WHERE name IN %(orders)s
-		""",
-			{"orders": orders, "is_completed": is_completed},
-		)
+		if not orders:
+			return
+
+		is_completed = 0 if on_cancel else 1
+
+		order_entry = frappe.qb.DocType("Inpatient Medication Order Entry")
+
+		(
+			frappe.qb.update(order_entry)
+			.set(order_entry.is_completed, is_completed)
+			.where(order_entry.name.isin(orders))
+		).run()
 
 		# update status and completed orders count
 		for order, count in order_entry_map.items():
 			medication_order = frappe.get_doc("Inpatient Medication Order", order)
 			completed_orders = flt(count)
-			current_value = frappe.db.get_value("Inpatient Medication Order", order, "completed_orders")
+			current_value = frappe.db.get_value(
+				"Inpatient Medication Order",
+				order,
+				"completed_orders",
+			)
 
 			if on_cancel:
 				completed_orders = flt(current_value) - flt(count)
