@@ -1115,7 +1115,7 @@ def send_message(doc, message):
 
 
 @frappe.whitelist()
-def get_events(start, end, filters=None):
+def get_events(start: str, end: str, filters: str | None = None):
 	"""Returns events for Gantt / Calendar view rendering.
 
 	:param start: Start date-time.
