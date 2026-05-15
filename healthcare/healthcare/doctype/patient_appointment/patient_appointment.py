@@ -1129,22 +1129,36 @@ def get_events(start, end, filters=None):
 	match_conditions = build_match_conditions("Patient Appointment")
 
 	if match_conditions:
-		conditions += "and" + match_conditions
+		conditions += " and " + match_conditions
+
+	query = """
+		select
+			`tabPatient Appointment`.name,
+			`tabPatient Appointment`.patient,
+			`tabPatient Appointment`.practitioner,
+			`tabPatient Appointment`.status,
+			`tabPatient Appointment`.duration,
+			timestamp(
+				`tabPatient Appointment`.appointment_date,
+				`tabPatient Appointment`.appointment_time
+			) as 'start',
+			`tabAppointment Type`.color
+		from
+			`tabPatient Appointment`
+		left join
+			`tabAppointment Type`
+		on
+			`tabPatient Appointment`.appointment_type = `tabAppointment Type`.name
+		where
+			(`tabPatient Appointment`.appointment_date between %(start)s and %(end)s)
+			and `tabPatient Appointment`.status != 'Cancelled'
+			and `tabPatient Appointment`.docstatus < 2
+	"""
+
+	query += conditions
 
 	data = frappe.db.sql(
-		f"""
-		select
-		`tabPatient Appointment`.name, `tabPatient Appointment`.patient,
-		`tabPatient Appointment`.practitioner, `tabPatient Appointment`.status,
-		`tabPatient Appointment`.duration,
-		timestamp(`tabPatient Appointment`.appointment_date, `tabPatient Appointment`.appointment_time) as 'start',
-		`tabAppointment Type`.color
-		from
-		`tabPatient Appointment`
-		left join `tabAppointment Type` on `tabPatient Appointment`.appointment_type=`tabAppointment Type`.name
-		where
-		(`tabPatient Appointment`.appointment_date between %(start)s and %(end)s)
-		and `tabPatient Appointment`.status != 'Cancelled' and `tabPatient Appointment`.docstatus < 2 {conditions}""",
+		query,
 		{"start": start, "end": end},
 		as_dict=True,
 		update={"allDay": 0},
