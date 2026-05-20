@@ -225,7 +225,7 @@ class InpatientRecord(Document):
 
 				minimum_billable_qty = inpatient.get("minimum_billable_qty")
 				total_qty = (
-					(inpatient.get("total_hours") / inpatient.get("no_of_hours"))
+					(inpatient.get("total_hours") / (inpatient.get("no_of_hours") or 1))
 					if inpatient.get("total_hours")
 					else 0
 				)

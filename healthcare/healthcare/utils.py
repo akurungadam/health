@@ -541,7 +541,7 @@ def get_inpatient_services_to_invoice(patient, company):
 					)
 					qty = 0.5
 					if hours_occupied > 0:
-						qty = hours_occupied / service_unit_type.no_of_hours
+						qty = hours_occupied / (service_unit_type.no_of_hours or 1)
 					if qty < service_unit_type.minimum_billable_qty:
 						qty = service_unit_type.minimum_billable_qty
 					services_to_invoice.append(
