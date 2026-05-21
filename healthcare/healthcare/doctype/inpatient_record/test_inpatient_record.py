@@ -112,7 +112,6 @@ class TestInpatientRecord(HealthcareTestSuite):
 
 	def test_validate_overlap_admission(self):
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		frappe.db.sql("""delete from `tabHealthcare Service Unit` where company='_Test Company'""")
 		patient = frappe.get_list("Patient", pluck="name")[0]
 
 		ip_record = create_inpatient(patient)
@@ -130,7 +129,6 @@ class TestInpatientRecord(HealthcareTestSuite):
 
 	def test_validate_admission_on_vacant_service_unit(self):
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		frappe.db.sql("""delete from `tabHealthcare Service Unit` where company='_Test Company'""")
 		patient_1 = frappe.get_list("Patient", pluck="name")[0]
 		patient_2 = frappe.get_list("Patient", pluck="name")[1]
 
@@ -152,9 +150,6 @@ class TestInpatientRecord(HealthcareTestSuite):
 
 	def test_validate_billables(self):
 		frappe.db.sql("""delete from `tabInpatient Record`""")
-		frappe.db.sql(
-			"""delete from `tabHealthcare Service Unit` where healthcare_service_unit_name='_Test IPD Service Unit'"""
-		)
 
 		# Setup test patient and inpatient record
 		patient = frappe.get_list("Patient", pluck="name")[0]
@@ -163,7 +158,7 @@ class TestInpatientRecord(HealthcareTestSuite):
 		ip_record.save(ignore_permissions=True)
 
 		# Setup service unit and mark as billable
-		service_unit = get_healthcare_service_unit("_Test HSU - Occupancy")
+		service_unit = get_healthcare_service_unit()
 		service_unit_type = frappe.get_cached_value(
 			"Healthcare Service Unit", service_unit, "service_unit_type"
 		)
@@ -247,54 +242,7 @@ def create_inpatient(patient):
 
 
 def get_healthcare_service_unit(unit_name=None):
-	if not unit_name:
-		service_unit = get_random(
-			"Healthcare Service Unit", filters={"inpatient_occupancy": 1, "company": "_Test Company"}
-		)
-	else:
-		service_unit = frappe.db.exists(
-			"Healthcare Service Unit", {"healthcare_service_unit_name": unit_name}
-		)
-
-	if not service_unit:
-		if unit_name:
-			unit_exists = frappe.db.exists(
-				"Healthcare Service Unit", {"healthcare_service_unit_name": unit_name}
-			)
-			if unit_exists:
-				return unit_exists
-		else:
-			su_exists = frappe.db.exists(
-				"Healthcare Service Unit", {"healthcare_service_unit_name": "_Test Service Unit IP Occupancy"}
-			)
-			if su_exists:
-				return su_exists
-
-		service_unit = frappe.new_doc("Healthcare Service Unit")
-		service_unit.healthcare_service_unit_name = unit_name or "_Test Service Unit IP Occupancy"
-		service_unit.company = "_Test Company"
-		service_unit.service_unit_type = get_random(
-			"Healthcare Service Unit Type", filters={"inpatient_occupancy": 1}
-		)
-		service_unit.inpatient_occupancy = 1
-		service_unit.occupancy_status = "Vacant"
-		service_unit.is_group = 0
-		service_unit_parent_name = frappe.db.exists(
-			{
-				"doctype": "Healthcare Service Unit",
-				"healthcare_service_unit_name": "_Test All Healthcare Service Units",
-				"is_group": 1,
-			}
-		)
-		if not service_unit_parent_name:
-			parent_service_unit = frappe.new_doc("Healthcare Service Unit")
-			parent_service_unit.healthcare_service_unit_name = "_Test All Healthcare Service Units"
-			parent_service_unit.company = "_Test Company"
-			parent_service_unit.is_group = 1
-			parent_service_unit.save(ignore_permissions=True)
-			service_unit.parent_healthcare_service_unit = parent_service_unit.name
-		else:
-			service_unit.parent_healthcare_service_unit = service_unit_parent_name
-		service_unit.save(ignore_permissions=True)
-		return service_unit.name
-	return service_unit
+	service_unit = frappe.get_doc("Healthcare Service Unit", "_Test HSU - Occupancy - _TC")
+	service_unit.occupancy_status = "Vacant"
+	service_unit.save()
+	return service_unit.name

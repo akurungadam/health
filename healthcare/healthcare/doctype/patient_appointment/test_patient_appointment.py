@@ -27,7 +27,6 @@ class TestPatientAppointment(HealthcareTestSuite):
 		frappe.db.sql("""delete from `tabFee Validity`""")
 		frappe.db.sql("""delete from `tabPatient Encounter`""")
 		make_pos_profile()
-		frappe.db.sql("""delete from `tabHealthcare Service Unit` where name like '_Test %'""")
 		frappe.db.sql("DELETE FROM `tabPractitioner Availability`")
 
 		self.patient = frappe.get_list("Patient", pluck="name")[0]
@@ -323,7 +322,7 @@ class TestPatientAppointment(HealthcareTestSuite):
 		ip_record.save(ignore_permissions=True)
 
 		# Admit
-		service_unit = get_healthcare_service_unit("_Test Service Unit Ip Occupancy")
+		service_unit = get_healthcare_service_unit()
 		admit_patient(ip_record, service_unit, now_datetime())
 
 		appointment = create_appointment(
@@ -356,12 +355,10 @@ class TestPatientAppointment(HealthcareTestSuite):
 		ip_record.save(ignore_permissions=True)
 
 		# Admit
-		service_unit = get_healthcare_service_unit("_Test Service Unit Ip Occupancy")
+		service_unit = get_healthcare_service_unit()
 		admit_patient(ip_record, service_unit, now_datetime())
 
-		appointment_service_unit = get_healthcare_service_unit(
-			"_Test Service Unit Ip Occupancy for Appointment"
-		)
+		appointment_service_unit = "_Test HSU - Appointments"
 		appointment = create_appointment(
 			self.patient, self.practitioner, nowdate(), service_unit=appointment_service_unit, save=0
 		)

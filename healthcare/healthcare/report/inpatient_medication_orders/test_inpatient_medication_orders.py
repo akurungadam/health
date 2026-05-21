@@ -41,7 +41,7 @@ class TestInpatientMedicationOrders(HealthcareTestSuite):
 			"from_date": getdate(),
 			"to_date": getdate(),
 			"patient": "_Test IPD Patient",
-			"service_unit": "_Test Service Unit Ip Occupancy - _TC",
+			"service_unit": "_Test HSU - Occupancy - _TC",
 		}
 
 		report = execute(filters)
@@ -58,7 +58,7 @@ class TestInpatientMedicationOrders(HealthcareTestSuite):
 				"date": getdate(),
 				"time": datetime.timedelta(seconds=32400),
 				"is_completed": 0,
-				"healthcare_service_unit": "_Test Service Unit Ip Occupancy - _TC",
+				"healthcare_service_unit": "_Test HSU - Occupancy - _TC",
 			},
 			{
 				"patient": "_Test IPD Patient",
@@ -71,7 +71,7 @@ class TestInpatientMedicationOrders(HealthcareTestSuite):
 				"date": getdate(),
 				"time": datetime.timedelta(seconds=50400),
 				"is_completed": 0,
-				"healthcare_service_unit": "_Test Service Unit Ip Occupancy - _TC",
+				"healthcare_service_unit": "_Test HSU - Occupancy - _TC",
 			},
 			{
 				"patient": "_Test IPD Patient",
@@ -84,7 +84,7 @@ class TestInpatientMedicationOrders(HealthcareTestSuite):
 				"date": getdate(),
 				"time": datetime.timedelta(seconds=75600),
 				"is_completed": 0,
-				"healthcare_service_unit": "_Test Service Unit Ip Occupancy - _TC",
+				"healthcare_service_unit": "_Test HSU - Occupancy - _TC",
 			},
 		]
 
@@ -99,7 +99,7 @@ class TestInpatientMedicationOrders(HealthcareTestSuite):
 			"from_date": getdate(),
 			"to_date": getdate(),
 			"patient": "_Test IPD Patient",
-			"service_unit": "_Test Service Unit Ip Occupancy - _TC",
+			"service_unit": "_Test HSU - Occupancy - _TC",
 			"show_completed_orders": 0,
 		}
 
@@ -135,7 +135,7 @@ def create_records(patient):
 	ip_record.expected_length_of_stay = 0
 	ip_record.save()
 	ip_record.reload()
-	service_unit = get_healthcare_service_unit("_Test Service Unit Ip Occupancy")
+	service_unit = get_healthcare_service_unit()
 	admit_patient(ip_record, service_unit, now_datetime())
 
 	ipmo = create_ipmo(patient)
