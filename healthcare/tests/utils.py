@@ -514,6 +514,15 @@ class BootStrapTestData:
 				"service_unit_type": "_Test Service Unit Type - Occupancy",
 				"company": "_Test Company",
 				"inpatient_occupancy": 1,
+				"occupancy_status": "Vacant",
+			},
+			{
+				"doctype": "Healthcare Service Unit",
+				"healthcare_service_unit_name": "_Test HSU - OT",
+				"service_unit_type": "_Test Service Unit Type - Non-billable Occupancy",
+				"company": "_Test Company",
+				"inpatient_occupancy": 1,
+				"occupancy_status": "Vacant",
 			},
 		]
 		self.make_records(["healthcare_service_unit_name"], records)
@@ -531,6 +540,17 @@ class BootStrapTestData:
 				"service_unit_type": "_Test Service Unit Type - Overlapping Appointments",
 				"allow_appointments": 1,
 				"overlap_appointments": 1,
+			},
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Service Unit Type - Non-billable Occupancy",
+				"inpatient_occupancy": 1,
+				"is_billable": 0,
+				"item_code": "_Test Service Unit Type - Occupancy",
+				"item_group": "Services",
+				"uom": "Day",
+				"no_of_hours": 24,
+				"unit_type.rate": 0,
 			},
 			{
 				"doctype": "Healthcare Service Unit Type",
