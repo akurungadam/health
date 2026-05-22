@@ -213,6 +213,7 @@ class InpatientRecord(Document):
 						"currency": self.currency or price_list_currency,
 						"plc_conversion_rate": 1.0,
 						"conversion_rate": 1.0,
+						"qty": 1,
 					}
 				)
 				item_details = get_item_details(ctx)
