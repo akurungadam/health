@@ -778,6 +778,7 @@ def set_item_rate(doc):
 					"price_list_currency": doc.currency or price_list_currency,
 					"plc_conversion_rate": 1.0,
 					"conversion_rate": 1.0,
+					"currency": doc.currency or price_list_currency,
 				}
 			)
 			item_details = get_item_details(ctx)
