@@ -421,6 +421,7 @@ let transfer_patient_dialog = function (frm) {
 			filters: {
 				inpatient_occupancy: 1,
 				allow_appointments: 0,
+				is_ot: 0,
 			},
 		};
 	};
