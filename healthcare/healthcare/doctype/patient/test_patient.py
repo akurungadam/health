@@ -136,3 +136,17 @@ class TestPatient(HealthcareTestSuite):
 
 		self.assertEqual(p1_customer_name, p2_customer_name)
 		self.assertEqual(p2_customer.customer_name, "John Doe")
+
+	def test_get_patient_detail_perms(self):
+		from healthcare.healthcare.doctype.patient.patient import get_patient_detail
+
+		patient = "_Test Patient"
+		frappe.set_user("Administrator")
+		try:
+			result = get_patient_detail(patient)
+			self.assertEqual(result.get("name"), patient)
+
+			frappe.set_user("test_user@marleyhealth.io")
+			self.assertRaises(frappe.PermissionError, get_patient_detail, patient)
+		finally:
+			frappe.set_user("Administrator")
