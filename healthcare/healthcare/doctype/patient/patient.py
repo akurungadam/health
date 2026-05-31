@@ -375,7 +375,9 @@ def make_invoice(patient, company):
 @frappe.whitelist()
 def get_patient_detail(patient):
 	frappe.has_permission("Patient", doc=patient, throw=True)
-	patient_dict = frappe.db.sql("""select * from tabPatient where name=%s""", (patient), as_dict=1)
+	Patient = frappe.qb.DocType("Patient")
+	patient_dict = frappe.qb.from_(Patient).select("*").where(Patient.name == patient).run(as_dict=1)
+
 	if not patient_dict:
 		frappe.throw(_("Patient not found"))
 	vital_sign = frappe.db.sql(
