@@ -114,7 +114,7 @@ class TestPatient(HealthcareTestSuite):
 		settings.link_customer_to_patient = 1
 		settings.save()
 
-		patient_name = create_patient()
+		patient_name = "_Test Patient"
 		patient = frappe.get_doc("Patient", patient_name)
 		patient.image = os.path.abspath("assets/frappe/images/default-avatar.png")
 		patient.save()
@@ -123,7 +123,6 @@ class TestPatient(HealthcareTestSuite):
 		self.assertEqual(customer.image, patient.image)
 
 	def test_multiple_patients_linked_with_same_customer(self):
-		frappe.db.sql("""delete from `tabPatient`""")
 		frappe.db.set_single_value("Healthcare Settings", "link_customer_to_patient", 1)
 
 		patient_name_1 = create_patient(patient_name="John Doe")
