@@ -8,8 +8,10 @@
 // =========================================================
 
 const API_METHODS = {
-	load_structure_definition_elements:
-		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.load_structure_definition_elements",
+	get_elements_from_structure_definitions:
+		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.get_elements_from_structure_definitions",
+	generate_fhir_resource:
+		"healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map.generate_fhir_resource",
 };
 
 const SKIP_FIELDTYPES = new Set([
@@ -95,69 +97,66 @@ const FormButtons = {
 	setup(frm) {
 		frm.clear_custom_buttons();
 		this._addLoadFromProfileButton(frm);
+		this._addPreviewButton(frm);
 	},
 
 	_addLoadFromProfileButton(frm) {
-		frm.add_custom_button(__("Load from Profile"), async () => {
-			if (!this._hasProfileSource(frm)) {
-				frappe.throw(
-					__("Please add at least one FHIR Profile before loading elements."),
-				);
-			}
+		frm.add_custom_button(__("Load from Profile"), () =>
+			this._loadFromProfile(frm),
+		);
+	},
 
-			if (!frm.doc.name || frm.is_new()) {
-				frappe.msgprint({
-					title: __("Save Required"),
-					message: __(
-						"Please save the FHIR Resource Map before loading elements from profile.",
-					),
-					indicator: "orange",
-				});
-				return;
-			}
+	async _loadFromProfile(frm) {
+		if (!this._hasProfileSource(frm)) {
+			frappe.throw(
+				__("Please add at least one FHIR Profile before loading elements."),
+			);
+		}
 
-			if (frm.is_dirty()) {
-				frappe.msgprint({
-					title: __("Unsaved Changes"),
-					message: __(
-						"Please save changes before loading elements from profile.",
-					),
-					indicator: "orange",
-				});
-				return;
-			}
+		const saveMessage = __(
+			"Please save the FHIR Resource Map before loading elements from profile.",
+		);
+		if (!this._requireSaved(frm, saveMessage)) return;
 
-			frm.disable_save();
-			try {
-				const res = await frappe.call({
-					method: API_METHODS.load_structure_definition_elements,
-					args: { fhir_resource_map: frm.doc.name },
-					freeze: true,
-					freeze_message: __("Loading elements from profile..."),
-				});
+		frm.disable_save();
+		try {
+			await this._loadElements(frm);
+		} finally {
+			frm.enable_save();
+		}
+	},
 
-				const elements = res.message || [];
-				if (!elements.length) {
-					frappe.msgprint(__("No elements found."));
-					return;
-				}
-
-				frm.clear_table("element_maps");
-				for (const row of elements) {
-					const child = frm.add_child("element_maps");
-					Object.assign(child, row);
-				}
-
-				frm.refresh_field("element_maps");
-				ElementsMapUI.render(frm);
-				frappe.show_alert({
-					message: __("FHIR elements loaded from profile."),
-					indicator: "green",
-				});
-			} finally {
-				frm.enable_save();
-			}
+	async _loadElements(frm) {
+		const res = await frappe.call({
+			method: API_METHODS.get_elements_from_structure_definitions,
+			args: { fhir_resource_map: frm.doc.name },
+			freeze: true,
+			freeze_message: __("Loading elements from profile..."),
 		});
+
+		const elements = res.message || [];
+		if (!elements.length) {
+			frappe.msgprint(__("No elements found."));
+			return;
+		}
+
+		frm.clear_table("element_maps");
+		for (const row of elements) {
+			Object.assign(frm.add_child("element_maps"), row);
+		}
+
+		frm.refresh_field("element_maps");
+		ElementsMapUI.render(frm);
+		frappe.show_alert({
+			message: __("FHIR elements loaded from profile."),
+			indicator: "green",
+		});
+	},
+
+	_addPreviewButton(frm) {
+		frm.add_custom_button(__("Preview FHIR Resource"), () =>
+			PreviewDialog.open(frm),
+		);
 	},
 
 	_hasProfileSource(frm) {
@@ -167,6 +166,28 @@ const FormButtons = {
 				String(row.fhir_profile || "").trim()
 			);
 		});
+	},
+
+	_requireSaved(frm, saveMessage) {
+		if (frm.is_new() || !frm.doc.name) {
+			frappe.msgprint({
+				title: __("Save Required"),
+				message: saveMessage,
+				indicator: "orange",
+			});
+			return false;
+		}
+
+		if (frm.is_dirty()) {
+			frappe.msgprint({
+				title: __("Unsaved Changes"),
+				message: __("Please save changes first."),
+				indicator: "orange",
+			});
+			return false;
+		}
+
+		return true;
 	},
 };
 
@@ -660,7 +681,6 @@ const MappingDialog = {
 				? String(dialog.get_value("fixed_value") || "")
 				: "";
 		row.expression = "";
-		row.json_path = "";
 		row.default_value = String(dialog.get_value("default_value") || "") || "";
 
 		if (isChoice) {
@@ -1007,278 +1027,89 @@ const KeyboardNavigation = {
 };
 
 // =========================================================
-// Dialogs
+// Preview Dialog
 // =========================================================
 
-const Dialogs = {
-	async promptPrimaryName(primaryDoctype) {
+const PreviewDialog = {
+	async open(frm) {
+		if (!this._canPreview(frm)) return;
+
+		const docname = await this._promptPrimaryDocument(frm);
+		if (!docname) return;
+
+		const resource = await this._generate(frm, docname);
+		if (resource) this._show(resource);
+	},
+
+	_canPreview(frm) {
+		const saveMessage = __("Please save the FHIR Resource Map before previewing.");
+		if (!FormButtons._requireSaved(frm, saveMessage)) return false;
+
+		if (!String(frm.doc.primary_doctype || "").trim()) {
+			frappe.msgprint({
+				title: __("Primary DocType Required"),
+				message: __("Set a Primary DocType before previewing."),
+				indicator: "orange",
+			});
+			return false;
+		}
+
+		return true;
+	},
+
+	_promptPrimaryDocument(frm) {
 		return new Promise(resolve => {
 			frappe.prompt(
 				[
 					{
 						fieldtype: "Link",
-						fieldname: "primary_name",
-						label: __("Primary Document Name"),
-						options: primaryDoctype,
+						fieldname: "docname",
+						label: __("{0} to Preview", [frm.doc.primary_doctype]),
+						options: frm.doc.primary_doctype,
 						reqd: 1,
 					},
 				],
-				values => {
-					const primaryName =
-						values && values.primary_name
-							? String(values.primary_name).trim()
-							: "";
-					resolve(primaryName);
-				},
-				__("Select Primary Document"),
-				__("Resolve"),
+				values => resolve(String(values.docname || "").trim()),
+				__("Preview FHIR Resource"),
+				__("Generate"),
 			);
 		});
 	},
 
-	showJson(title, obj) {
-		const pretty = Utils.safePrettyJson(obj);
-		frappe.msgprint({
-			title,
-			message: `<pre style="max-height:60vh; overflow:auto">${Utils.escapeHtml(
-				pretty,
-			)}</pre>`,
-			wide: true,
+	async _generate(frm, docname) {
+		const res = await frappe.call({
+			method: API_METHODS.generate_fhir_resource,
+			args: { resource_map_name: frm.doc.name, docname },
+			freeze: true,
+			freeze_message: __("Generating FHIR resource..."),
 		});
+		return res.message;
 	},
 
-	showValidationResults(result) {
-		const { is_valid, errors, warnings, error_count, warning_count } = result;
-
-		const dialog = new frappe.ui.Dialog({
-			title: __("Mapping Validation Results"),
-			size: "large",
-			fields: [{ fieldtype: "HTML", fieldname: "results_html" }],
-			primary_action_label: __("Close"),
-			primary_action: () => dialog.hide(),
-		});
-
-		dialog.show();
-
-		const wrapper = dialog.get_field("results_html").$wrapper;
-		wrapper.html(
-			this._renderValidationResultsHtml(
-				is_valid,
-				errors,
-				warnings,
-				error_count,
-				warning_count,
-			),
-		);
-	},
-
-	_renderValidationResultsHtml(
-		is_valid,
-		errors,
-		warnings,
-		error_count,
-		warning_count,
-	) {
-		const statusHtml = is_valid
-			? `<div class="mb-4">
-				<span class="indicator-pill green">
-					${__("Mapping is Valid")}
-				</span>
-			</div>`
-			: `<div class="mb-4">
-				<span class="indicator-pill red">
-					${__("Mapping has Issues")}
-				</span>
-			</div>`;
-
-		const summaryHtml = `
-			<div class="mb-4" style="display:flex; gap:16px;">
-				<div>
-					<span class="text-danger font-weight-bold">${error_count}</span>
-					<span class="text-muted">${__("Errors")}</span>
-				</div>
-				<div>
-					<span class="text-warning font-weight-bold">${warning_count}</span>
-					<span class="text-muted">${__("Warnings")}</span>
-				</div>
-			</div>
-		`;
-
-		let errorsHtml = "";
-		if (errors && errors.length) {
-			const errorItems = errors
-				.map(e => {
-					const path = e.fhir_path || e.source_key || "";
-					const pathBadge = path
-						? `<span class="badge badge-light mr-2">${Utils.escapeHtml(
-								path,
-						  )}</span>`
-						: "";
-					return `
-						<div class="validation-item validation-error mb-2 p-2" style="background: var(--bg-red); border-radius: 4px;">
-							<div style="display:flex; align-items:flex-start; gap:8px;">
-								<span class="indicator red" style="margin-top:4px;"></span>
-								<div>
-									${pathBadge}
-									<span>${Utils.escapeHtml(e.message || "")}</span>
-									<div class="text-muted small mt-1">${Utils.escapeHtml(e.type || "")}</div>
-								</div>
-							</div>
-						</div>
-					`;
-				})
-				.join("");
-
-			errorsHtml = `
-				<div class="mb-4">
-					<h6 class="text-danger">${__("Errors")}</h6>
-					${errorItems}
-				</div>
-			`;
-		}
-
-		let warningsHtml = "";
-		if (warnings && warnings.length) {
-			const warningItems = warnings
-				.map(w => {
-					const path = w.fhir_path || w.source_key || "";
-					const pathBadge = path
-						? `<span class="badge badge-light mr-2">${Utils.escapeHtml(
-								path,
-						  )}</span>`
-						: "";
-					return `
-						<div class="validation-item validation-warning mb-2 p-2" style="background: var(--bg-orange); border-radius: 4px;">
-							<div style="display:flex; align-items:flex-start; gap:8px;">
-								<span class="indicator orange" style="margin-top:4px;"></span>
-								<div>
-									${pathBadge}
-									<span>${Utils.escapeHtml(w.message || "")}</span>
-									<div class="text-muted small mt-1">${Utils.escapeHtml(w.type || "")}</div>
-								</div>
-							</div>
-						</div>
-					`;
-				})
-				.join("");
-
-			warningsHtml = `
-				<div class="mb-4">
-					<h6 class="text-warning">${__("Warnings")}</h6>
-					${warningItems}
-				</div>
-			`;
-		}
-
-		let noIssuesHtml = "";
-		if (!errors?.length && !warnings?.length) {
-			noIssuesHtml = `
-				<div class="text-muted text-center p-4">
-					<i class="fa fa-check-circle text-success fa-2x mb-2"></i>
-					<div>${__("No issues found!")}</div>
-				</div>
-			`;
-		}
-
-		return `
-			<div class="validation-results">
-				${statusHtml}
-				${summaryHtml}
-				<hr/>
-				${errorsHtml}
-				${warningsHtml}
-				${noIssuesHtml}
-			</div>
-		`;
-	},
-
-	showFhirPreview(frm, payload) {
-		const resource =
-			payload && (payload.resource || payload.fhir_resource || payload);
-		const sourceIssues = (payload && payload.source_issues) || [];
-		const valueIssues = (payload && payload.value_issues) || [];
-
-		const errors = [
-			...sourceIssues.map(x => `source: ${x.source_key}: ${x.error}`),
-			...valueIssues.map(x => `value: ${x.fhir_path}: ${x.error}`),
-		];
-		const warnings = (payload && payload.compile_warnings) || [];
-		const prettyJson = Utils.safePrettyJson(resource);
+	_show(resource) {
+		const json = Utils.safeJsonStringify(resource);
 
 		const dialog = new frappe.ui.Dialog({
 			title: __("FHIR Resource Preview"),
-			size: "extra-large",
+			size: "large",
 			fields: [
-				{ fieldtype: "HTML", fieldname: "summary_html" },
-				{ fieldtype: "HTML", fieldname: "json_html" },
+				{
+					fieldtype: "Code",
+					fieldname: "resource_json",
+					label: __("Resource"),
+					options: "JSON",
+					read_only: 1,
+				},
 			],
-			primary_action_label: __("Copy JSON"),
-			primary_action: () => Utils.copyToClipboard(prettyJson),
-			secondary_action_label: __("Close"),
-			secondary_action: () => dialog.hide(),
+			primary_action_label: __("Copy"),
+			primary_action: () => {
+				frappe.utils.copy_to_clipboard(json);
+				dialog.hide();
+			},
 		});
 
 		dialog.show();
-
-		const summaryWrapper = dialog.get_field("summary_html").$wrapper;
-		summaryWrapper.html(this._renderSummaryHtml(errors, warnings));
-
-		const jsonWrapper = dialog.get_field("json_html").$wrapper;
-		jsonWrapper.html(this._renderJsonBlockHtml(prettyJson));
-
-		jsonWrapper.off("click.fhir_copy_inline");
-		jsonWrapper.on("click.fhir_copy_inline", '[data-action="copy-inline"]', () => {
-			Utils.copyToClipboard(prettyJson);
-		});
-	},
-
-	_renderSummaryHtml(errors, warnings) {
-		const errorHtml =
-			errors && errors.length
-				? `<div class="mb-2"><span class="indicator red">${__("Errors")}</span>
-				   <ul class="mt-2">${errors
-						.map(
-							e =>
-								`<li class="text-danger">${Utils.escapeHtml(
-									String(e),
-								)}</li>`,
-						)
-						.join("")}</ul></div>`
-				: `<div class="mb-2"><span class="indicator green">${__(
-						"Errors",
-				  )}</span> <span class="text-muted">${__("None")}</span></div>`;
-
-		const warningHtml =
-			warnings && warnings.length
-				? `<div class="mb-2"><span class="indicator orange">${__(
-						"Warnings",
-				  )}</span>
-				   <ul class="mt-2">${warnings
-						.map(
-							w =>
-								`<li class="text-warning">${Utils.escapeHtml(
-									String(w),
-								)}</li>`,
-						)
-						.join("")}</ul></div>`
-				: `<div class="mb-2"><span class="indicator green">${__(
-						"Warnings",
-				  )}</span> <span class="text-muted">${__("None")}</span></div>`;
-
-		return `<div>${errorHtml}${warningHtml}<hr/></div>`;
-	},
-
-	_renderJsonBlockHtml(prettyJson) {
-		const escaped = Utils.escapeHtml(prettyJson || "");
-		return `
-			<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-				<div class="text-muted">${__("Generated JSON")}</div>
-				<button class="btn btn-xs btn-default" data-action="copy-inline">${__("Copy")}</button>
-			</div>
-			<pre class="small"
-				style="max-height: 60vh; overflow:auto; background: var(--control-bg); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;"
-			>${escaped}</pre>
-		`;
+		dialog.set_value("resource_json", json);
 	},
 };
 
@@ -1304,18 +1135,6 @@ const Utils = {
 		}
 	},
 
-	safePrettyJson(obj) {
-		try {
-			return JSON.stringify(obj ?? {}, null, 2);
-		} catch (e) {
-			return JSON.stringify(
-				{ error: "Could not stringify JSON", details: String(e) },
-				null,
-				2,
-			);
-		}
-	},
-
 	parseJsonOrString(text) {
 		try {
 			return JSON.parse(text);
@@ -1331,17 +1150,5 @@ const Utils = {
 
 	escapeHtml(s) {
 		return frappe.utils.escape_html(String(s || ""));
-	},
-
-	async copyToClipboard(text) {
-		try {
-			await navigator.clipboard.writeText(text || "");
-			frappe.show_alert({
-				message: __("Copied to clipboard"),
-				indicator: "green",
-			});
-		} catch (e) {
-			frappe.utils.copy_to_clipboard(text || "");
-		}
 	},
 };

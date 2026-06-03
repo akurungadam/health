@@ -5,7 +5,7 @@
   },
   {
     "doctype": "FHIR Profile",
-    "profile_name": "Overlay-Strict-R4",
+    "profile_name": "Overlay-Strict",
     "fhir_version": "R4"
   },
   {
