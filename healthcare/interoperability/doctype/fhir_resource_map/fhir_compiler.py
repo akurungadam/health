@@ -5,55 +5,27 @@
 FHIR Resource Map Compiler
 
 Compiles a FHIR Resource Map (UI tables + custom_elements JSON) into a single,
-self-contained ``compiled_mapping`` blueprint. The runtime consumes only this
-blueprint and reads nothing else from the resource map.
-
-Compiled shape::
-
-    {
-        "meta": {"resource_type", "primary_doctype", "fhir_version", "profiles"},
-        "sources": {"<key>": {"doctype", "kind", "is_primary", "parent", "link_fieldname", "filters"}},
-        "elements": {"<fhir_path>": {"source", "datatype", "is_array", "is_required", "value_spec"}},
-    }
-
-``value_spec`` mirrors the UI ``value_pointer``:
-    - { "kind": "field",      "fieldname": "...", "default": <any?> }
-    - { "kind": "fixed",      "value": <any>,     "default": <any?> }
-    - { "kind": "expression", "expression": "..." }
-    - { "kind": "json",       "value": <any> }
+self-contained ``compiled_mapping`` blueprint that the runtime consumes on its
+own. Element entries, references and extensions are built by ElementCompiler;
+collection sources (child_table / reverse_link) carry ``is_collection`` and a
+computed ``fhir_path`` (the repeating backbone they populate) so the runtime can
+group rows without inspecting the StructureDefinition - source-driven grouping.
 """
 
 import json
 
 import frappe
-from frappe.utils import cint
 
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_element_compiler import (
+	ElementCompiler,
+	parse_json,
+)
 from healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import (
 	FHIRStructureDefinitionLoader,
 )
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
 
-# primitive FHIR datatypes (lower-cased) the runtime knows how to coerce
-PRIMITIVE_DATATYPES = {
-	"string",
-	"boolean",
-	"integer",
-	"decimal",
-	"date",
-	"datetime",
-	"instant",
-	"time",
-	"uri",
-	"url",
-	"canonical",
-	"code",
-	"id",
-	"oid",
-	"uuid",
-	"markdown",
-	"base64binary",
-	"positiveint",
-	"unsignedint",
-}
+COLLECTION_KINDS = ("child_table", "reverse_link")
 
 
 class FHIRCompiler:
@@ -63,25 +35,47 @@ class FHIRCompiler:
 		self.resource_map = resource_map
 		self.warnings = []
 		self._sd_index = {}
-		self._custom = None
+		self._custom = {}
+		self._elements = None
 
 	def compile(self):
 		"""Return ``(compiled_dict, warnings)``. Never raises on user-data issues."""
 		self._sd_index = self._load_sd_index()
-		self._custom = self._parse_json(self.resource_map.custom_elements) or {}
+		self._custom = self._parse_custom_elements()
+		self._elements = ElementCompiler(self._sd_index, self.warnings)
+
+		sources = self._compile_sources()
+		elements = self._compile_elements()
+		self._assign_collection_backbones(sources, elements)
+		slices = self._compile_slices()
 
 		compiled = {
 			"meta": self._build_meta(),
-			"sources": self._compile_sources(),
-			"elements": self._compile_elements(),
+			"sources": sources,
+			"elements": elements,
+			"extensions": self._compile_extensions(),
+			"slices": slices,
+			"array_paths": self._array_paths(sources, elements, slices),
 		}
 
-		self._validate(compiled)
+		self.warnings.extend(MappingValidator(self._sd_index).validate(compiled))
 		return compiled, self.warnings
 
 	# =========================================================
-	# Structure Definition index (for cardinality / datatype fallback)
+	# Structure Definition index (cardinality / datatype fallback)
 	# =========================================================
+
+	def _parse_custom_elements(self):
+		raw = self.resource_map.custom_elements
+		if not raw:
+			return {}
+		if isinstance(raw, dict):
+			return raw
+		try:
+			return json.loads(raw)
+		except (json.JSONDecodeError, TypeError) as e:
+			self.warnings.append(f"custom_elements is not valid JSON: {e}")
+			return {}
 
 	def _load_sd_index(self):
 		index = {}
@@ -136,254 +130,172 @@ class FHIRCompiler:
 		sources = {}
 
 		if self.resource_map.primary_doctype:
-			sources["primary"] = {
-				"doctype": self.resource_map.primary_doctype,
-				"kind": "document",
-				"is_primary": True,
-				"parent": None,
-				"link_fieldname": None,
-				"filters": {},
-			}
+			sources["primary"] = self._source(self.resource_map.primary_doctype, "document", is_primary=True)
 
 		for row in self.resource_map.sources or []:
 			key = (row.source_key or "").strip()
 			if not key:
 				continue
+			sources[key] = self._source(
+				(row.source_doctype or "").strip(),
+				self._normalize_kind(row.kind),
+				link_fieldname=(row.link_fieldname or "").strip() or None,
+				filters=parse_json(getattr(row, "config", None), self.warnings) or {},
+			)
 
-			sources[key] = {
-				"doctype": (row.source_doctype or "").strip(),
-				"kind": self._normalize_kind(row.kind),
-				"is_primary": False,
-				"parent": "primary",
-				"link_fieldname": (row.link_fieldname or "").strip() or None,
-				"filters": self._parse_json(getattr(row, "config", None)) or {},
-			}
-
-		# custom_elements may declare additional sources (override UI on key clash)
 		for source_def in self._custom.get("sources", []) or []:
 			key = (source_def.get("key") or "").strip()
 			if not key:
 				continue
-			sources[key] = {
-				"doctype": (source_def.get("doctype") or "").strip(),
-				"kind": self._normalize_kind(source_def.get("kind")),
-				"is_primary": bool(source_def.get("is_primary")),
-				"parent": source_def.get("parent") or source_def.get("parent_source_key") or "primary",
-				"link_fieldname": source_def.get("link_fieldname") or source_def.get("link_field"),
-				"filters": source_def.get("filters") or {},
-			}
+			sources[key] = self._source(
+				(source_def.get("doctype") or "").strip(),
+				self._normalize_kind(source_def.get("kind")),
+				is_primary=bool(source_def.get("is_primary")),
+				parent=source_def.get("parent") or source_def.get("parent_source_key") or "primary",
+				link_fieldname=source_def.get("link_fieldname") or source_def.get("link_field"),
+				filters=source_def.get("filters") or {},
+			)
 
 		return sources
 
+	def _source(self, doctype, kind, is_primary=False, parent="primary", link_fieldname=None, filters=None):
+		return {
+			"doctype": doctype,
+			"kind": kind,
+			"is_primary": is_primary,
+			"is_collection": kind in COLLECTION_KINDS,
+			"parent": None if is_primary else parent,
+			"link_fieldname": link_fieldname,
+			"filters": filters or {},
+		}
+
 	def _normalize_kind(self, kind):
 		kind = (kind or "").strip().lower().replace(" ", "_")
-		if kind in ("document", "child_table", "direct_link", "reverse_link"):
+		if kind in ("document", *COLLECTION_KINDS, "direct_link"):
 			return kind
 		return "document"
 
 	# =========================================================
-	# Elements
+	# Elements & extensions
 	# =========================================================
 
 	def _compile_elements(self):
 		elements = {}
 
 		for row in self.resource_map.element_maps or []:
-			path = (row.fhir_path or "").strip()
-			if not path:
-				continue
-
-			source, value_spec = self._element_value_spec(row)
-			if value_spec is None:
-				continue
-
-			elements[path] = self._build_entry(path, source, value_spec, row)
+			path, entry = self._elements.build_ui_element(row)
+			if path:
+				elements[path] = entry
 
 		# custom_elements override / add (custom wins on path clash)
 		for element_def in self._custom.get("elements", []) or []:
-			path = (element_def.get("path") or element_def.get("fhir_path") or "").strip()
-			if not path:
-				continue
-			elements[path] = self._build_custom_entry(path, element_def)
+			path, entry = self._elements.build_custom_element(element_def)
+			if path:
+				elements[path] = entry
 
 		return elements
 
-	def _element_value_spec(self, row):
-		"""Resolve (source_key, value_spec) for a UI element row.
+	def _compile_extensions(self):
+		extensions = []
+		for extension_def in self._custom.get("extensions", []) or []:
+			extension = self._elements.build_extension(extension_def, self.resource_map.resource_type)
+			if extension:
+				extensions.append(extension)
+		return extensions
 
-		Prefers ``value_pointer`` JSON; falls back to the legacy columns.
-		Returns (source_key, None) when the row carries no usable mapping.
-		"""
-		pointer = self._parse_json(getattr(row, "value_pointer", None))
-		if isinstance(pointer, dict) and pointer.get("kind"):
-			return self._spec_from_pointer(pointer)
-
-		return self._spec_from_columns(row)
-
-	def _spec_from_pointer(self, pointer):
-		kind = (pointer.get("kind") or "").strip()
-		source = (pointer.get("source_key") or "primary").strip() or "primary"
-
-		if kind == "field":
-			spec = {"kind": "field", "fieldname": self._clean_field(pointer.get("fieldname"))}
-		elif kind == "fixed":
-			spec = {"kind": "fixed", "value": pointer.get("value")}
-		elif kind == "expression":
-			spec = {"kind": "expression", "expression": pointer.get("expression")}
-		elif kind == "json":
-			spec = {"kind": "json", "value": pointer.get("value")}
-		else:
-			return source, None
-
-		if pointer.get("default") is not None:
-			spec["default"] = pointer.get("default")
-
-		return source, spec
-
-	def _spec_from_columns(self, row):
-		mapping_type = (getattr(row, "mapping_type", None) or "").strip()
-		source = (getattr(row, "source_name", None) or "primary").strip() or "primary"
-
-		if mapping_type == "Frappe Field":
-			field = self._clean_field(getattr(row, "frappe_field", None))
-			spec = {"kind": "field", "fieldname": field} if field else None
-		elif mapping_type == "Fixed":
-			value = self._parse_json_or_text(getattr(row, "fixed_value", None))
-			spec = {"kind": "fixed", "value": value} if value is not None else None
-		elif mapping_type == "Expression":
-			expr = (getattr(row, "expression", None) or "").strip()
-			spec = {"kind": "expression", "expression": expr} if expr else None
-		elif mapping_type == "JSON":
-			value = self._parse_json(getattr(row, "fixed_value", None))
-			spec = {"kind": "json", "value": value} if value is not None else None
-		else:
-			spec = None
-
-		if spec is not None:
-			default = self._parse_json_or_text(getattr(row, "default_value", None))
-			if default is not None:
-				spec["default"] = default
-
-		return source, spec
-
-	def _build_entry(self, path, source, value_spec, row):
-		sd = self._sd_index.get(path, {})
-		datatype = (getattr(row, "datatype", None) or sd.get("datatype") or "").strip()
-		max_card = (str(getattr(row, "max", "") or "").strip()) or str(sd.get("max") or "").strip()
-		min_card = cint(getattr(row, "min", None)) or cint(sd.get("min"))
-
-		return {
-			"source": source,
-			"datatype": datatype,
-			"is_array": self._is_array(max_card),
-			"is_required": min_card >= 1,
-			"value_spec": value_spec,
-		}
-
-	def _build_custom_entry(self, path, element_def):
-		value_spec = element_def.get("value_spec")
-		if not value_spec:
-			value_spec = self._infer_custom_spec(element_def)
-
-		sd = self._sd_index.get(path, {})
-		datatype = (element_def.get("datatype") or sd.get("datatype") or "").strip()
-		max_card = str(element_def.get("max") or sd.get("max") or "").strip()
-
-		return {
-			"source": element_def.get("source") or element_def.get("source_key") or "primary",
-			"datatype": datatype,
-			"is_array": bool(element_def.get("is_array")) or self._is_array(max_card),
-			"is_required": bool(element_def.get("is_required")) or cint(sd.get("min")) >= 1,
-			"value_spec": value_spec,
-		}
-
-	def _infer_custom_spec(self, element_def):
-		"""Allow flat custom element definitions without a nested value_spec."""
-		if element_def.get("fieldname") or element_def.get("field"):
-			return {
-				"kind": "field",
-				"fieldname": self._clean_field(element_def.get("fieldname") or element_def.get("field")),
-			}
-		if "fixed" in element_def or "value" in element_def:
-			return {"kind": "fixed", "value": element_def.get("fixed", element_def.get("value"))}
-		if element_def.get("expression"):
-			return {"kind": "expression", "expression": element_def.get("expression")}
-		return None
+	def _compile_slices(self):
+		slices = []
+		for slice_def in self._custom.get("slices", []) or []:
+			compiled_slice = self._elements.build_slice(slice_def)
+			if compiled_slice:
+				slices.append(compiled_slice)
+		return slices
 
 	# =========================================================
-	# Validation (warn-only)
+	# Collection backbones (source-driven grouping)
 	# =========================================================
 
-	def _validate(self, compiled):
-		elements = compiled.get("elements", {})
-		sources = compiled.get("sources", {})
-		mapped_paths = set(elements.keys())
-
-		# required SD elements that are unmapped
-		for path, sd in self._sd_index.items():
-			if cint(sd.get("min")) < 1 or "[x]" in path:
-				continue
-			if path not in mapped_paths:
-				self.warnings.append(f"Required element '{path}' is not mapped.")
-
-		# mapped paths absent from the merged SD (typo / stale)
-		if self._sd_index:
-			for path in mapped_paths:
-				if path not in self._sd_index and "[x]" not in path:
-					self.warnings.append(f"Mapped element '{path}' is not in the merged StructureDefinition.")
-
-		# elements pointing at undefined sources
-		for path, element in elements.items():
-			source_key = element.get("source")
-			if source_key and source_key not in sources:
-				self.warnings.append(f"Element '{path}' references unknown source '{source_key}'.")
-
-		# sources referencing non-existent doctypes
+	def _assign_collection_backbones(self, sources, elements):
 		for key, source in sources.items():
-			doctype = (source.get("doctype") or "").strip()
-			if not doctype:
-				self.warnings.append(f"Source '{key}' has no doctype.")
-			elif not frappe.db.exists("DocType", doctype):
-				self.warnings.append(f"Source '{key}' references non-existent doctype '{doctype}'.")
+			if not source.get("is_collection"):
+				continue
+
+			paths = [path for path, element in elements.items() if element.get("source") == key]
+			backbone = self._backbone_path(paths)
+			if backbone:
+				source["fhir_path"] = backbone
+			elif paths:
+				self.warnings.append(f"Could not determine the repeating path for collection source '{key}'.")
+
+	def _backbone_path(self, element_paths):
+		if not element_paths:
+			return None
+
+		repeating = set()
+		for path in element_paths:
+			ancestors = self._repeating_ancestors(path, include_self=True)
+			if ancestors:
+				repeating.add(ancestors[0])
+		if repeating:
+			return min(repeating, key=lambda path: path.count("."))
+
+		return self._common_parent(element_paths)
+
+	def _common_parent(self, element_paths):
+		common = []
+		for segments in zip(*[path.split(".") for path in element_paths], strict=False):
+			if len(set(segments)) == 1:
+				common.append(segments[0])
+			else:
+				break
+
+		if len(common) < 2:
+			return None
+
+		prefix = ".".join(common)
+		if prefix in element_paths:
+			prefix = prefix.rsplit(".", 1)[0]
+		return prefix if prefix.count(".") >= 1 else None
 
 	# =========================================================
-	# Helpers
+	# Array paths (repeating complex backbones from single docs)
 	# =========================================================
 
-	def _clean_field(self, field):
-		if not field:
-			return None
-		return str(field).split("|")[0].strip()
+	def _array_paths(self, sources, elements, slices):
+		"""Paths that must render as arrays from a single doc: explicit
+		``custom_elements["arrays"]`` + repeating (max=*) SD ancestors of mapped
+		paths. Collection backbones / slice paths already produce lists (excluded).
+		"""
+		explicit = {path for path in (self._custom.get("arrays") or []) if isinstance(path, str)}
 
-	def _is_array(self, max_card):
-		max_card = (str(max_card or "")).strip()
-		if max_card == "*":
-			return True
-		try:
-			return int(max_card) > 1
-		except (ValueError, TypeError):
-			return False
+		excluded = {source.get("fhir_path") for source in sources.values() if source.get("is_collection")}
+		excluded |= {compiled_slice["path"] for compiled_slice in slices}
 
-	def _parse_json(self, value):
-		if not value:
-			return None
-		if isinstance(value, dict | list):
-			return value
-		try:
-			return json.loads(value)
-		except (json.JSONDecodeError, TypeError):
-			self.warnings.append("Invalid JSON encountered while compiling.")
-			return None
+		derived = set()
+		for path in self._mapped_object_paths(elements, slices):
+			for ancestor in self._repeating_ancestors(path):
+				if ancestor not in excluded:
+					derived.add(ancestor)
 
-	def _parse_json_or_text(self, value):
-		if value is None or value == "":
-			return None
-		if isinstance(value, dict | list):
-			return value
-		try:
-			return json.loads(value)
-		except (json.JSONDecodeError, TypeError):
-			return value
+		return sorted(explicit | derived)
+
+	def _mapped_object_paths(self, elements, slices):
+		paths = list(elements.keys())
+		for compiled_slice in slices:
+			for sub in compiled_slice.get("elements", []):
+				paths.append(f"{compiled_slice['path']}.{sub['path']}")
+		return paths
+
+	def _repeating_ancestors(self, path, include_self=False):
+		parts = path.split(".")
+		end_limit = len(parts) + 1 if include_self else len(parts)
+		ancestors = []
+		for end in range(2, end_limit):
+			prefix = ".".join(parts[:end])
+			sd = self._sd_index.get(prefix)
+			if sd and str(sd.get("max") or "").strip() == "*":
+				ancestors.append(prefix)
+		return ancestors
 
 
 def compile_fhir_resource_map(resource_map):

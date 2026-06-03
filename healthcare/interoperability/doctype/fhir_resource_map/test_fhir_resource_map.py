@@ -63,3 +63,51 @@ class IntegrationTestFHIRResourceMap(IntegrationTestCase):
 				map.value_pointer = json.dumps({"kind": "field", "source_key": "gender", "fieldname": "name"})
 		resource_map.save()
 		# print("Mapping: ", resource_map.compiled_mapping)
+
+	def test_generate_fhir_resource_from_compiled_map(self):
+		"""End-to-end: compiled map + a real primary doc -> generated FHIR resource.
+
+		Uses the core ``ToDo`` doctype as the primary source so the test stays
+		self-contained (no healthcare mandatory-field / Gender coupling).
+		"""
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_resource_map import (
+			generate_fhir_resource,
+		)
+
+		resource_map = frappe.get_doc(
+			{
+				"doctype": "FHIR Resource Map",
+				"resource_type": "Basic",
+				"primary_doctype": "ToDo",
+				"element_maps": [
+					{
+						"doctype": "FHIR Resource Element Map",
+						"fhir_path": "Basic.id",
+						"datatype": "id",
+						"max": "1",
+						"value_pointer": json.dumps(
+							{"kind": "field", "source_key": "primary", "fieldname": "name"}
+						),
+					},
+					{
+						"doctype": "FHIR Resource Element Map",
+						"fhir_path": "Basic.code.text",
+						"datatype": "string",
+						"max": "1",
+						"value_pointer": json.dumps({"kind": "fixed", "value": "vitals"}),
+					},
+				],
+			}
+		).insert(ignore_permissions=True)
+
+		# saving compiled the mapping
+		self.assertTrue(resource_map.compiled_mapping)
+		self.assertEqual(resource_map.status, "No Errors")
+
+		todo = frappe.get_doc({"doctype": "ToDo", "description": "demo"}).insert(ignore_permissions=True)
+
+		resource = generate_fhir_resource(resource_map.name, todo.name)
+
+		self.assertEqual(resource["resourceType"], "Basic")
+		self.assertEqual(resource["id"], todo.name)
+		self.assertEqual(resource["code"], {"text": "vitals"})

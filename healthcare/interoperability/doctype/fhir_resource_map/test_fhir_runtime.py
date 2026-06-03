@@ -15,9 +15,9 @@ from healthcare.interoperability.doctype.fhir_resource_map.fhir_runtime import F
 
 
 def run(compiled, source_docs, primary_id="P-1"):
-	rt = FHIRRuntime(compiled)
-	rt._load_sources = lambda _pid: rt.source_docs.update(source_docs)
-	return rt.generate(primary_id)
+	runtime = FHIRRuntime(compiled)
+	runtime._load_sources = lambda _pid: runtime.source_docs.update(source_docs)
+	return runtime.generate(primary_id)
 
 
 PRIMARY_ONLY = {"primary": {"doctype": "Patient", "kind": "document", "is_primary": True}}
@@ -25,6 +25,18 @@ PRIMARY_ONLY = {"primary": {"doctype": "Patient", "kind": "document", "is_primar
 
 def element(source="primary", datatype="", is_array=False, **value_spec):
 	return {"source": source, "datatype": datatype, "is_array": is_array, "value_spec": value_spec}
+
+
+def collection_source(doctype, fhir_path, parent="primary", link_fieldname=None):
+	return {
+		"doctype": doctype,
+		"kind": "child_table",
+		"is_primary": False,
+		"is_collection": True,
+		"parent": parent,
+		"link_fieldname": link_fieldname,
+		"fhir_path": fhir_path,
+	}
 
 
 class TestFHIRRuntime(unittest.TestCase):
@@ -62,6 +74,22 @@ class TestFHIRRuntime(unittest.TestCase):
 
 		self.assertEqual(result["name"], {"family": "Doe", "given": ["John"]})
 
+	def test_repeating_backbone_wrapped_as_array(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"array_paths": ["Patient.name"],
+			"elements": {
+				"Patient.name.family": element(datatype="string", kind="field", fieldname="last_name"),
+				"Patient.name.given": element(
+					datatype="string", is_array=True, kind="field", fieldname="first_name"
+				),
+			},
+		}
+		result = run(compiled, {"primary": {"last_name": "Doe", "first_name": "John"}})
+
+		self.assertEqual(result["name"], [{"family": "Doe", "given": ["John"]}])
+
 	def test_default_applied_when_field_missing(self):
 		compiled = {
 			"meta": {"resource_type": "Patient"},
@@ -79,37 +107,26 @@ class TestFHIRRuntime(unittest.TestCase):
 		compiled = {
 			"meta": {"resource_type": "Patient"},
 			"sources": PRIMARY_ONLY,
-			"elements": {
-				"Patient.gender": element(datatype="code", kind="field", fieldname="sex"),
-			},
+			"elements": {"Patient.gender": element(datatype="code", kind="field", fieldname="sex")},
 		}
 		result = run(compiled, {"primary": {"sex": None}})
 		self.assertEqual(result, {"resourceType": "Patient"})
-		self.assertNotIn("gender", result)
 
-	def test_collection_source_not_grouped_yet(self):
-		# iteration 1: an element bound to a list source produces nothing (no crash)
+	def test_value_map_translates_code(self):
 		compiled = {
 			"meta": {"resource_type": "Patient"},
-			"sources": {
-				"primary": {"doctype": "Patient", "kind": "document", "is_primary": True},
-				"phones": {
-					"doctype": "Phone",
-					"kind": "child_table",
-					"is_primary": False,
-					"parent": "primary",
-					"link_fieldname": "phones",
-				},
-			},
+			"sources": PRIMARY_ONLY,
 			"elements": {
-				"Patient.telecom.value": element(
-					source="phones", datatype="string", kind="field", fieldname="number"
+				"Patient.gender": element(
+					datatype="code",
+					kind="field",
+					fieldname="sex",
+					map={"Male": "male", "Female": "female", "*": "unknown"},
 				),
 			},
 		}
-		docs = {"primary": {"name": "P-1"}, "phones": [{"number": "123"}, {"number": "456"}]}
-		result = run(compiled, docs)
-		self.assertEqual(result, {"resourceType": "Patient"})
+		self.assertEqual(run(compiled, {"primary": {"sex": "Male"}})["gender"], "male")
+		self.assertEqual(run(compiled, {"primary": {"sex": "Trans"}})["gender"], "unknown")
 
 	def test_dotted_field_path(self):
 		compiled = {
@@ -121,6 +138,167 @@ class TestFHIRRuntime(unittest.TestCase):
 		}
 		result = run(compiled, {"primary": {"details": {"sex": "female"}}})
 		self.assertEqual(result["gender"], "female")
+
+	def test_collection_grouping_simple(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": {
+				"primary": {"doctype": "Patient", "kind": "document", "is_primary": True},
+				"phones": collection_source("Phone", "Patient.telecom", link_fieldname="phones"),
+			},
+			"elements": {
+				"Patient.telecom.value": element(
+					source="phones", datatype="string", kind="field", fieldname="number"
+				),
+			},
+		}
+		docs = {"primary": {"name": "P-1"}, "phones": [{"number": "123"}, {"number": "456"}]}
+		result = run(compiled, docs)
+
+		self.assertEqual(result["telecom"], [{"value": "123"}, {"value": "456"}])
+
+	def test_collection_grouping_nested_object_per_row(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": {
+				"primary": {"doctype": "Patient", "kind": "document", "is_primary": True},
+				"contacts": collection_source("Contact", "Patient.contact", link_fieldname="contacts"),
+			},
+			"elements": {
+				"Patient.contact.name.given": element(
+					source="contacts", datatype="string", is_array=True, kind="field", fieldname="first_name"
+				),
+				"Patient.contact.gender": element(
+					source="contacts", datatype="code", kind="field", fieldname="sex"
+				),
+			},
+		}
+		docs = {
+			"primary": {"name": "P-1"},
+			"contacts": [
+				{"first_name": "Ann", "sex": "female"},
+				{"first_name": "Bob", "sex": "male"},
+			],
+		}
+		result = run(compiled, docs)
+
+		self.assertEqual(
+			result["contact"],
+			[
+				{"name": {"given": ["Ann"]}, "gender": "female"},
+				{"name": {"given": ["Bob"]}, "gender": "male"},
+			],
+		)
+
+	def test_reference_with_type_and_display(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"elements": {
+				"Patient.managingOrganization": {
+					"source": "primary",
+					"datatype": "Reference",
+					"is_array": False,
+					"reference": {"resource_type": "Organization", "display_field": "org_name"},
+					"value_spec": {"kind": "field", "fieldname": "org"},
+				},
+			},
+		}
+		docs = {"primary": {"org": "ORG-1", "org_name": "Acme Hospital"}}
+		result = run(compiled, docs)
+
+		self.assertEqual(
+			result["managingOrganization"],
+			{"reference": "Organization/ORG-1", "type": "Organization", "display": "Acme Hospital"},
+		)
+
+	def test_extension_built_at_root(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"elements": {},
+			"extensions": [
+				{
+					"host": "Patient",
+					"url": "http://example.org/fhir/StructureDefinition/note",
+					"value_type": "valueString",
+					"source": "primary",
+					"is_modifier": False,
+					"value_spec": {"kind": "field", "fieldname": "note"},
+				}
+			],
+		}
+		result = run(compiled, {"primary": {"note": "fragile"}})
+
+		self.assertEqual(
+			result["extension"],
+			[{"url": "http://example.org/fhir/StructureDefinition/note", "valueString": "fragile"}],
+		)
+
+	def test_slices_with_pattern_on_same_array(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"elements": {},
+			"slices": [
+				{
+					"path": "Patient.identifier",
+					"slice_name": "MRN",
+					"source": "primary",
+					"pattern": {"system": "http://hospital.org/mrn"},
+					"elements": [
+						{
+							"path": "value",
+							"datatype": "string",
+							"value_spec": {"kind": "field", "fieldname": "mrn"},
+						}
+					],
+				},
+				{
+					"path": "Patient.identifier",
+					"slice_name": "SSN",
+					"source": "primary",
+					"pattern": {"system": "http://hl7.org/fhir/sid/us-ssn"},
+					"elements": [
+						{
+							"path": "value",
+							"datatype": "string",
+							"value_spec": {"kind": "field", "fieldname": "ssn"},
+						}
+					],
+				},
+			],
+		}
+		result = run(compiled, {"primary": {"mrn": "MRN-1", "ssn": "111-22-3333"}})
+
+		self.assertEqual(
+			result["identifier"],
+			[
+				{"system": "http://hospital.org/mrn", "value": "MRN-1"},
+				{"system": "http://hl7.org/fhir/sid/us-ssn", "value": "111-22-3333"},
+			],
+		)
+
+	def test_modifier_extension_field_name(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"elements": {},
+			"extensions": [
+				{
+					"url": "http://example.org/mod",
+					"value_type": "valueBoolean",
+					"source": "primary",
+					"is_modifier": True,
+					"value_spec": {"kind": "fixed", "value": True},
+				}
+			],
+		}
+		result = run(compiled, {"primary": {}})
+
+		self.assertEqual(
+			result["modifierExtension"], [{"url": "http://example.org/mod", "valueBoolean": True}]
+		)
 
 
 if __name__ == "__main__":

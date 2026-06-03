@@ -199,8 +199,211 @@ class TestFHIRCompiler(unittest.TestCase):
 	def test_invalid_custom_json_warns_not_raises(self):
 		rm = resource_map(custom_elements="{not valid json")
 		compiled, warnings = self.compile(rm)
-		self.assertTrue(any("Invalid JSON" in w for w in warnings))
+		self.assertTrue(any("not valid JSON" in w for w in warnings))
 		self.assertEqual(compiled["meta"]["resource_type"], "Patient")
+
+	def test_collection_source_backbone_computed(self):
+		rm = resource_map(
+			sources=[source_row("phones", "Phone", kind="child_table", link_fieldname="phones")],
+			element_maps=[
+				element_row(
+					"Patient.telecom.value",
+					{"kind": "field", "source_key": "phones", "fieldname": "number"},
+					datatype="string",
+				),
+			],
+		)
+		compiled, _ = self.compile(rm)
+
+		phones = compiled["sources"]["phones"]
+		self.assertTrue(phones["is_collection"])
+		self.assertEqual(phones["fhir_path"], "Patient.telecom")
+		self.assertEqual(compiled["elements"]["Patient.telecom.value"]["source"], "phones")
+
+	def test_linked_source_is_not_collection(self):
+		rm = resource_map(
+			sources=[source_row("gender", "Gender", kind="direct_link", link_fieldname="sex")],
+		)
+		compiled, _ = self.compile(rm)
+		self.assertFalse(compiled["sources"]["gender"]["is_collection"])
+
+	def test_reference_config_from_custom(self):
+		rm = resource_map(
+			custom_elements=json.dumps(
+				{
+					"elements": [
+						{
+							"path": "Patient.managingOrganization",
+							"datatype": "Reference",
+							"reference": {"resource_type": "Organization", "display_field": "org_name"},
+							"value_spec": {"kind": "field", "fieldname": "org"},
+						}
+					]
+				}
+			),
+		)
+		compiled, _ = self.compile(rm)
+		element = compiled["elements"]["Patient.managingOrganization"]
+		self.assertEqual(element["datatype"], "Reference")
+		self.assertEqual(element["reference"], {"resource_type": "Organization", "display_field": "org_name"})
+
+	def test_extensions_compiled_from_custom(self):
+		rm = resource_map(
+			custom_elements=json.dumps(
+				{
+					"extensions": [
+						{
+							"url": "http://example.org/fhir/StructureDefinition/note",
+							"value_type": "valueString",
+							"value_spec": {"kind": "field", "fieldname": "note"},
+						}
+					]
+				}
+			),
+		)
+		compiled, _ = self.compile(rm)
+		self.assertEqual(len(compiled["extensions"]), 1)
+		extension = compiled["extensions"][0]
+		self.assertEqual(extension["host"], "Patient")
+		self.assertEqual(extension["source"], "primary")
+		self.assertEqual(extension["value_type"], "valueString")
+
+	def test_slices_compiled_from_custom(self):
+		rm = resource_map(
+			custom_elements=json.dumps(
+				{
+					"slices": [
+						{
+							"path": "Patient.identifier",
+							"slice_name": "MRN",
+							"pattern": {"system": "http://hospital.org/mrn"},
+							"elements": [
+								{
+									"path": "value",
+									"datatype": "string",
+									"value_spec": {"kind": "field", "fieldname": "mrn"},
+								}
+							],
+						}
+					]
+				}
+			),
+		)
+		compiled, _ = self.compile(rm)
+
+		self.assertEqual(len(compiled["slices"]), 1)
+		compiled_slice = compiled["slices"][0]
+		self.assertEqual(compiled_slice["path"], "Patient.identifier")
+		self.assertEqual(compiled_slice["slice_name"], "MRN")
+		self.assertEqual(compiled_slice["pattern"], {"system": "http://hospital.org/mrn"})
+		self.assertEqual(compiled_slice["elements"][0]["path"], "value")
+
+	def test_array_paths_explicit_and_excludes_collection(self):
+		rm = resource_map(
+			sources=[source_row("phones", "Phone", kind="child_table", link_fieldname="phones")],
+			element_maps=[
+				element_row(
+					"Patient.telecom.value",
+					{"kind": "field", "source_key": "phones", "fieldname": "number"},
+					datatype="string",
+				),
+			],
+			custom_elements=json.dumps({"arrays": ["Patient.name"]}),
+		)
+		compiled, _ = self.compile(rm)
+
+		self.assertIn("Patient.name", compiled["array_paths"])
+		# the collection backbone already produces a list, so it must not be wrapped again
+		self.assertNotIn("Patient.telecom", compiled["array_paths"])
+
+	def test_choice_expansion_helper(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		validator = MappingValidator({"Patient.deceased[x]": {"min": 0, "max": "1"}})
+		self.assertTrue(validator._is_choice_expansion("Patient.deceasedBoolean"))
+		self.assertFalse(validator._is_choice_expansion("Patient.gender"))
+
+	def test_required_satisfied_by_child_or_slice(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		sd_index = {"Patient.identifier": {"min": 1, "max": "*"}}
+		validator = MappingValidator(sd_index)
+
+		# satisfied by a slice under the required path
+		by_slice = {
+			"elements": {},
+			"sources": {},
+			"slices": [{"path": "Patient.identifier", "elements": [{"path": "value"}]}],
+		}
+		self.assertEqual([w for w in validator.validate(by_slice) if "Required" in w], [])
+
+		# satisfied by a mapped child element
+		by_child = {
+			"elements": {"Patient.identifier.value": {"source": "primary"}},
+			"sources": {"primary": {"doctype": "Patient"}},
+			"slices": [],
+		}
+		with mock.patch("frappe.db.exists", return_value=True):
+			required_warnings = [w for w in validator.validate(by_child) if "Required" in w]
+		self.assertEqual(required_warnings, [])
+
+	def test_required_satisfied_by_slice_pattern(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		# the profile requires the coding leaves; the slice pattern supplies them
+		sd_index = {
+			"Patient.identifier": {"min": 1, "max": "*"},
+			"Patient.identifier.type.coding.system": {"min": 1, "max": "1"},
+			"Patient.identifier.type.coding.code": {"min": 1, "max": "1"},
+		}
+		compiled = {
+			"elements": {},
+			"sources": {},
+			"slices": [
+				{
+					"path": "Patient.identifier",
+					"pattern": {"type": {"coding": [{"system": "s", "code": "MR"}]}},
+					"elements": [{"path": "value", "value_spec": {"kind": "field", "fieldname": "mrn"}}],
+				}
+			],
+		}
+		required = [w for w in MappingValidator(sd_index).validate(compiled) if "Required" in w]
+		self.assertEqual(required, [])
+
+	def test_complex_datatype_internals_not_flagged_unknown(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		sd_index = {
+			"Patient.maritalStatus": {"min": 0, "max": "1", "datatype": "CodeableConcept"},
+			"Patient.gender": {"min": 0, "max": "1", "datatype": "code"},
+		}
+		compiled = {
+			"elements": {
+				"Patient.maritalStatus.coding.code": {"source": "primary"},  # into a complex type -> OK
+				"Patient.bogus": {"source": "primary"},  # truly unknown -> warns
+			},
+			"sources": {"primary": {"doctype": "Patient"}},
+			"slices": [],
+		}
+		with mock.patch("frappe.db.exists", return_value=True):
+			warnings = MappingValidator(sd_index).validate(compiled)
+
+		unknown = [w for w in warnings if "not in the merged StructureDefinition" in w]
+		self.assertTrue(any("Patient.bogus" in w for w in unknown))
+		self.assertFalse(any("maritalStatus" in w for w in unknown))
+
+	def test_required_child_of_unmapped_optional_backbone_not_flagged(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		# Patient.link is optional (min 0); its children are required only when link is present
+		sd_index = {
+			"Patient.link": {"min": 0, "max": "*"},
+			"Patient.link.other": {"min": 1, "max": "1"},
+			"Patient.link.type": {"min": 1, "max": "1"},
+		}
+		compiled = {"elements": {}, "sources": {}, "slices": []}
+		required = [w for w in MappingValidator(sd_index).validate(compiled) if "Required" in w]
+		self.assertEqual(required, [])
 
 
 if __name__ == "__main__":

@@ -5,30 +5,17 @@
 FHIR Runtime
 
 Executes a compiled FHIR Resource Map (see ``fhir_compiler.py``) against a
-primary Frappe document to produce a FHIR resource dict.
-
-The runtime reads ONLY the compiled mapping passed to it - it never inspects the
-FHIR Resource Map document.
-
-Iteration 1 scope: single-document sources (primary / direct_link / document)
-and nested objects built from dotted FHIR paths. Repeating backbone elements
-backed by collection sources (child_table / reverse_link) are loaded but not yet
-grouped - that is iteration 2.
+primary Frappe document to produce a FHIR resource dict, reading ONLY the
+compiled mapping. Supports single-document sources, nested objects and primitive
+arrays, collection-backed repeating backbones (source-driven grouping),
+references, extensions and slices. Repeating complex backbones sourced from a
+single document are wrapped into single-element arrays via ``array_paths``.
 """
 
-import frappe
+import copy
 
-PRIMITIVE_STRING_TYPES = {
-	"uri",
-	"url",
-	"canonical",
-	"code",
-	"id",
-	"oid",
-	"uuid",
-	"markdown",
-	"base64binary",
-}
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_source_loader import SourceLoader
+from healthcare.interoperability.doctype.fhir_resource_map.fhir_value_resolver import ValueResolver
 
 
 class FHIRRuntime:
@@ -39,237 +26,199 @@ class FHIRRuntime:
 		self.meta = self.compiled.get("meta", {})
 		self.sources_def = self.compiled.get("sources", {})
 		self.elements = self.compiled.get("elements", {})
+		self.extensions = self.compiled.get("extensions", [])
+		self.slices = self.compiled.get("slices", [])
+		self.array_paths = set(self.compiled.get("array_paths", []))
 		self.resource_type = self.meta.get("resource_type")
+		self.resolver = ValueResolver()
 		self.source_docs = {}
 		self.issues = []
 
 	def generate(self, primary_id):
 		self.source_docs = {}
 		self.issues = []
+		self.resolver.issues = []
 
 		self._load_sources(primary_id)
 
 		resource = {"resourceType": self.resource_type}
-
-		for path, element in self.elements.items():
-			value = self._resolve_element(element)
+		for path, value, is_array in self._collect_writes():
 			if value is None:
 				continue
-			self._write_path(resource, path, value, element.get("is_array"))
+			parts = self._relative_path(path).split(".")
+			self._insert(resource, self.resource_type, parts, value, is_array)
 
 		return self._prune(resource) or {"resourceType": self.resource_type}
 
-	# =========================================================
-	# Source loading
-	# =========================================================
-
 	def _load_sources(self, primary_id):
-		primary_def = self._primary_source()
-		if primary_def:
-			self.source_docs["primary"] = self._load_primary(primary_def, primary_id)
+		loader = SourceLoader(self.sources_def)
+		self.source_docs = loader.load(primary_id)
+		self.issues = loader.issues
 
-		for key, source in self.sources_def.items():
-			if source.get("is_primary"):
+	# =========================================================
+	# Writes (scalar + collection + slice + extension)
+	# =========================================================
+
+	def _collect_writes(self):
+		return [
+			*self._scalar_writes(),
+			*self._collection_writes(),
+			*self._slice_writes(),
+			*self._extension_writes(),
+		]
+
+	def _scalar_writes(self):
+		writes = []
+		for path, element in self.elements.items():
+			if self._is_collection_element(element):
 				continue
-			self.source_docs[key] = self._load_source(source)
 
-	def _primary_source(self):
-		for source in self.sources_def.values():
-			if source.get("is_primary"):
-				return source
-		return None
+			doc = self.source_docs.get(element.get("source"))
+			if isinstance(doc, list):
+				continue
 
-	def _load_primary(self, source, primary_id):
-		if not primary_id:
-			return None
-		try:
-			return frappe.get_cached_doc(source["doctype"], primary_id).as_dict()
-		except frappe.DoesNotExistError:
-			self.issues.append(f"Primary document not found: {source['doctype']}/{primary_id}")
-			return None
+			value = self.resolver.resolve(element, doc)
+			if value is not None:
+				writes.append((path, value, bool(element.get("is_array"))))
+		return writes
 
-	def _load_source(self, source):
-		kind = source.get("kind")
-		if kind == "direct_link":
-			return self._load_direct_link(source)
-		if kind == "child_table":
-			return self._load_child_table(source)
-		if kind == "reverse_link":
-			return self._load_reverse_link(source)
-		return self._load_document(source)
+	def _collection_writes(self):
+		writes = []
+		for key, source in self.sources_def.items():
+			if not source.get("is_collection"):
+				continue
 
-	def _load_direct_link(self, source):
-		parent = self.source_docs.get(source.get("parent") or "primary")
-		link_field = source.get("link_fieldname")
-		if not parent or not link_field:
-			return None
+			backbone = source.get("fhir_path")
+			rows = self.source_docs.get(key)
+			if not backbone or not isinstance(rows, list):
+				continue
 
-		linked_id = parent.get(link_field)
-		if not linked_id:
-			return None
+			bound = self._elements_for_source(key)
+			items = [item for row in rows if (item := self._build_item(bound, backbone, row))]
+			if items:
+				writes.append((backbone, items, False))
+		return writes
 
-		try:
-			return frappe.get_cached_doc(source["doctype"], linked_id).as_dict()
-		except frappe.DoesNotExistError:
-			return None
+	def _build_item(self, bound_elements, backbone, row):
+		item = {}
+		prefix = f"{backbone}."
+		for path, element in bound_elements:
+			if not path.startswith(prefix):
+				continue
+			value = self.resolver.resolve(element, row)
+			if value is not None:
+				parts = path[len(prefix) :].split(".")
+				self._insert(item, backbone, parts, value, bool(element.get("is_array")))
+		return item
 
-	def _load_document(self, source):
-		filters = source.get("filters") or {}
-		if not filters:
-			return None
-		names = frappe.get_all(source["doctype"], filters=filters, pluck="name", limit=1)
-		if not names:
-			return None
-		return frappe.get_cached_doc(source["doctype"], names[0]).as_dict()
+	def _slice_writes(self):
+		grouped = {}
+		for compiled_slice in self.slices:
+			path = compiled_slice.get("path")
+			if not path:
+				continue
+			items = self._build_slice_items(compiled_slice)
+			if items:
+				grouped.setdefault(path, []).extend(items)
 
-	def _load_child_table(self, source):
-		parent = self.source_docs.get(source.get("parent") or "primary")
-		field = source.get("link_fieldname")
-		if not parent or not field:
-			return []
+		return [(path, items, False) for path, items in grouped.items()]
 
-		rows = parent.get(field) or []
-		return [row.as_dict() if hasattr(row, "as_dict") else row for row in rows]
+	def _build_slice_items(self, compiled_slice):
+		doc = self.source_docs.get(compiled_slice.get("source") or "primary")
+		rows = doc if isinstance(doc, list) else [doc]
+		return [item for row in rows if (item := self._build_slice_item(compiled_slice, row))]
 
-	def _load_reverse_link(self, source):
-		parent = self.source_docs.get(source.get("parent") or "primary")
-		link_field = source.get("link_fieldname")
-		if not parent or not link_field:
-			return []
+	def _build_slice_item(self, compiled_slice, doc):
+		item = copy.deepcopy(compiled_slice.get("pattern") or {})
+		for sub in compiled_slice.get("elements", []):
+			value = self.resolver.resolve(sub, doc)
+			if value is not None:
+				self._insert(
+					item, compiled_slice["path"], sub["path"].split("."), value, bool(sub.get("is_array"))
+				)
+		return item or None
 
-		parent_id = parent.get("name")
-		if not parent_id:
-			return []
+	def _extension_writes(self):
+		grouped = {}
+		for extension in self.extensions:
+			host = extension.get("host") or self.resource_type
+			field = "modifierExtension" if extension.get("is_modifier") else "extension"
+			items = self._build_extension_items(extension)
+			if items:
+				grouped.setdefault((host, field), []).extend(items)
 
-		filters = {link_field: parent_id}
-		filters.update(source.get("filters") or {})
-		names = frappe.get_all(source["doctype"], filters=filters, pluck="name")
-		return [frappe.get_cached_doc(source["doctype"], name).as_dict() for name in names]
+		return [(f"{host}.{field}", items, False) for (host, field), items in grouped.items()]
 
-	# =========================================================
-	# Value resolution
-	# =========================================================
+	def _build_extension_items(self, extension):
+		source = extension.get("source") or "primary"
+		doc = self.source_docs.get(source)
+		rows = doc if isinstance(doc, list) else [doc]
 
-	def _resolve_element(self, element):
-		doc = self.source_docs.get(element.get("source"))
+		value_type = extension.get("value_type") or "valueString"
+		datatype = self._extension_datatype(value_type)
+		value_spec = extension.get("value_spec") or {}
 
-		# collection sources are not grouped yet (iteration 2)
-		if isinstance(doc, list):
-			return None
+		items = []
+		for row in rows:
+			value = self.resolver.resolve_value_spec(value_spec, row)
+			if (value is None or value == "") and value_spec.get("default") is not None:
+				value = value_spec["default"]
+			value = self.resolver.transform(datatype, value)
+			if value is not None:
+				items.append({"url": extension.get("url"), value_type: value})
+		return items
 
-		value_spec = element.get("value_spec") or {}
-		value = self._resolve_value_spec(value_spec, doc)
+	def _extension_datatype(self, value_type):
+		if not value_type or not value_type.startswith("value"):
+			return "string"
+		return value_type[len("value") :].lower()
 
-		if (value is None or value == "") and value_spec.get("default") is not None:
-			value = value_spec["default"]
+	def _is_collection_element(self, element):
+		source = self.sources_def.get(element.get("source"), {})
+		return bool(source.get("is_collection"))
 
-		return self._transform(element.get("datatype"), value)
-
-	def _resolve_value_spec(self, value_spec, doc):
-		kind = value_spec.get("kind")
-
-		if kind == "fixed":
-			return value_spec.get("value")
-		if kind == "json":
-			return value_spec.get("value")
-		if kind == "field":
-			return self._get_field(doc, value_spec.get("fieldname"))
-		if kind == "expression":
-			return self._eval_expression(value_spec.get("expression"), doc)
-		return None
-
-	def _get_field(self, doc, fieldname):
-		if not doc or not fieldname:
-			return None
-
-		value = doc
-		for part in str(fieldname).split("."):
-			if not isinstance(value, dict):
-				return None
-			value = value.get(part)
-			if value is None:
-				return None
-		return value
-
-	def _eval_expression(self, expression, doc):
-		if not expression:
-			return None
-		try:
-			return frappe.safe_eval(expression, eval_locals={"doc": doc})
-		except Exception as e:
-			self.issues.append(f"Expression failed: {expression} - {e!s}")
-			return None
+	def _elements_for_source(self, key):
+		return [(path, element) for path, element in self.elements.items() if element.get("source") == key]
 
 	# =========================================================
-	# Transformers
+	# Assembly
 	# =========================================================
 
-	def _transform(self, datatype, value):
-		if value is None:
-			return None
+	def _insert(self, node, base_path, parts, value, is_array):
+		"""Insert ``value`` at ``parts`` under ``node`` (whose absolute path is ``base_path``).
 
-		datatype = (datatype or "").strip().lower()
-
-		if datatype == "boolean":
-			if isinstance(value, str):
-				return value.strip().lower() in ("1", "true", "yes")
-			return bool(value)
-		if datatype in ("integer", "positiveint", "unsignedint"):
-			try:
-				return int(value)
-			except (ValueError, TypeError):
-				return None
-		if datatype == "decimal":
-			try:
-				return float(value)
-			except (ValueError, TypeError):
-				return None
-		if datatype == "date":
-			return self._format_date(value)
-		if datatype in ("datetime", "instant"):
-			return self._format_datetime(value)
-		if datatype == "string" or datatype in PRIMITIVE_STRING_TYPES:
-			return str(value)
-
-		# complex types / unknown datatypes pass through unchanged
-		return value
-
-	def _format_date(self, value):
-		if hasattr(value, "strftime"):
-			return value.strftime("%Y-%m-%d")
-		return str(value)[:10]
-
-	def _format_datetime(self, value):
-		if hasattr(value, "isoformat"):
-			return value.isoformat()
-		return str(value)
-
-	# =========================================================
-	# Resource assembly
-	# =========================================================
-
-	def _write_path(self, resource, fhir_path, value, is_array):
-		parts = self._relative_path(fhir_path).split(".")
-		if not parts or parts == [""]:
-			return
-
-		current = resource
+		Intermediate segments listed in ``array_paths`` are materialised as
+		single-element arrays so repeating complex backbones render correctly.
+		"""
+		absolute = base_path
 		for part in parts[:-1]:
-			node = current.get(part)
-			if not isinstance(node, dict):
-				node = {}
-				current[part] = node
-			current = node
+			absolute = f"{absolute}.{part}"
+			if absolute in self.array_paths:
+				node[part] = self._as_object_list(node.get(part))
+				node = node[part][0]
+			else:
+				if not isinstance(node.get(part), dict):
+					node[part] = {}
+				node = node[part]
 
 		leaf = parts[-1]
 		if is_array:
-			current.setdefault(leaf, [])
-			if isinstance(value, list):
-				current[leaf].extend(value)
-			else:
-				current[leaf].append(value)
+			node.setdefault(leaf, [])
+			node[leaf].extend(value if isinstance(value, list) else [value])
+		elif isinstance(value, list) and isinstance(node.get(leaf), list):
+			# combine arrays feeding the same path (e.g. a collection plus slices)
+			node[leaf].extend(value)
 		else:
-			current[leaf] = value
+			node[leaf] = value
+
+	def _as_object_list(self, child):
+		if isinstance(child, list):
+			if not child or not isinstance(child[0], dict):
+				child.insert(0, {})
+			return child
+		if isinstance(child, dict):
+			return [child]
+		return [{}]
 
 	def _relative_path(self, fhir_path):
 		prefix = f"{self.resource_type}."
