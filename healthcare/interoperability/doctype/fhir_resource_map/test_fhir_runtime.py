@@ -358,6 +358,37 @@ class TestFHIRRuntime(unittest.TestCase):
 			],
 		)
 
+	def test_slice_dropped_when_mapped_value_empty(self):
+		# an identifier slice whose only value field is blank must not emit a
+		# pattern-only identifier (fails ident-1); it is dropped entirely.
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": PRIMARY_ONLY,
+			"elements": {},
+			"slices": [
+				{
+					"path": "Patient.identifier",
+					"slice_name": "MRN",
+					"source": "primary",
+					"pattern": {"system": "http://hospital.org/mrn"},
+					"elements": [
+						{
+							"path": "value",
+							"datatype": "string",
+							"value_spec": {"kind": "field", "fieldname": "uid"},
+						}
+					],
+				}
+			],
+		}
+		# value present -> identifier emitted
+		self.assertEqual(
+			run(compiled, {"primary": {"uid": "MRN-1"}})["identifier"],
+			[{"system": "http://hospital.org/mrn", "value": "MRN-1"}],
+		)
+		# value blank -> slice dropped, no identifier at all
+		self.assertEqual(run(compiled, {"primary": {}}), {"resourceType": "Patient"})
+
 	def test_modifier_extension_field_name(self):
 		compiled = {
 			"meta": {"resource_type": "Patient"},

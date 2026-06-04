@@ -137,12 +137,20 @@ class FHIRRuntime:
 
 	def _build_slice_item(self, compiled_slice, doc):
 		item = copy.deepcopy(compiled_slice.get("pattern") or {})
-		for sub in compiled_slice.get("elements", []):
+		subs = compiled_slice.get("elements", [])
+		produced = False
+		for sub in subs:
 			value = self.resolver.resolve(sub, doc)
 			if value is not None:
+				produced = True
 				self._insert(
 					item, compiled_slice["path"], sub["path"].split("."), value, bool(sub.get("is_array"))
 				)
+		# a slice that maps value sub-elements but produced none is empty data
+		# (e.g. an identifier slice whose value field is blank) -> drop it, so we
+		# don't emit a pattern-only item that fails constraints like ident-1
+		if subs and not produced:
+			return None
 		return item or None
 
 	def _extension_writes(self):
