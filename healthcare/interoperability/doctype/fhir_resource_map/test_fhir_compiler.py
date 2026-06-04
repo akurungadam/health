@@ -548,6 +548,42 @@ class TestFHIRCompiler(unittest.TestCase):
 			warnings = MappingValidator(sd_index).validate(compiled)
 		self.assertTrue(any("complex datatype" in w and "maritalStatus" in w for w in warnings))
 
+	def test_coded_codeableconcept_subelements_compile_clean(self):
+		# the documented fix for the complex-as-scalar warning: map the CodeableConcept
+		# sub-elements (.coding.system/.code/.text), not the whole concept -> no warning.
+		rm = resource_map(
+			element_maps=[
+				element_row(
+					"Patient.maritalStatus.coding.system",
+					{
+						"kind": "fixed",
+						"value": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+					},
+					datatype="uri",
+				),
+				element_row(
+					"Patient.maritalStatus.coding.code",
+					{
+						"kind": "field",
+						"source_key": "primary",
+						"fieldname": "marital_status",
+						"map": {"Married": "M", "*": "UNK"},
+					},
+					datatype="code",
+				),
+				element_row(
+					"Patient.maritalStatus.text",
+					{"kind": "field", "source_key": "primary", "fieldname": "marital_status"},
+					datatype="string",
+				),
+			]
+		)
+		compiled, warnings = self.compile(rm)
+		self.assertFalse(any("complex datatype" in w for w in warnings))
+		# and the value map survived compilation
+		code = compiled["elements"]["Patient.maritalStatus.coding.code"]
+		self.assertEqual(code["value_spec"]["map"], {"Married": "M", "*": "UNK"})
+
 	def test_required_child_of_unmapped_optional_backbone_not_flagged(self):
 		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
 

@@ -1,0 +1,139 @@
+{
+  "description": "Patient with PROPERLY CODED CodeableConcepts: maritalStatus (v3-MaritalStatus) and a contact.relationship (v2-0131) sourced from a contacts collection. coding arrays are forced via custom 'arrays' (no SD). Demonstrates the fix for the complex-datatype-as-scalar warning: map .coding.system (fixed) + .coding.code (field+value map) + .text, not the whole CC.",
+  "primary_id": "PAT-002",
+  "compiled": {
+    "meta": {
+      "resource_type": "Patient",
+      "primary_doctype": "Patient",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [
+      "Patient.maritalStatus.coding",
+      "Patient.contact.relationship",
+      "Patient.contact.relationship.coding"
+    ],
+    "sources": {
+      "primary": {
+        "doctype": "Patient",
+        "kind": "document",
+        "is_primary": true
+      },
+      "contacts": {
+        "doctype": "Patient Relation",
+        "kind": "child_table",
+        "is_primary": false,
+        "is_collection": true,
+        "parent": "primary",
+        "link_fieldname": "patient_relations",
+        "fhir_path": "Patient.contact"
+      }
+    },
+    "elements": {
+      "Patient.maritalStatus.coding.system": {
+        "source": "primary",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus"
+        }
+      },
+      "Patient.maritalStatus.coding.code": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "marital_status",
+          "map": {
+            "Married": "M",
+            "Single": "S",
+            "Divorced": "D",
+            "Widowed": "W",
+            "*": "UNK"
+          }
+        }
+      },
+      "Patient.maritalStatus.text": {
+        "source": "primary",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "marital_status"
+        }
+      },
+      "Patient.contact.name.text": {
+        "source": "contacts",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "contact_name"
+        }
+      },
+      "Patient.contact.relationship.coding.system": {
+        "source": "contacts",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "http://terminology.hl7.org/CodeSystem/v2-0131"
+        }
+      },
+      "Patient.contact.relationship.coding.code": {
+        "source": "contacts",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "relationship",
+          "map": {
+            "Next of Kin": "N",
+            "Emergency Contact": "C",
+            "*": "O"
+          }
+        }
+      }
+    },
+    "extensions": [],
+    "slices": []
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Patient",
+      "name": "PAT-002",
+      "marital_status": "Married"
+    },
+    "contacts": [
+      {
+        "contact_name": "Jane Doe",
+        "relationship": "Next of Kin"
+      }
+    ]
+  },
+  "expected": {
+    "resourceType": "Patient",
+    "maritalStatus": {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus",
+          "code": "M"
+        }
+      ],
+      "text": "Married"
+    },
+    "contact": [
+      {
+        "name": {
+          "text": "Jane Doe"
+        },
+        "relationship": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0131",
+                "code": "N"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
