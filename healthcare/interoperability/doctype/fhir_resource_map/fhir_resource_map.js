@@ -66,6 +66,10 @@ const ELEMENTS_MAP_STYLES = `
 .fhir-em-col-map { width: 26%; }
 .fhir-em-pill { margin-left: 6px; }
 .fhir-map-kb-hint { margin-right: auto; font-size: 12px; padding-left: 4px; }
+.fhir-vmap-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.fhir-vmap-row .fhir-vmap-k, .fhir-vmap-row .fhir-vmap-v { flex: 1; }
+.fhir-vmap-add { margin-top: 4px; }
+.fhir-vmap-hint { font-size: 12px; margin-top: 6px; }
 `;
 
 // =========================================================
@@ -523,6 +527,7 @@ const MappingDialog = {
 		this._setInitialSourceKey(dialog, pointer, pointerKind);
 		await this._refreshFieldOptions(dialog, sourcesIndex);
 		this._appendKeyboardHint(dialog);
+		ValueMapGrid.render(dialog.fields_dict.value_map?.$wrapper, pointer.map);
 	},
 
 	_val(dialog, fieldname) {
@@ -607,14 +612,9 @@ const MappingDialog = {
 						: row.fixed_value || "",
 			},
 			{
-				fieldtype: "Code",
+				fieldtype: "HTML",
 				fieldname: "value_map",
 				label: "Value Map (optional)",
-				options: "JSON",
-				description: __(
-					'Translate a local value to a FHIR code, e.g. {"Male": "male", "Female": "female", "*": "unknown"} ("*" = fallback).',
-				),
-				default: pointer.map ? Utils.safeJsonStringify(pointer.map) : "",
 			},
 			{
 				fieldtype: "Code",
@@ -668,15 +668,8 @@ const MappingDialog = {
 	},
 
 	_applyValueMap(dialog, pointer) {
-		const parsed = Utils.safeJsonParse(this._val(dialog, "value_map"));
-		if (
-			parsed &&
-			typeof parsed === "object" &&
-			!Array.isArray(parsed) &&
-			Object.keys(parsed).length
-		) {
-			pointer.map = parsed;
-		}
+		const map = ValueMapGrid.read(dialog.fields_dict.value_map?.$wrapper);
+		if (Object.keys(map).length) pointer.map = map;
 	},
 
 	_initDialogState(frm, dialog, sourceSelect, row) {
@@ -835,7 +828,13 @@ const MappingDialog = {
 		const field = dialog.fields_dict?.[fieldname];
 		if (!field) return;
 		field.df.hidden = hidden ? 1 : 0;
-		field.refresh();
+		// HTML fields (the value-map grid) lose their injected content on refresh,
+		// so just toggle the wrapper and keep the rendered grid intact.
+		if (field.df.fieldtype === "HTML") {
+			field.$wrapper?.toggle(!hidden);
+		} else {
+			field.refresh();
+		}
 	},
 
 	async _refreshFieldOptions(dialog, sourcesIndex) {
@@ -877,6 +876,23 @@ const MappingDialog = {
 			"reference_display_field",
 			includeDisplayField ? optionLines : [""],
 		);
+		// restore the saved selection (stored bare, options are "field|Label")
+		this._reconcileSelect(dialog, "frappe_field");
+		if (includeDisplayField)
+			this._reconcileSelect(dialog, "reference_display_field");
+	},
+
+	_reconcileSelect(dialog, fieldname) {
+		const field = dialog.fields_dict?.[fieldname];
+		if (!field) return;
+
+		const current = String(dialog.get_value(fieldname) || "").trim();
+		if (!current || current.includes("|")) return;
+
+		const match = String(field.df.options || "")
+			.split("\n")
+			.find(line => line.split("|")[0].trim() === current);
+		if (match) dialog.set_value(fieldname, match);
 	},
 
 	_setSelectOptions(dialog, fieldname, options) {
@@ -1230,6 +1246,67 @@ const PreviewDialog = {
 				<ul class="mb-0 mt-2">${items}</ul>
 			</div>
 		`;
+	},
+};
+
+// =========================================================
+// Value Map Grid (key/value editor for inline code translation)
+// =========================================================
+
+const ValueMapGrid = {
+	render($wrapper, mapObj) {
+		if (!$wrapper) return;
+
+		$wrapper.empty().append(`
+			<div class="fhir-vmap">
+				<div class="fhir-vmap-rows"></div>
+				<button type="button" class="btn btn-xs btn-default fhir-vmap-add">${__(
+					"+ Add mapping",
+				)}</button>
+				<div class="text-muted fhir-vmap-hint">${__(
+					'Translate a local value to a FHIR code. Use "*" as the key for a fallback.',
+				)}</div>
+			</div>
+		`);
+
+		const $rows = $wrapper.find(".fhir-vmap-rows");
+		const addRow = (key = "", value = "") =>
+			$rows.append(this._rowHtml(key, value));
+
+		const entries = Object.entries(mapObj || {});
+		if (entries.length) entries.forEach(([k, v]) => addRow(k, String(v)));
+		else addRow();
+
+		$wrapper.find(".fhir-vmap-add").on("click", () => addRow());
+		$wrapper.on("click", ".fhir-vmap-del", e =>
+			$(e.currentTarget).closest(".fhir-vmap-row").remove(),
+		);
+	},
+
+	_rowHtml(key, value) {
+		return `
+			<div class="fhir-vmap-row">
+				<input class="form-control input-xs fhir-vmap-k" placeholder="${__(
+					"local value",
+				)}" value="${Utils.escapeHtml(key)}"/>
+				<input class="form-control input-xs fhir-vmap-v" placeholder="${__(
+					"FHIR code",
+				)}" value="${Utils.escapeHtml(value)}"/>
+				<button type="button" class="btn btn-xs btn-default fhir-vmap-del">×</button>
+			</div>
+		`;
+	},
+
+	read($wrapper) {
+		const map = {};
+		if (!$wrapper) return map;
+
+		$wrapper.find(".fhir-vmap-row").each((_, el) => {
+			const key = String($(el).find(".fhir-vmap-k").val() || "").trim();
+			const value = String($(el).find(".fhir-vmap-v").val() || "").trim();
+			if (key) map[key] = value;
+		});
+		return map;
 	},
 };
 
