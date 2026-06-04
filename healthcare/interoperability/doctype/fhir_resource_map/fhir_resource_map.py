@@ -71,11 +71,20 @@ def get_elements_from_structure_definitions(fhir_resource_map):
 @frappe.whitelist()
 def generate_fhir_resource(resource_map_name, docname):
 	resource_map = frappe.get_doc("FHIR Resource Map", resource_map_name)
+	resource_map.check_permission("read")
 
 	if not resource_map.compiled_mapping:
 		frappe.throw(
 			_("Resource map '{0}' has no compiled mapping. Save it first.").format(resource_map_name)
 		)
 
+	# The generated resource exposes the source document's data, so the caller
+	# must be allowed to read that document.
+	primary_doctype = resource_map.primary_doctype
+	if primary_doctype and not frappe.has_permission(primary_doctype, "read", doc=docname):
+		raise frappe.PermissionError(_("Not permitted to read {0} {1}").format(primary_doctype, docname))
+
 	compiled = json.loads(resource_map.compiled_mapping)
-	return FHIRRuntime(compiled).generate(docname)
+	runtime = FHIRRuntime(compiled)
+	resource = runtime.generate(docname)
+	return {"resource": resource, "issues": runtime.issues}

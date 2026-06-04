@@ -220,6 +220,52 @@ class TestFHIRCompiler(unittest.TestCase):
 		self.assertEqual(phones["fhir_path"], "Patient.telecom")
 		self.assertEqual(compiled["elements"]["Patient.telecom.value"]["source"], "phones")
 
+	def test_explicit_source_fhir_path_is_honoured(self):
+		rm = resource_map(
+			custom_elements=json.dumps(
+				{
+					"sources": [
+						{
+							"key": "encounters",
+							"doctype": "Patient Encounter",
+							"kind": "reverse_link",
+							"link_fieldname": "patient",
+							"fhir_path": "Patient.generalPractitioner",
+						}
+					],
+					"elements": [
+						{
+							"path": "Patient.generalPractitioner",
+							"source": "encounters",
+							"datatype": "Reference",
+							"reference": {"resource_type": "Practitioner"},
+							"value_spec": {"kind": "field", "fieldname": "practitioner"},
+						}
+					],
+				}
+			),
+		)
+		compiled, _ = self.compile(rm)
+		self.assertEqual(compiled["sources"]["encounters"]["fhir_path"], "Patient.generalPractitioner")
+
+	def test_dynamic_link_source_is_collection_with_backbone(self):
+		rm = resource_map(
+			sources=[source_row("addresses", "Address", kind="dynamic_link")],
+			element_maps=[
+				element_row(
+					"Patient.address.city",
+					{"kind": "field", "source_key": "addresses", "fieldname": "city"},
+					datatype="string",
+				),
+			],
+		)
+		compiled, _ = self.compile(rm)
+
+		addresses = compiled["sources"]["addresses"]
+		self.assertEqual(addresses["kind"], "dynamic_link")
+		self.assertTrue(addresses["is_collection"])
+		self.assertEqual(addresses["fhir_path"], "Patient.address")
+
 	def test_linked_source_is_not_collection(self):
 		rm = resource_map(
 			sources=[source_row("gender", "Gender", kind="direct_link", link_fieldname="sex")],

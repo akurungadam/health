@@ -106,8 +106,10 @@ class IntegrationTestFHIRResourceMap(IntegrationTestCase):
 
 		todo = frappe.get_doc({"doctype": "ToDo", "description": "demo"}).insert(ignore_permissions=True)
 
-		resource = generate_fhir_resource(resource_map.name, todo.name)
+		result = generate_fhir_resource(resource_map.name, todo.name)
 
+		self.assertEqual(result["issues"], [])
+		resource = result["resource"]
 		self.assertEqual(resource["resourceType"], "Basic")
 		self.assertEqual(resource["id"], todo.name)
 		self.assertEqual(resource["code"], {"text": "vitals"})

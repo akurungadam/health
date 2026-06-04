@@ -48,6 +48,8 @@ class FHIRRuntime:
 			parts = self._relative_path(path).split(".")
 			self._insert(resource, self.resource_type, parts, value, is_array)
 
+		# resolver issues accrue during _collect_writes; fold them into the run's issues
+		self.issues.extend(self.resolver.issues)
 		return self._prune(resource) or {"resourceType": self.resource_type}
 
 	def _load_sources(self, primary_id):
@@ -100,6 +102,11 @@ class FHIRRuntime:
 		return writes
 
 	def _build_item(self, bound_elements, backbone, row):
+		# an element mapped AT the backbone => each row is a single value (e.g. a Reference)
+		for path, element in bound_elements:
+			if path == backbone:
+				return self.resolver.resolve(element, row)
+
 		item = {}
 		prefix = f"{backbone}."
 		for path, element in bound_elements:

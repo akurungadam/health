@@ -190,6 +190,85 @@ class TestFHIRRuntime(unittest.TestCase):
 			],
 		)
 
+	def test_dynamic_link_collection_grouping(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": {
+				"primary": {"doctype": "Patient", "kind": "document", "is_primary": True},
+				"addresses": {
+					"doctype": "Address",
+					"kind": "dynamic_link",
+					"is_primary": False,
+					"is_collection": True,
+					"parent": "primary",
+					"fhir_path": "Patient.address",
+				},
+			},
+			"elements": {
+				"Patient.address.city": element(
+					source="addresses", datatype="string", kind="field", fieldname="city"
+				),
+				"Patient.address.line": element(
+					source="addresses",
+					datatype="string",
+					is_array=True,
+					kind="field",
+					fieldname="address_line1",
+				),
+			},
+		}
+		docs = {
+			"primary": {"name": "P-1"},
+			"addresses": [
+				{"city": "Kochi", "address_line1": "1 MG Rd"},
+				{"city": "Delhi", "address_line1": "2 CP"},
+			],
+		}
+		result = run(compiled, docs)
+
+		self.assertEqual(
+			result["address"],
+			[{"city": "Kochi", "line": ["1 MG Rd"]}, {"city": "Delhi", "line": ["2 CP"]}],
+		)
+
+	def test_collection_of_references_at_backbone(self):
+		compiled = {
+			"meta": {"resource_type": "Patient"},
+			"sources": {
+				"primary": {"doctype": "Patient", "kind": "document", "is_primary": True},
+				"encounters": {
+					"doctype": "Patient Encounter",
+					"kind": "reverse_link",
+					"is_primary": False,
+					"is_collection": True,
+					"parent": "primary",
+					"fhir_path": "Patient.generalPractitioner",
+				},
+			},
+			"elements": {
+				"Patient.generalPractitioner": {
+					"source": "encounters",
+					"datatype": "Reference",
+					"is_array": False,
+					"reference": {"resource_type": "Practitioner"},
+					"value_spec": {"kind": "field", "fieldname": "practitioner"},
+				},
+			},
+		}
+		docs = {
+			"primary": {"name": "P-1"},
+			"encounters": [{"practitioner": "DR-1"}, {"practitioner": "DR-2"}],
+		}
+		result = run(compiled, docs)
+
+		self.assertEqual(
+			result["generalPractitioner"],
+			[
+				{"reference": "Practitioner/DR-1", "type": "Practitioner"},
+				{"reference": "Practitioner/DR-2", "type": "Practitioner"},
+			],
+		)
+
 	def test_reference_with_type_and_display(self):
 		compiled = {
 			"meta": {"resource_type": "Patient"},
@@ -299,6 +378,21 @@ class TestFHIRRuntime(unittest.TestCase):
 		self.assertEqual(
 			result["modifierExtension"], [{"url": "http://example.org/mod", "valueBoolean": True}]
 		)
+
+
+class TestSourceLoaderChildTable(unittest.TestCase):
+	def test_child_table_rows_from_frappe_dict(self):
+		# frappe._dict returns None for missing attrs, so an `as_dict` hasattr check
+		# wrongly passes; rows must be detected as dicts and used as-is.
+		from frappe import _dict
+
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_source_loader import SourceLoader
+
+		loader = SourceLoader({})
+		docs = {"primary": _dict({"phone_numbers": [_dict({"number": "123"})]})}
+		source = {"kind": "child_table", "parent": "primary", "link_fieldname": "phone_numbers"}
+
+		self.assertEqual(loader._child_table(source, docs), [{"number": "123"}])
 
 
 if __name__ == "__main__":

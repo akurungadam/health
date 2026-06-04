@@ -1037,8 +1037,8 @@ const PreviewDialog = {
 		const docname = await this._promptPrimaryDocument(frm);
 		if (!docname) return;
 
-		const resource = await this._generate(frm, docname);
-		if (resource) this._show(resource);
+		const result = await this._generate(frm, docname);
+		if (result && result.resource) this._show(result.resource, result.issues || []);
 	},
 
 	_canPreview(frm) {
@@ -1086,13 +1086,17 @@ const PreviewDialog = {
 		return res.message;
 	},
 
-	_show(resource) {
+	_show(resource, issues) {
 		const json = Utils.safeJsonStringify(resource);
 
 		const dialog = new frappe.ui.Dialog({
 			title: __("FHIR Resource Preview"),
 			size: "large",
 			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "issues_html",
+				},
 				{
 					fieldtype: "Code",
 					fieldname: "resource_json",
@@ -1108,8 +1112,23 @@ const PreviewDialog = {
 			},
 		});
 
+		dialog.fields_dict.issues_html.$wrapper.html(this._issuesHtml(issues));
 		dialog.show();
 		dialog.set_value("resource_json", json);
+	},
+
+	_issuesHtml(issues) {
+		if (!issues || !issues.length) return "";
+
+		const items = issues
+			.map(issue => `<li>${Utils.escapeHtml(issue)}</li>`)
+			.join("");
+		return `
+			<div class="alert alert-warning" role="alert">
+				<strong>${__("Generated with {0} issue(s):", [issues.length])}</strong>
+				<ul class="mb-0 mt-2">${items}</ul>
+			</div>
+		`;
 	},
 };
 

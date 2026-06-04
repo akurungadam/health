@@ -54,6 +54,8 @@ class SourceLoader:
 			return self._child_table(source, docs)
 		if kind == "reverse_link":
 			return self._reverse_link(source, docs)
+		if kind == "dynamic_link":
+			return self._dynamic_link(source, docs)
 		return self._document(source)
 
 	def _direct_link(self, source, docs):
@@ -85,7 +87,8 @@ class SourceLoader:
 			return []
 
 		rows = parent.get(field) or []
-		return [row.as_dict() if hasattr(row, "as_dict") else row for row in rows]
+		# child rows from as_dict() are already (frappe._)dicts; only Documents need as_dict()
+		return [row if isinstance(row, dict) else row.as_dict() for row in rows]
 
 	def _reverse_link(self, source, docs):
 		parent = docs.get(source.get("parent") or "primary")
@@ -101,3 +104,27 @@ class SourceLoader:
 		filters.update(source.get("filters") or {})
 		names = frappe.get_all(source["doctype"], filters=filters, pluck="name")
 		return [frappe.get_cached_doc(source["doctype"], name).as_dict() for name in names]
+
+	def _dynamic_link(self, source, docs):
+		"""Children linked to the parent via Frappe's standard Dynamic Link table
+		(e.g. Address/Contact linked to Patient through their ``links`` table)."""
+		parent = docs.get(source.get("parent") or "primary")
+		if not parent:
+			return []
+
+		parent_doctype = parent.get("doctype")
+		parent_id = parent.get("name")
+		if not parent_doctype or not parent_id:
+			return []
+
+		names = frappe.get_all(
+			"Dynamic Link",
+			filters={
+				"link_doctype": parent_doctype,
+				"link_name": parent_id,
+				"parenttype": source["doctype"],
+			},
+			pluck="parent",
+		)
+		unique_names = list(dict.fromkeys(names))
+		return [frappe.get_cached_doc(source["doctype"], name).as_dict() for name in unique_names]

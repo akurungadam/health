@@ -25,7 +25,7 @@ from healthcare.interoperability.doctype.fhir_resource_map.fhir_sd_loader import
 )
 from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
 
-COLLECTION_KINDS = ("child_table", "reverse_link")
+COLLECTION_KINDS = ("child_table", "reverse_link", "dynamic_link")
 
 
 class FHIRCompiler:
@@ -155,6 +155,8 @@ class FHIRCompiler:
 				link_fieldname=source_def.get("link_fieldname") or source_def.get("link_field"),
 				filters=source_def.get("filters") or {},
 			)
+			if source_def.get("fhir_path"):
+				sources[key]["fhir_path"] = source_def["fhir_path"]
 
 		return sources
 
@@ -217,7 +219,7 @@ class FHIRCompiler:
 
 	def _assign_collection_backbones(self, sources, elements):
 		for key, source in sources.items():
-			if not source.get("is_collection"):
+			if not source.get("is_collection") or source.get("fhir_path"):
 				continue
 
 			paths = [path for path, element in elements.items() if element.get("source") == key]
