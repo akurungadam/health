@@ -472,13 +472,27 @@ const ElementsMapUI = {
 					label = pointer.source_key === "primary" ? `${dt} (Primary)` : dt;
 				}
 			} catch (e) {}
+
+			if (pointer.reference_type) {
+				return `<span class="text-muted">Reference → ${Utils.escapeHtml(
+					pointer.reference_type,
+				)}</span> · ${Utils.escapeHtml(pointer.fieldname || "")}`;
+			}
+
+			const mapHint = pointer.map
+				? ` <span class="text-muted">· mapped codes</span>`
+				: "";
 			return `<span class="text-muted">${Utils.escapeHtml(
 				label,
-			)}</span> → ${Utils.escapeHtml(pointer.fieldname || "")}`;
+			)}</span> → ${Utils.escapeHtml(pointer.fieldname || "")}${mapHint}`;
 		}
 
 		if (kind === "fixed") {
 			return `<span class="text-muted">Fixed</span>`;
+		}
+
+		if (kind === "expression") {
+			return `<span class="text-muted">Expression</span>`;
 		}
 
 		return `<span class="text-muted">Mapped</span>`;
@@ -542,8 +556,8 @@ const MappingDialog = {
 				fieldtype: "Select",
 				fieldname: "mapping_type",
 				label: "Mapping Type",
-				options: "\nFrappe Field\nFixed",
-				default: this._getMappingTypeDefault(pointer),
+				options: "\nFrappe Field\nFixed\nReference\nExpression",
+				default: this._getMappingTypeDefault(pointer, row),
 			},
 			{
 				fieldtype: "Select",
@@ -560,6 +574,35 @@ const MappingDialog = {
 				default: String(pointer.fieldname || row.frappe_field || ""),
 			},
 			{
+				fieldtype: "Data",
+				fieldname: "reference_type",
+				label: "Reference Resource Type",
+				description: __(
+					"FHIR resource the reference points to, e.g. Patient, Organization.",
+				),
+				default: this._defaultReferenceType(pointer, row),
+			},
+			{
+				fieldtype: "Select",
+				fieldname: "reference_display_field",
+				label: "Display Field (optional)",
+				options: "",
+				default: String(pointer.display_field || ""),
+			},
+			{
+				fieldtype: "Code",
+				fieldname: "expression",
+				label: "Expression",
+				options: "Python",
+				description: __(
+					"Python expression; 'doc' is the source document. e.g. doc.codification_table[0].code",
+				),
+				default:
+					pointer.kind === "expression"
+						? String(pointer.expression || "")
+						: row.expression || "",
+			},
+			{
 				fieldtype: "Code",
 				fieldname: "fixed_value",
 				label: "Fixed Value",
@@ -568,6 +611,16 @@ const MappingDialog = {
 					pointer.kind === "fixed"
 						? Utils.safeJsonStringify(pointer.value ?? null)
 						: row.fixed_value || "",
+			},
+			{
+				fieldtype: "Code",
+				fieldname: "value_map",
+				label: "Value Map (optional)",
+				options: "JSON",
+				description: __(
+					'Translate a local value to a FHIR code, e.g. {"Male": "male", "Female": "female", "*": "unknown"} ("*" = fallback).',
+				),
+				default: pointer.map ? Utils.safeJsonStringify(pointer.map) : "",
 			},
 			{
 				fieldtype: "Code",
@@ -582,11 +635,59 @@ const MappingDialog = {
 		];
 	},
 
-	_getMappingTypeDefault(pointer) {
+	_getMappingTypeDefault(pointer, row) {
 		const kind = String(pointer.kind || "").trim();
+		const datatype = String((row && row.datatype) || "")
+			.trim()
+			.toLowerCase();
+
+		if (pointer.reference_type || (kind === "field" && datatype === "reference")) {
+			return "Reference";
+		}
 		if (kind === "field") return "Frappe Field";
 		if (kind === "fixed") return "Fixed";
-		return "";
+		if (kind === "expression") return "Expression";
+		// unmapped element whose datatype is a reference -> pre-select Reference
+		return datatype === "reference" ? "Reference" : "";
+	},
+
+	_defaultReferenceType(pointer, row) {
+		if (pointer && pointer.reference_type) return String(pointer.reference_type);
+
+		const raw = String((row && row.target_profiles) || "").trim();
+		if (!raw) return "";
+
+		let data;
+		try {
+			data = JSON.parse(raw);
+		} catch (e) {
+			data = raw;
+		}
+		const url = Array.isArray(data) ? data[0] : data;
+		if (!url) return "";
+
+		const segment = String(url).replace(/\/+$/, "").split("/").pop().trim();
+		return segment || "";
+	},
+
+	_fieldValue(raw) {
+		const value = String(raw || "").trim();
+		return value.includes("|") ? value.split("|")[0].trim() : value;
+	},
+
+	_applyValueMap(dialog, pointer) {
+		const raw = String(dialog.get_value("value_map") || "").trim();
+		if (!raw) return;
+
+		const parsed = Utils.safeJsonParse(raw);
+		if (
+			parsed &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed) &&
+			Object.keys(parsed).length
+		) {
+			pointer.map = parsed;
+		}
 	},
 
 	_initDialogState(frm, dialog, sourceSelect, row) {
@@ -632,7 +733,7 @@ const MappingDialog = {
 	},
 
 	_setInitialSourceKey(dialog, pointer, pointerKind) {
-		if (pointerKind === "field") {
+		if (pointerKind === "field" || pointerKind === "expression") {
 			const existingKey = String(pointer.source_key || "").trim();
 			const label = dialog.__from_source_key_to_label?.[existingKey];
 			if (label) dialog.set_value("source_key", label);
@@ -650,13 +751,30 @@ const MappingDialog = {
 		let newPointer = null;
 
 		if (mappingType === "Frappe Field") {
-			const selected = String(dialog.get_value("frappe_field") || "").trim();
-			const fieldname = selected.includes("|")
-				? selected.split("|")[0].trim()
-				: selected;
-
+			const fieldname = this._fieldValue(dialog.get_value("frappe_field"));
 			if (sourceKey && fieldname) {
 				newPointer = { kind: "field", source_key: sourceKey, fieldname };
+				this._applyValueMap(dialog, newPointer);
+			}
+		} else if (mappingType === "Reference") {
+			const fieldname = this._fieldValue(dialog.get_value("frappe_field"));
+			if (sourceKey && fieldname) {
+				newPointer = { kind: "field", source_key: sourceKey, fieldname };
+
+				const referenceType = String(
+					dialog.get_value("reference_type") || "",
+				).trim();
+				if (referenceType) newPointer.reference_type = referenceType;
+
+				const displayField = this._fieldValue(
+					dialog.get_value("reference_display_field"),
+				);
+				if (displayField) newPointer.display_field = displayField;
+			}
+		} else if (mappingType === "Expression") {
+			const expression = String(dialog.get_value("expression") || "").trim();
+			if (expression) {
+				newPointer = { kind: "expression", source_key: sourceKey, expression };
 			}
 		} else if (mappingType === "Fixed") {
 			const raw = String(dialog.get_value("fixed_value") || "").trim();
@@ -673,15 +791,22 @@ const MappingDialog = {
 		row.value_pointer = newPointer ? JSON.stringify(newPointer) : "";
 		row.mapping_type = mappingType || "";
 		row.frappe_field =
-			mappingType === "Frappe Field"
+			mappingType === "Frappe Field" || mappingType === "Reference"
 				? String(dialog.get_value("frappe_field") || "")
 				: "";
 		row.fixed_value =
 			mappingType === "Fixed"
 				? String(dialog.get_value("fixed_value") || "")
 				: "";
-		row.expression = "";
+		row.expression =
+			mappingType === "Expression"
+				? String(dialog.get_value("expression") || "")
+				: "";
 		row.default_value = String(dialog.get_value("default_value") || "") || "";
+
+		if (mappingType === "Reference") {
+			row.datatype = "Reference";
+		}
 
 		if (isChoice) {
 			const newFhirPath = String(dialog.get_value("fhir_path") || "").trim();
@@ -700,14 +825,31 @@ const MappingDialog = {
 	_applyVisibility(dialog) {
 		const mappingType = String(dialog.get_value("mapping_type") || "").trim();
 
-		this._setFieldHidden(dialog, "source_key", true);
-		this._setFieldHidden(dialog, "frappe_field", true);
-		this._setFieldHidden(dialog, "fixed_value", true);
+		for (const fieldname of [
+			"source_key",
+			"frappe_field",
+			"reference_type",
+			"reference_display_field",
+			"expression",
+			"fixed_value",
+			"value_map",
+		]) {
+			this._setFieldHidden(dialog, fieldname, true);
+		}
 		this._setFieldHidden(dialog, "default_value", !mappingType);
 
 		if (mappingType === "Frappe Field") {
 			this._setFieldHidden(dialog, "source_key", false);
 			this._setFieldHidden(dialog, "frappe_field", false);
+			this._setFieldHidden(dialog, "value_map", false);
+		} else if (mappingType === "Reference") {
+			this._setFieldHidden(dialog, "source_key", false);
+			this._setFieldHidden(dialog, "frappe_field", false);
+			this._setFieldHidden(dialog, "reference_type", false);
+			this._setFieldHidden(dialog, "reference_display_field", false);
+		} else if (mappingType === "Expression") {
+			this._setFieldHidden(dialog, "source_key", false);
+			this._setFieldHidden(dialog, "expression", false);
 		} else if (mappingType === "Fixed") {
 			this._setFieldHidden(dialog, "fixed_value", false);
 		}
@@ -722,9 +864,14 @@ const MappingDialog = {
 
 	async _refreshFieldOptions(dialog, sourcesIndex) {
 		const mappingType = String(dialog.get_value("mapping_type") || "").trim();
+		const usesSource =
+			mappingType === "Frappe Field" ||
+			mappingType === "Reference" ||
+			mappingType === "Expression";
 
-		if (mappingType !== "Frappe Field") {
+		if (!usesSource) {
 			this._setSelectOptions(dialog, "frappe_field", [""]);
+			this._setSelectOptions(dialog, "reference_display_field", [""]);
 			dialog.__resolved_from_source_key = "";
 			return;
 		}
@@ -738,9 +885,14 @@ const MappingDialog = {
 
 		dialog.__resolved_from_source_key = sourceKey;
 
-		const doctype = String(sourcesIndex[sourceKey]?.doctype || "").trim();
+		// Expression maps the whole row via 'doc'; no field dropdown needed.
+		const doctype =
+			mappingType === "Expression"
+				? ""
+				: String(sourcesIndex[sourceKey]?.doctype || "").trim();
 		if (!doctype) {
 			this._setSelectOptions(dialog, "frappe_field", [""]);
+			this._setSelectOptions(dialog, "reference_display_field", [""]);
 			return;
 		}
 
@@ -748,6 +900,9 @@ const MappingDialog = {
 		const meta = frappe.get_meta(doctype);
 		const optionLines = await FieldOptionsBuilder.build(meta);
 		this._setSelectOptions(dialog, "frappe_field", optionLines);
+		if (mappingType === "Reference") {
+			this._setSelectOptions(dialog, "reference_display_field", optionLines);
+		}
 	},
 
 	_setSelectOptions(dialog, fieldname, options) {
