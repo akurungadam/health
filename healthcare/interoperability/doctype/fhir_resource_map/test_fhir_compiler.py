@@ -548,6 +548,33 @@ class TestFHIRCompiler(unittest.TestCase):
 			warnings = MappingValidator(sd_index).validate(compiled)
 		self.assertTrue(any("complex datatype" in w and "maritalStatus" in w for w in warnings))
 
+	def test_complex_datatype_with_object_map_not_flagged(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		# kind=field but the value map translates a local code straight to a
+		# CodeableConcept object, so the resolved value is an object -> no warning.
+		compiled = {
+			"elements": {
+				"Patient.maritalStatus": {
+					"source": "primary",
+					"datatype": "CodeableConcept",
+					"value_spec": {
+						"kind": "field",
+						"fieldname": "marital_status",
+						"map": {
+							"Married": {"coding": [{"system": "s", "code": "M"}]},
+							"*": {"coding": [{"system": "s", "code": "UNK"}]},
+						},
+					},
+				},
+			},
+			"sources": {"primary": {"doctype": "Patient"}},
+			"slices": [],
+		}
+		with mock.patch("frappe.db.exists", return_value=True):
+			warnings = MappingValidator({}).validate(compiled)
+		self.assertFalse(any("complex datatype" in w for w in warnings))
+
 	def test_coded_codeableconcept_subelements_compile_clean(self):
 		# the documented fix for the complex-as-scalar warning: map the CodeableConcept
 		# sub-elements (.coding.system/.code/.text), not the whole concept -> no warning.

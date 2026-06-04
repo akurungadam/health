@@ -102,14 +102,25 @@ class MappingValidator:
 		return not datatype[0].islower()
 
 	def _is_scalar_value_spec(self, value_spec):
-		"""True when the spec yields a plain scalar (a field, or a non-object fixed)."""
+		"""True when the spec yields a plain scalar (a field, or a non-object fixed).
+
+		A value ``map`` whose entries are objects (e.g. a local code translated
+		straight to a CodeableConcept) makes the resolved value an object, so such
+		a spec is not treated as scalar.
+		"""
 		value_spec = value_spec or {}
+		if self._map_yields_object(value_spec):
+			return False
 		kind = value_spec.get("kind")
 		if kind == "field":
 			return True
 		if kind == "fixed":
 			return not isinstance(value_spec.get("value"), dict | list)
 		return False
+
+	def _map_yields_object(self, value_spec):
+		mapping = value_spec.get("map")
+		return isinstance(mapping, dict) and any(isinstance(value, dict | list) for value in mapping.values())
 
 	def _unknown_sources(self, compiled, warnings):
 		sources = compiled["sources"]
