@@ -23,6 +23,51 @@ const SKIP_FIELDTYPES = new Set([
 	"Fold",
 ]);
 
+// Element-table filters. One definition drives the toolbar, its bindings, the
+// reset and the row predicate, so a filter is added/changed in a single place.
+const ELEMENT_FILTERS = [
+	{
+		key: "filterRequired",
+		cls: "required",
+		label: "Required",
+		test: r => r._ui_required,
+	},
+	{ key: "filterChoice", cls: "choice", label: "Choice", test: r => r._ui_choice },
+	{
+		key: "filterMapped",
+		cls: "mapped",
+		label: "Mapped",
+		test: r => r._ui_mapped,
+		excludes: "filterUnmapped",
+	},
+	{
+		key: "filterUnmapped",
+		cls: "unmapped",
+		label: "Unmapped",
+		test: r => !r._ui_mapped,
+		excludes: "filterMapped",
+	},
+];
+
+const ELEMENTS_MAP_STYLES = `
+.fhir-em-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.fhir-em-search-wrap { flex: 1; min-width: 260px; }
+.fhir-em-toolbar .fhir-em-filter { margin: 0; }
+.fhir-em-toolbar .fhir-em-filter span { margin-left: 6px; }
+.fhir-em-table { margin: 0; }
+.fhir-em-empty { padding: 12px; }
+.elements-map-row { cursor: pointer; }
+.fhir-em-pathwrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fhir-em-pathname { font-weight: 600; }
+.fhir-em-hint { font-size: 12px; margin-top: 4px; }
+.fhir-em-col-path { width: 44%; }
+.fhir-em-col-dt { width: 14%; }
+.fhir-em-col-min, .fhir-em-col-max { width: 8%; }
+.fhir-em-col-map { width: 26%; }
+.fhir-em-pill { margin-left: 6px; }
+.fhir-map-kb-hint { margin-right: auto; font-size: 12px; padding-left: 4px; }
+`;
+
 // =========================================================
 // Form Events
 // =========================================================
@@ -58,13 +103,9 @@ frappe.ui.form.on("FHIR Resource Map", {
 const FormState = {
 	init(frm) {
 		if (!frm._elements_map_state) {
-			frm._elements_map_state = {
-				search: "",
-				filterRequired: false,
-				filterChoice: false,
-				filterMapped: false,
-				filterUnmapped: false,
-			};
+			const state = { search: "" };
+			for (const f of ELEMENT_FILTERS) state[f.key] = false;
+			frm._elements_map_state = state;
 		}
 
 		frm._elements_map_ui_built = frm._elements_map_ui_built || false;
@@ -82,10 +123,7 @@ const FormState = {
 	resetFilters(frm) {
 		const state = this.getState(frm);
 		state.search = "";
-		state.filterRequired = false;
-		state.filterChoice = false;
-		state.filterMapped = false;
-		state.filterUnmapped = false;
+		for (const f of ELEMENT_FILTERS) state[f.key] = false;
 	},
 };
 
@@ -96,13 +134,11 @@ const FormState = {
 const FormButtons = {
 	setup(frm) {
 		frm.clear_custom_buttons();
-		this._addLoadFromProfileButton(frm);
-		this._addPreviewButton(frm);
-	},
-
-	_addLoadFromProfileButton(frm) {
 		frm.add_custom_button(__("Load from Profile"), () =>
 			this._loadFromProfile(frm),
+		);
+		frm.add_custom_button(__("Preview FHIR Resource"), () =>
+			PreviewDialog.open(frm),
 		);
 	},
 
@@ -153,19 +189,12 @@ const FormButtons = {
 		});
 	},
 
-	_addPreviewButton(frm) {
-		frm.add_custom_button(__("Preview FHIR Resource"), () =>
-			PreviewDialog.open(frm),
-		);
-	},
-
 	_hasProfileSource(frm) {
-		return (frm.doc.profiles || []).some(row => {
-			return (
+		return (frm.doc.profiles || []).some(
+			row =>
 				String(row.fhir_structure_definition || "").trim() ||
-				String(row.fhir_profile || "").trim()
-			);
-		});
+				String(row.fhir_profile || "").trim(),
+		);
 	},
 
 	_requireSaved(frm, saveMessage) {
@@ -209,7 +238,7 @@ const ElementsMapUI = {
 	},
 
 	_buildInitialUI(frm, wrapper) {
-		const state = FormState.getState(frm);
+		this._injectStyles();
 
 		wrapper.empty();
 		wrapper.append(`
@@ -219,18 +248,26 @@ const ElementsMapUI = {
 			</div>
 		`);
 
-		const toolbarSlot = wrapper.find(".elements-map-toolbar-slot");
-		toolbarSlot.append(this._buildToolbar(state));
-		this._bindToolbarEvents(frm, wrapper, state);
+		wrapper
+			.find(".elements-map-toolbar-slot")
+			.append(this._buildToolbar(FormState.getState(frm)));
+		this._bindToolbarEvents(frm, wrapper);
+	},
+
+	_injectStyles() {
+		if (document.getElementById("fhir-em-styles")) return;
+		const style = document.createElement("style");
+		style.id = "fhir-em-styles";
+		style.textContent = ELEMENTS_MAP_STYLES;
+		document.head.appendChild(style);
 	},
 
 	_renderTable(frm) {
 		const wrapper = frm.fields_dict.elements_map_html?.$wrapper;
 		if (!wrapper) return;
 
-		const state = FormState.getState(frm);
 		const rows = (frm.doc.element_maps || []).map(this._normalizeRow);
-		const filtered = this._applyFilters(rows, state);
+		const filtered = this._applyFilters(rows, FormState.getState(frm));
 
 		const tableSlot = wrapper.find(".elements-map-table-slot");
 		tableSlot.empty();
@@ -239,20 +276,17 @@ const ElementsMapUI = {
 	},
 
 	_normalizeRow(row) {
-		const fhirPath = String(row.fhir_path || "");
-		const min = Utils.toInt(row.min);
 		const pointer = Utils.safeJsonParse(String(row.value_pointer || "").trim());
-
-		const isMapped =
-			!!pointer &&
-			typeof pointer === "object" &&
-			!!String(pointer.kind || "").trim();
+		const min = Utils.toInt(row.min);
 
 		return {
 			...row,
 			_ui_required: min >= 1,
-			_ui_choice: fhirPath.includes("[x]"),
-			_ui_mapped: isMapped,
+			_ui_choice: String(row.fhir_path || "").includes("[x]"),
+			_ui_mapped:
+				!!pointer &&
+				typeof pointer === "object" &&
+				!!String(pointer.kind || "").trim(),
 			_ui_pointer: pointer,
 			_ui_min: min,
 			_ui_max: String(row.max || "").trim(),
@@ -275,44 +309,28 @@ const ElementsMapUI = {
 			);
 		}
 
-		if (state.filterRequired) out = out.filter(r => r._ui_required);
-		if (state.filterChoice) out = out.filter(r => r._ui_choice);
-		if (state.filterMapped) out = out.filter(r => r._ui_mapped);
-		if (state.filterUnmapped) out = out.filter(r => !r._ui_mapped);
+		for (const f of ELEMENT_FILTERS) {
+			if (state[f.key]) out = out.filter(f.test);
+		}
 
 		return out;
 	},
 
 	_buildToolbar(state) {
-		const filters = [
-			{
-				class: "filter-required",
-				label: "Required",
-				checked: state.filterRequired,
-			},
-			{ class: "filter-choice", label: "Choice", checked: state.filterChoice },
-			{ class: "filter-mapped", label: "Mapped", checked: state.filterMapped },
-			{
-				class: "filter-unmapped",
-				label: "Unmapped",
-				checked: state.filterUnmapped,
-			},
-		];
-
-		const filterHtml = filters
-			.map(
-				f => `
-				<label class="checkbox" style="margin:0;">
-					<input type="checkbox" class="elements-map-${f.class}" ${f.checked ? "checked" : ""}/>
-					<span style="margin-left:6px;">${f.label}</span>
+		const filterHtml = ELEMENT_FILTERS.map(
+			f => `
+				<label class="checkbox fhir-em-filter">
+					<input type="checkbox" class="elements-map-filter-${f.cls}" ${
+						state[f.key] ? "checked" : ""
+					}/>
+					<span>${f.label}</span>
 				</label>
 			`,
-			)
-			.join("");
+		).join("");
 
 		return $(`
-			<div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
-				<div style="flex:1; min-width:260px;">
+			<div class="fhir-em-toolbar">
+				<div class="fhir-em-search-wrap">
 					<input type="text" class="form-control elements-map-search"
 						placeholder="Search path / datatype / short / mapping"
 						value="${Utils.escapeHtml(state.search)}" />
@@ -323,8 +341,9 @@ const ElementsMapUI = {
 		`);
 	},
 
-	_bindToolbarEvents(frm, wrapper, state) {
+	_bindToolbarEvents(frm, wrapper) {
 		const root = wrapper.find(".elements-map-root");
+		const state = FormState.getState(frm);
 
 		root.find(".elements-map-search").on(
 			"input",
@@ -334,45 +353,29 @@ const ElementsMapUI = {
 			}, 120),
 		);
 
-		root.find(".elements-map-filter-required").on("change", e => {
-			state.filterRequired = !!e.target.checked;
-			this._renderTable(frm);
-		});
-
-		root.find(".elements-map-filter-choice").on("change", e => {
-			state.filterChoice = !!e.target.checked;
-			this._renderTable(frm);
-		});
-
-		root.find(".elements-map-filter-mapped").on("change", e => {
-			state.filterMapped = !!e.target.checked;
-			if (state.filterMapped) state.filterUnmapped = false;
-			root.find(".elements-map-filter-unmapped").prop(
-				"checked",
-				state.filterUnmapped,
-			);
-			this._renderTable(frm);
-		});
-
-		root.find(".elements-map-filter-unmapped").on("change", e => {
-			state.filterUnmapped = !!e.target.checked;
-			if (state.filterUnmapped) state.filterMapped = false;
-			root.find(".elements-map-filter-mapped").prop(
-				"checked",
-				state.filterMapped,
-			);
-			this._renderTable(frm);
-		});
+		for (const f of ELEMENT_FILTERS) {
+			root.find(`.elements-map-filter-${f.cls}`).on("change", e => {
+				state[f.key] = !!e.target.checked;
+				// mapped / unmapped are mutually exclusive
+				if (f.excludes && state[f.key]) {
+					state[f.excludes] = false;
+					const other = ELEMENT_FILTERS.find(x => x.key === f.excludes);
+					if (other)
+						root.find(`.elements-map-filter-${other.cls}`).prop(
+							"checked",
+							false,
+						);
+				}
+				this._renderTable(frm);
+			});
+		}
 
 		root.find(".elements-map-clear").on("click", () => {
 			FormState.resetFilters(frm);
-
 			root.find(".elements-map-search").val("");
-			root.find(".elements-map-filter-required").prop("checked", false);
-			root.find(".elements-map-filter-choice").prop("checked", false);
-			root.find(".elements-map-filter-mapped").prop("checked", false);
-			root.find(".elements-map-filter-unmapped").prop("checked", false);
-
+			for (const f of ELEMENT_FILTERS) {
+				root.find(`.elements-map-filter-${f.cls}`).prop("checked", false);
+			}
 			this._renderTable(frm);
 		});
 	},
@@ -380,14 +383,14 @@ const ElementsMapUI = {
 	_buildTable(frm, rows) {
 		if (!rows.length) {
 			return $(
-				`<div class="text-muted" style="padding:12px;">No rows match filters.</div>`,
+				`<div class="text-muted fhir-em-empty">No rows match filters.</div>`,
 			);
 		}
 
 		const body = rows.map(r => this._buildTableRow(frm, r)).join("");
 
 		return $(`
-			<table class="table table-bordered table-hover" style="margin:0;">
+			<table class="table table-bordered table-hover fhir-em-table">
 				<thead>
 					<tr>
 						<th>FHIR Path</th>
@@ -410,26 +413,24 @@ const ElementsMapUI = {
 		].join("");
 
 		const hint = r._ui_short
-			? `<div class="text-muted" style="font-size:12px; margin-top:4px;">${Utils.escapeHtml(
+			? `<div class="text-muted fhir-em-hint">${Utils.escapeHtml(
 					r._ui_short,
 			  )}</div>`
 			: "";
 
 		return `
-			<tr class="elements-map-row" data-rowname="${Utils.escapeHtml(
-				r.name,
-			)}" style="cursor:pointer;">
-				<td style="width:44%;">
-					<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-						<div style="font-weight:600;">${Utils.escapeHtml(r.fhir_path)}</div>
+			<tr class="elements-map-row" data-rowname="${Utils.escapeHtml(r.name)}">
+				<td class="fhir-em-col-path">
+					<div class="fhir-em-pathwrap">
+						<div class="fhir-em-pathname">${Utils.escapeHtml(r.fhir_path)}</div>
 						<div>${pills}</div>
 					</div>
 					${hint}
 				</td>
-				<td style="width:14%;">${Utils.escapeHtml(r._ui_datatype || "")}</td>
-				<td style="width:8%;">${Utils.escapeHtml(String(r._ui_min))}</td>
-				<td style="width:8%;">${Utils.escapeHtml(String(r._ui_max || ""))}</td>
-				<td style="width:26%;">${this._getMappingSummary(frm, r)}</td>
+				<td class="fhir-em-col-dt">${Utils.escapeHtml(r._ui_datatype || "")}</td>
+				<td class="fhir-em-col-min">${Utils.escapeHtml(String(r._ui_min))}</td>
+				<td class="fhir-em-col-max">${Utils.escapeHtml(String(r._ui_max || ""))}</td>
+				<td class="fhir-em-col-map">${this._getMappingSummary(frm, r)}</td>
 			</tr>
 		`;
 	},
@@ -440,17 +441,13 @@ const ElementsMapUI = {
 			.off("click")
 			.on("click", async e => {
 				const rowname = $(e.currentTarget).attr("data-rowname");
-				if (!rowname) return;
-
 				const row = (frm.doc.element_maps || []).find(r => r.name === rowname);
-				if (!row) return;
-
-				await MappingDialog.open(frm, row);
+				if (row) await MappingDialog.open(frm, row);
 			});
 	},
 
 	_pill(text) {
-		return `<span class="indicator-pill gray" style="margin-left:6px;">${Utils.escapeHtml(
+		return `<span class="indicator-pill gray fhir-em-pill">${Utils.escapeHtml(
 			text,
 		)}</span>`;
 	},
@@ -463,39 +460,32 @@ const ElementsMapUI = {
 
 		const kind = String(pointer.kind || "").trim();
 
-		if (kind === "field") {
-			let label = String(pointer.source_key || "source_key");
-			try {
-				const sourcesIndex = SourcesHelper.buildIndex(frm);
-				const dt = sourcesIndex?.[pointer.source_key]?.doctype;
-				if (dt) {
-					label = pointer.source_key === "primary" ? `${dt} (Primary)` : dt;
-				}
-			} catch (e) {}
+		if (kind === "fixed") return `<span class="text-muted">Fixed</span>`;
+		if (kind === "expression") return `<span class="text-muted">Expression</span>`;
+		if (kind !== "field") return `<span class="text-muted">Mapped</span>`;
 
-			if (pointer.reference_type) {
-				return `<span class="text-muted">Reference → ${Utils.escapeHtml(
-					pointer.reference_type,
-				)}</span> · ${Utils.escapeHtml(pointer.fieldname || "")}`;
-			}
+		const fieldname = Utils.escapeHtml(pointer.fieldname || "");
 
-			const mapHint = pointer.map
-				? ` <span class="text-muted">· mapped codes</span>`
-				: "";
-			return `<span class="text-muted">${Utils.escapeHtml(
-				label,
-			)}</span> → ${Utils.escapeHtml(pointer.fieldname || "")}${mapHint}`;
+		if (pointer.reference_type) {
+			return `<span class="text-muted">Reference → ${Utils.escapeHtml(
+				pointer.reference_type,
+			)}</span> · ${fieldname}`;
 		}
 
-		if (kind === "fixed") {
-			return `<span class="text-muted">Fixed</span>`;
-		}
+		const mapHint = pointer.map
+			? ` <span class="text-muted">· mapped codes</span>`
+			: "";
+		return `<span class="text-muted">${Utils.escapeHtml(
+			this._sourceLabel(frm, pointer.source_key),
+		)}</span> → ${fieldname}${mapHint}`;
+	},
 
-		if (kind === "expression") {
-			return `<span class="text-muted">Expression</span>`;
-		}
-
-		return `<span class="text-muted">Mapped</span>`;
+	_sourceLabel(frm, sourceKey) {
+		try {
+			const dt = SourcesHelper.buildIndex(frm)?.[sourceKey]?.doctype;
+			if (dt) return sourceKey === "primary" ? `${dt} (Primary)` : dt;
+		} catch (e) {}
+		return String(sourceKey || "source_key");
 	},
 };
 
@@ -525,7 +515,7 @@ const MappingDialog = {
 		});
 
 		this._initDialogState(frm, dialog, sourceSelect, row);
-		this._setupDialogEvents(frm, dialog, sourcesIndex, pointer);
+		this._setupDialogEvents(frm, dialog, sourcesIndex);
 
 		dialog.show();
 
@@ -533,6 +523,10 @@ const MappingDialog = {
 		this._setInitialSourceKey(dialog, pointer, pointerKind);
 		await this._refreshFieldOptions(dialog, sourcesIndex);
 		this._appendKeyboardHint(dialog);
+	},
+
+	_val(dialog, fieldname) {
+		return String(dialog.get_value(fieldname) || "").trim();
 	},
 
 	_buildFields(row, pointer, defaultLabel, isChoice) {
@@ -641,9 +635,8 @@ const MappingDialog = {
 			.trim()
 			.toLowerCase();
 
-		if (pointer.reference_type || (kind === "field" && datatype === "reference")) {
+		if (pointer.reference_type || (kind === "field" && datatype === "reference"))
 			return "Reference";
-		}
 		if (kind === "field") return "Frappe Field";
 		if (kind === "fixed") return "Fixed";
 		if (kind === "expression") return "Expression";
@@ -666,8 +659,7 @@ const MappingDialog = {
 		const url = Array.isArray(data) ? data[0] : data;
 		if (!url) return "";
 
-		const segment = String(url).replace(/\/+$/, "").split("/").pop().trim();
-		return segment || "";
+		return String(url).replace(/\/+$/, "").split("/").pop().trim();
 	},
 
 	_fieldValue(raw) {
@@ -676,10 +668,7 @@ const MappingDialog = {
 	},
 
 	_applyValueMap(dialog, pointer) {
-		const raw = String(dialog.get_value("value_map") || "").trim();
-		if (!raw) return;
-
-		const parsed = Utils.safeJsonParse(raw);
+		const parsed = Utils.safeJsonParse(this._val(dialog, "value_map"));
 		if (
 			parsed &&
 			typeof parsed === "object" &&
@@ -705,88 +694,79 @@ const MappingDialog = {
 
 		KeyboardNavigation.attach(frm, dialog);
 
-		if (dialog.$wrapper) {
-			dialog.$wrapper.one("hidden.bs.modal.fhir_map_nav_clear", () => {
-				if (frm._active_mapping_dialog === dialog) {
-					frm._active_mapping_dialog = null;
-					frm._active_mapping_row = null;
-				}
-			});
-		}
+		dialog.$wrapper?.one("hidden.bs.modal.fhir_map_nav_clear", () => {
+			if (frm._active_mapping_dialog === dialog) {
+				frm._active_mapping_dialog = null;
+				frm._active_mapping_row = null;
+			}
+		});
 	},
 
-	_setupDialogEvents(frm, dialog, sourcesIndex, pointer) {
-		const mappingTypeField = dialog.fields_dict?.mapping_type;
-		if (mappingTypeField) {
-			mappingTypeField.df.change = async () => {
-				this._applyVisibility(dialog);
-				await this._refreshFieldOptions(dialog, sourcesIndex);
-			};
-		}
+	_setupDialogEvents(frm, dialog, sourcesIndex) {
+		const refresh = async () => {
+			this._applyVisibility(dialog);
+			await this._refreshFieldOptions(dialog, sourcesIndex);
+		};
 
-		const sourceKeyField = dialog.fields_dict?.source_key;
-		if (sourceKeyField) {
-			sourceKeyField.df.change = async () => {
-				await this._refreshFieldOptions(dialog, sourcesIndex);
-			};
+		if (dialog.fields_dict?.mapping_type)
+			dialog.fields_dict.mapping_type.df.change = refresh;
+		if (dialog.fields_dict?.source_key) {
+			dialog.fields_dict.source_key.df.change = () =>
+				this._refreshFieldOptions(dialog, sourcesIndex);
 		}
 	},
 
 	_setInitialSourceKey(dialog, pointer, pointerKind) {
-		if (pointerKind === "field" || pointerKind === "expression") {
-			const existingKey = String(pointer.source_key || "").trim();
-			const label = dialog.__from_source_key_to_label?.[existingKey];
-			if (label) dialog.set_value("source_key", label);
-		}
+		if (pointerKind !== "field" && pointerKind !== "expression") return;
+		const label =
+			dialog.__from_source_key_to_label?.[
+				String(pointer.source_key || "").trim()
+			];
+		if (label) dialog.set_value("source_key", label);
+	},
+
+	_resolveSourceKey(dialog, sourcesIndex) {
+		const selectedLabel = this._val(dialog, "source_key");
+		return (
+			(dialog.__source_label_to_key || {})[selectedLabel] ||
+			SourcesHelper.resolveDefaultKey({}, sourcesIndex) ||
+			""
+		);
 	},
 
 	_handleApply(frm, dialog, row, sourcesIndex, isChoice) {
-		const mappingType = String(dialog.get_value("mapping_type") || "").trim();
-		const selectedLabel = String(dialog.get_value("source_key") || "").trim();
-		const sourceKey =
-			(dialog.__source_label_to_key || {})[selectedLabel] ||
-			SourcesHelper.resolveDefaultKey({}, sourcesIndex) ||
-			"";
+		const mappingType = this._val(dialog, "mapping_type");
+		const sourceKey = this._resolveSourceKey(dialog, sourcesIndex);
+		const fieldname = this._fieldValue(dialog.get_value("frappe_field"));
 
 		let newPointer = null;
 
-		if (mappingType === "Frappe Field") {
-			const fieldname = this._fieldValue(dialog.get_value("frappe_field"));
-			if (sourceKey && fieldname) {
-				newPointer = { kind: "field", source_key: sourceKey, fieldname };
-				this._applyValueMap(dialog, newPointer);
-			}
-		} else if (mappingType === "Reference") {
-			const fieldname = this._fieldValue(dialog.get_value("frappe_field"));
-			if (sourceKey && fieldname) {
-				newPointer = { kind: "field", source_key: sourceKey, fieldname };
+		if (mappingType === "Frappe Field" && sourceKey && fieldname) {
+			newPointer = { kind: "field", source_key: sourceKey, fieldname };
+			this._applyValueMap(dialog, newPointer);
+		} else if (mappingType === "Reference" && sourceKey && fieldname) {
+			newPointer = { kind: "field", source_key: sourceKey, fieldname };
 
-				const referenceType = String(
-					dialog.get_value("reference_type") || "",
-				).trim();
-				if (referenceType) newPointer.reference_type = referenceType;
+			const referenceType = this._val(dialog, "reference_type");
+			if (referenceType) newPointer.reference_type = referenceType;
 
-				const displayField = this._fieldValue(
-					dialog.get_value("reference_display_field"),
-				);
-				if (displayField) newPointer.display_field = displayField;
-			}
+			const displayField = this._fieldValue(
+				dialog.get_value("reference_display_field"),
+			);
+			if (displayField) newPointer.display_field = displayField;
 		} else if (mappingType === "Expression") {
-			const expression = String(dialog.get_value("expression") || "").trim();
-			if (expression) {
+			const expression = this._val(dialog, "expression");
+			if (expression)
 				newPointer = { kind: "expression", source_key: sourceKey, expression };
-			}
 		} else if (mappingType === "Fixed") {
-			const raw = String(dialog.get_value("fixed_value") || "").trim();
-			if (raw) {
+			const raw = this._val(dialog, "fixed_value");
+			if (raw)
 				newPointer = { kind: "fixed", value: Utils.parseJsonOrString(raw) };
-			}
 		}
 
-		const defaultRaw = String(dialog.get_value("default_value") || "").trim();
-		if (newPointer && defaultRaw) {
+		const defaultRaw = this._val(dialog, "default_value");
+		if (newPointer && defaultRaw)
 			newPointer.default = Utils.parseJsonOrString(defaultRaw);
-		}
 
 		row.value_pointer = newPointer ? JSON.stringify(newPointer) : "";
 		row.mapping_type = mappingType || "";
@@ -802,15 +782,13 @@ const MappingDialog = {
 			mappingType === "Expression"
 				? String(dialog.get_value("expression") || "")
 				: "";
-		row.default_value = String(dialog.get_value("default_value") || "") || "";
+		row.default_value = String(dialog.get_value("default_value") || "");
 
-		if (mappingType === "Reference") {
-			row.datatype = "Reference";
-		}
+		if (mappingType === "Reference") row.datatype = "Reference";
 
 		if (isChoice) {
-			const newFhirPath = String(dialog.get_value("fhir_path") || "").trim();
-			const newDatatype = String(dialog.get_value("datatype") || "").trim();
+			const newFhirPath = this._val(dialog, "fhir_path");
+			const newDatatype = this._val(dialog, "datatype");
 			if (newFhirPath) row.fhir_path = newFhirPath;
 			if (newDatatype) row.datatype = newDatatype;
 		}
@@ -822,8 +800,22 @@ const MappingDialog = {
 		dialog.hide();
 	},
 
+	// fields shown per mapping type; everything else is hidden
+	_VISIBLE_FIELDS: {
+		"Frappe Field": ["source_key", "frappe_field", "value_map"],
+		Reference: [
+			"source_key",
+			"frappe_field",
+			"reference_type",
+			"reference_display_field",
+		],
+		Expression: ["source_key", "expression"],
+		Fixed: ["fixed_value"],
+	},
+
 	_applyVisibility(dialog) {
-		const mappingType = String(dialog.get_value("mapping_type") || "").trim();
+		const mappingType = this._val(dialog, "mapping_type");
+		const visible = new Set(this._VISIBLE_FIELDS[mappingType] || []);
 
 		for (const fieldname of [
 			"source_key",
@@ -834,25 +826,9 @@ const MappingDialog = {
 			"fixed_value",
 			"value_map",
 		]) {
-			this._setFieldHidden(dialog, fieldname, true);
+			this._setFieldHidden(dialog, fieldname, !visible.has(fieldname));
 		}
 		this._setFieldHidden(dialog, "default_value", !mappingType);
-
-		if (mappingType === "Frappe Field") {
-			this._setFieldHidden(dialog, "source_key", false);
-			this._setFieldHidden(dialog, "frappe_field", false);
-			this._setFieldHidden(dialog, "value_map", false);
-		} else if (mappingType === "Reference") {
-			this._setFieldHidden(dialog, "source_key", false);
-			this._setFieldHidden(dialog, "frappe_field", false);
-			this._setFieldHidden(dialog, "reference_type", false);
-			this._setFieldHidden(dialog, "reference_display_field", false);
-		} else if (mappingType === "Expression") {
-			this._setFieldHidden(dialog, "source_key", false);
-			this._setFieldHidden(dialog, "expression", false);
-		} else if (mappingType === "Fixed") {
-			this._setFieldHidden(dialog, "fixed_value", false);
-		}
 	},
 
 	_setFieldHidden(dialog, fieldname, hidden) {
@@ -863,46 +839,44 @@ const MappingDialog = {
 	},
 
 	async _refreshFieldOptions(dialog, sourcesIndex) {
-		const mappingType = String(dialog.get_value("mapping_type") || "").trim();
-		const usesSource =
-			mappingType === "Frappe Field" ||
-			mappingType === "Reference" ||
-			mappingType === "Expression";
+		const mappingType = this._val(dialog, "mapping_type");
+		const usesField = mappingType === "Frappe Field" || mappingType === "Reference";
+		const usesSource = usesField || mappingType === "Expression";
 
 		if (!usesSource) {
-			this._setSelectOptions(dialog, "frappe_field", [""]);
-			this._setSelectOptions(dialog, "reference_display_field", [""]);
 			dialog.__resolved_from_source_key = "";
+			this._setFieldOptions(dialog, [""], false);
 			return;
 		}
 
-		const selectedLabel = String(dialog.get_value("source_key") || "").trim();
-		const labelToKey = dialog.__source_label_to_key || {};
-		const sourceKey =
-			labelToKey[selectedLabel] ||
-			SourcesHelper.resolveDefaultKey({}, sourcesIndex) ||
-			"";
-
-		dialog.__resolved_from_source_key = sourceKey;
+		dialog.__resolved_from_source_key = this._resolveSourceKey(
+			dialog,
+			sourcesIndex,
+		);
 
 		// Expression maps the whole row via 'doc'; no field dropdown needed.
-		const doctype =
-			mappingType === "Expression"
-				? ""
-				: String(sourcesIndex[sourceKey]?.doctype || "").trim();
+		const doctype = usesField
+			? String(
+					sourcesIndex[dialog.__resolved_from_source_key]?.doctype || "",
+			  ).trim()
+			: "";
 		if (!doctype) {
-			this._setSelectOptions(dialog, "frappe_field", [""]);
-			this._setSelectOptions(dialog, "reference_display_field", [""]);
+			this._setFieldOptions(dialog, [""], false);
 			return;
 		}
 
 		await frappe.model.with_doctype(doctype);
-		const meta = frappe.get_meta(doctype);
-		const optionLines = await FieldOptionsBuilder.build(meta);
+		const optionLines = await FieldOptionsBuilder.build(frappe.get_meta(doctype));
+		this._setFieldOptions(dialog, optionLines, mappingType === "Reference");
+	},
+
+	_setFieldOptions(dialog, optionLines, includeDisplayField) {
 		this._setSelectOptions(dialog, "frappe_field", optionLines);
-		if (mappingType === "Reference") {
-			this._setSelectOptions(dialog, "reference_display_field", optionLines);
-		}
+		this._setSelectOptions(
+			dialog,
+			"reference_display_field",
+			includeDisplayField ? optionLines : [""],
+		);
 	},
 
 	_setSelectOptions(dialog, fieldname, options) {
@@ -914,18 +888,16 @@ const MappingDialog = {
 
 	_appendKeyboardHint(dialog) {
 		try {
-			const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-			const modifier = isMac ? "⌘" : "Ctrl";
-
+			const modifier = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+				? "⌘"
+				: "Ctrl";
 			const $footer = dialog.$wrapper?.find(".modal-footer");
 			if (!$footer || !$footer.length) return;
 
 			$footer.find(".fhir-map-kb-hint").remove();
 			$footer.prepend(
 				$(
-					`<div class="text-muted fhir-map-kb-hint" style="margin-right:auto; font-size:12px; padding-left:4px;">
-						${modifier} ↑ / ${modifier} ↓ to navigate
-					</div>`,
+					`<div class="text-muted fhir-map-kb-hint">${modifier} ↑ / ${modifier} ↓ to navigate</div>`,
 				),
 			);
 		} catch (e) {}
@@ -963,52 +935,39 @@ const MappingDialog = {
 const FieldOptionsBuilder = {
 	async build(meta) {
 		const optionLines = ["", "name|Name (name)"];
-		const fields = Array.isArray(meta?.fields) ? meta.fields : [];
 
-		for (const df of fields) {
-			if (!df || !df.fieldname) continue;
-			if (SKIP_FIELDTYPES.has(df.fieldtype)) continue;
+		for (const df of meta?.fields || []) {
+			if (!df?.fieldname || SKIP_FIELDTYPES.has(df.fieldtype)) continue;
 
-			const fieldname = String(df.fieldname || "").trim();
-			const fieldLabel = String(df.label || df.fieldname || "").trim();
+			const fieldname = String(df.fieldname).trim();
+			const fieldLabel = String(df.label || df.fieldname).trim();
 
 			if (df.fieldtype === "Table") {
-				const childOptions = await this._buildChildTableOptions(
-					df,
-					fieldname,
-					fieldLabel,
+				optionLines.push(
+					...(await this._buildChildTableOptions(df, fieldname, fieldLabel)),
 				);
-				optionLines.push(...childOptions);
-				continue;
+			} else {
+				optionLines.push(`${fieldname}|${fieldLabel} (${fieldname})`);
 			}
-
-			optionLines.push(`${fieldname}|${fieldLabel} (${fieldname})`);
 		}
 
 		return this._dedupe(optionLines);
 	},
 
 	async _buildChildTableOptions(df, parentFieldname, parentLabel) {
-		const options = [];
 		const childDoctype = String(df.options || "").trim();
-		if (!childDoctype) return options;
+		if (!childDoctype) return [];
 
 		await frappe.model.with_doctype(childDoctype);
 		const childMeta = frappe.get_meta(childDoctype);
-		const childFields = Array.isArray(childMeta?.fields) ? childMeta.fields : [];
 
-		for (const childDf of childFields) {
-			if (!childDf || !childDf.fieldname) continue;
-			if (SKIP_FIELDTYPES.has(childDf.fieldtype)) continue;
+		const options = [];
+		for (const childDf of childMeta?.fields || []) {
+			if (!childDf?.fieldname || SKIP_FIELDTYPES.has(childDf.fieldtype)) continue;
 
-			const childFieldname = String(childDf.fieldname || "").trim();
-			if (!childFieldname) continue;
-
-			const childLabel = String(childDf.label || childDf.fieldname || "").trim();
-			const value = `${parentFieldname}.${childFieldname}`;
-			const label = `${parentLabel} → ${childLabel} (${value})`;
-
-			options.push(`${value}|${label}`);
+			const value = `${parentFieldname}.${String(childDf.fieldname).trim()}`;
+			const childLabel = String(childDf.label || childDf.fieldname).trim();
+			options.push(`${value}|${parentLabel} → ${childLabel} (${value})`);
 		}
 
 		return options;
@@ -1046,16 +1005,13 @@ const SourcesHelper = {
 		const sourcesIndex = {};
 
 		const primaryDoctype = String(frm.doc.primary_doctype || "").trim();
-		if (primaryDoctype) {
+		if (primaryDoctype)
 			sourcesIndex["primary"] = { doctype: primaryDoctype, is_primary: 1 };
-		}
 
-		const rows = Array.isArray(frm.doc.sources) ? frm.doc.sources : [];
-		for (const row of rows) {
+		for (const row of frm.doc.sources || []) {
 			const key = String(row.source_key || "").trim();
 			const dt = String(row.source_doctype || row.doctype || "").trim();
-			if (!key || !dt) continue;
-			sourcesIndex[key] = { doctype: dt, is_primary: 0 };
+			if (key && dt) sourcesIndex[key] = { doctype: dt, is_primary: 0 };
 		}
 
 		return sourcesIndex;
@@ -1078,7 +1034,6 @@ const SourcesHelper = {
 			if (!dt) continue;
 
 			const label = key === "primary" ? `${dt} (Primary)` : dt;
-
 			labels.push(label);
 			labelToKey[label] = key;
 			keyToLabel[key] = label;
@@ -1096,7 +1051,7 @@ const SourcesHelper = {
 };
 
 // =========================================================
-// Keyboard Navigation
+// Keyboard Navigation (Ctrl/⌘ + ↑/↓ between mapping rows)
 // =========================================================
 
 const KeyboardNavigation = {
@@ -1106,22 +1061,20 @@ const KeyboardNavigation = {
 		const handler = e => {
 			if (frm._active_mapping_dialog !== dialog) return;
 
-			const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-			const modifierPressed = isMac ? e.metaKey : e.ctrlKey;
+			const modifierPressed = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+				? e.metaKey
+				: e.ctrlKey;
 			if (!modifierPressed) return;
 
 			const tag = (e.target?.tagName || "").toLowerCase();
 			if (tag === "input" || tag === "textarea" || tag === "select") return;
-
-			const $t = $(e.target);
-			if ($t.closest(".ace_editor, .CodeMirror, .cm-editor").length) return;
+			if ($(e.target).closest(".ace_editor, .CodeMirror, .cm-editor").length)
+				return;
 
 			if (e.key === "ArrowUp") {
 				e.preventDefault();
 				this._navigate(frm, -1).catch(() => {});
-			}
-
-			if (e.key === "ArrowDown") {
+			} else if (e.key === "ArrowDown") {
 				e.preventDefault();
 				this._navigate(frm, +1).catch(() => {});
 			}
@@ -1130,11 +1083,9 @@ const KeyboardNavigation = {
 		frm._mapping_keydown_handler = handler;
 		document.addEventListener("keydown", handler, true);
 
-		if (dialog.$wrapper) {
-			dialog.$wrapper.one("hidden.bs.modal.fhir_map_nav_cleanup", () => {
-				this.detach(frm);
-			});
-		}
+		dialog.$wrapper?.one("hidden.bs.modal.fhir_map_nav_cleanup", () =>
+			this.detach(frm),
+		);
 	},
 
 	detach(frm) {
@@ -1156,22 +1107,14 @@ const KeyboardNavigation = {
 
 		try {
 			const rows = frm.doc.element_maps || [];
-			if (!rows.length) return;
-
 			const currentRow = frm._active_mapping_row;
-			if (!currentRow) return;
+			if (!rows.length || !currentRow) return;
 
 			const currentIndex = rows.findIndex(r => r.name === currentRow.name);
-			if (currentIndex < 0) return;
-
-			const nextIndex = currentIndex + delta;
-			if (nextIndex < 0 || nextIndex >= rows.length) return;
-
-			const nextRow = rows[nextIndex];
-			if (!nextRow) return;
+			const nextRow = rows[currentIndex + delta];
+			if (currentIndex < 0 || !nextRow) return;
 
 			await MappingDialog._closeActive(frm);
-
 			if (seq !== frm._mapping_nav_seq) return;
 
 			await MappingDialog.open(frm, nextRow);
@@ -1197,8 +1140,14 @@ const PreviewDialog = {
 	},
 
 	_canPreview(frm) {
-		const saveMessage = __("Please save the FHIR Resource Map before previewing.");
-		if (!FormButtons._requireSaved(frm, saveMessage)) return false;
+		if (
+			!FormButtons._requireSaved(
+				frm,
+				__("Please save the FHIR Resource Map before previewing."),
+			)
+		) {
+			return false;
+		}
 
 		if (!String(frm.doc.primary_doctype || "").trim()) {
 			frappe.msgprint({
@@ -1248,10 +1197,7 @@ const PreviewDialog = {
 			title: __("FHIR Resource Preview"),
 			size: "large",
 			fields: [
-				{
-					fieldtype: "HTML",
-					fieldname: "issues_html",
-				},
+				{ fieldtype: "HTML", fieldname: "issues_html" },
 				{
 					fieldtype: "Code",
 					fieldname: "resource_json",
@@ -1294,8 +1240,7 @@ const PreviewDialog = {
 const Utils = {
 	safeJsonParse(text) {
 		try {
-			if (!text) return null;
-			return JSON.parse(text);
+			return text ? JSON.parse(text) : null;
 		} catch (e) {
 			return null;
 		}
