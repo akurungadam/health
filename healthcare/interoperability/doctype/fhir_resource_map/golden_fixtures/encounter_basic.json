@@ -1,0 +1,139 @@
+{
+  "description": "Encounter from a Patient Encounter: status value-map, a fixed class Coding, subject/serviceProvider/participant.individual references, and a single participant backbone wrapped to an array via array_paths (repeating backbone from one doc).",
+  "primary_id": "HLC-ENC-2026-0001",
+  "compiled": {
+    "meta": {
+      "resource_type": "Encounter",
+      "primary_doctype": "Patient Encounter",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [
+      "Encounter.participant"
+    ],
+    "sources": {
+      "primary": {
+        "doctype": "Patient Encounter",
+        "kind": "document",
+        "is_primary": true
+      }
+    },
+    "elements": {
+      "Encounter.status": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "status",
+          "map": {
+            "Open": "in-progress",
+            "Ordered": "planned",
+            "Completed": "finished",
+            "Cancelled": "cancelled",
+            "*": "unknown"
+          }
+        }
+      },
+      "Encounter.class": {
+        "source": "primary",
+        "datatype": "Coding",
+        "value_spec": {
+          "kind": "json",
+          "value": {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "AMB",
+            "display": "ambulatory"
+          }
+        }
+      },
+      "Encounter.subject": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Patient",
+          "display_field": "patient_name"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "patient"
+        }
+      },
+      "Encounter.participant.individual": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Practitioner",
+          "display_field": "practitioner_name"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "practitioner"
+        }
+      },
+      "Encounter.period.start": {
+        "source": "primary",
+        "datatype": "dateTime",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "encounter_date"
+        }
+      },
+      "Encounter.serviceProvider": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Organization"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "company"
+        }
+      }
+    },
+    "extensions": [],
+    "slices": []
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Patient Encounter",
+      "name": "HLC-ENC-2026-0001",
+      "status": "Open",
+      "patient": "PAT-001",
+      "patient_name": "John Doe",
+      "practitioner": "DR-1",
+      "practitioner_name": "Dr. Stephen Strange",
+      "encounter_date": "2026-06-01",
+      "company": "Acme Hospital"
+    }
+  },
+  "expected": {
+    "resourceType": "Encounter",
+    "status": "in-progress",
+    "class": {
+      "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+      "code": "AMB",
+      "display": "ambulatory"
+    },
+    "subject": {
+      "reference": "Patient/PAT-001",
+      "type": "Patient",
+      "display": "John Doe"
+    },
+    "participant": [
+      {
+        "individual": {
+          "reference": "Practitioner/DR-1",
+          "type": "Practitioner",
+          "display": "Dr. Stephen Strange"
+        }
+      }
+    ],
+    "period": {
+      "start": "2026-06-01"
+    },
+    "serviceProvider": {
+      "reference": "Organization/Acme Hospital",
+      "type": "Organization"
+    }
+  }
+}

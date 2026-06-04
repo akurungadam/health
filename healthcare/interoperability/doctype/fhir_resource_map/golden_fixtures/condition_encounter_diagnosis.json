@@ -1,0 +1,201 @@
+{
+  "description": "Condition (encounter diagnosis) from a Patient Encounter: clinicalStatus/verificationStatus/category as json, code.coding sourced from the encounter's codification rows via a child_table collection (backbone Condition.code.coding, one coding per row), subject + encounter references, recordedDate.",
+  "primary_id": "HLC-ENC-2026-0001",
+  "compiled": {
+    "meta": {
+      "resource_type": "Condition",
+      "primary_doctype": "Patient Encounter",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [],
+    "sources": {
+      "primary": {
+        "doctype": "Patient Encounter",
+        "kind": "document",
+        "is_primary": true
+      },
+      "diagnosis_codings": {
+        "doctype": "Codification Table",
+        "kind": "child_table",
+        "is_primary": false,
+        "is_collection": true,
+        "parent": "primary",
+        "link_fieldname": "codification_table",
+        "fhir_path": "Condition.code.coding"
+      }
+    },
+    "elements": {
+      "Condition.clinicalStatus": {
+        "source": "primary",
+        "datatype": "CodeableConcept",
+        "value_spec": {
+          "kind": "json",
+          "value": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+                "code": "active"
+              }
+            ]
+          }
+        }
+      },
+      "Condition.verificationStatus": {
+        "source": "primary",
+        "datatype": "CodeableConcept",
+        "value_spec": {
+          "kind": "json",
+          "value": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+                "code": "confirmed"
+              }
+            ]
+          }
+        }
+      },
+      "Condition.category": {
+        "source": "primary",
+        "datatype": "CodeableConcept",
+        "value_spec": {
+          "kind": "json",
+          "value": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                  "code": "encounter-diagnosis",
+                  "display": "Encounter Diagnosis"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Condition.code.coding.system": {
+        "source": "diagnosis_codings",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "system"
+        }
+      },
+      "Condition.code.coding.code": {
+        "source": "diagnosis_codings",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "code"
+        }
+      },
+      "Condition.code.coding.display": {
+        "source": "diagnosis_codings",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "display"
+        }
+      },
+      "Condition.subject": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Patient",
+          "display_field": "patient_name"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "patient"
+        }
+      },
+      "Condition.encounter": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Encounter"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "name"
+        }
+      },
+      "Condition.recordedDate": {
+        "source": "primary",
+        "datatype": "dateTime",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "encounter_date"
+        }
+      }
+    },
+    "extensions": [],
+    "slices": []
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Patient Encounter",
+      "name": "HLC-ENC-2026-0001",
+      "patient": "PAT-001",
+      "patient_name": "John Doe",
+      "encounter_date": "2026-06-01"
+    },
+    "diagnosis_codings": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "38341003",
+        "display": "Hypertensive disorder"
+      }
+    ]
+  },
+  "expected": {
+    "resourceType": "Condition",
+    "clinicalStatus": {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+          "code": "active"
+        }
+      ]
+    },
+    "verificationStatus": {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+          "code": "confirmed"
+        }
+      ]
+    },
+    "category": [
+      {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+            "code": "encounter-diagnosis",
+            "display": "Encounter Diagnosis"
+          }
+        ]
+      }
+    ],
+    "subject": {
+      "reference": "Patient/PAT-001",
+      "type": "Patient",
+      "display": "John Doe"
+    },
+    "encounter": {
+      "reference": "Encounter/HLC-ENC-2026-0001",
+      "type": "Encounter"
+    },
+    "recordedDate": "2026-06-01",
+    "code": {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "38341003",
+          "display": "Hypertensive disorder"
+        }
+      ]
+    }
+  }
+}
