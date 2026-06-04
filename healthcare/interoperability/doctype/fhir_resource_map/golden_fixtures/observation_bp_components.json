@@ -1,0 +1,263 @@
+{
+  "description": "Blood Pressure panel from a Frappe Health Observation whose Systolic/Diastolic components are child Observation records reverse-linked via parent_observation. Demonstrates a reverse_link collection grouping Observation.component (one item per child), per-row code via observation_template value-map, valueQuantity from result_data (the Data field where Quantity/Numeric results are stored; result_float is hidden/unused), and a panel-level status value-map. No profile (coding arrays forced via custom 'arrays').",
+  "primary_id": "HLC-OBS-BP-0001",
+  "compiled": {
+    "meta": {
+      "resource_type": "Observation",
+      "primary_doctype": "Observation",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [
+      "Observation.component.code.coding",
+      "Observation.code.coding"
+    ],
+    "sources": {
+      "primary": {
+        "doctype": "Observation",
+        "kind": "document",
+        "is_primary": true
+      },
+      "components": {
+        "doctype": "Observation",
+        "kind": "reverse_link",
+        "is_primary": false,
+        "is_collection": true,
+        "parent": "primary",
+        "link_fieldname": "parent_observation",
+        "fhir_path": "Observation.component"
+      }
+    },
+    "elements": {
+      "Observation.status": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "status",
+          "map": {
+            "Registered": "registered",
+            "Preliminary": "preliminary",
+            "Final": "final",
+            "Amended": "amended",
+            "Corrected": "corrected",
+            "Cancelled": "cancelled",
+            "Entered in Error": "entered-in-error",
+            "Unknown": "unknown",
+            "Approved": "final",
+            "Rejected": "cancelled",
+            "*": "unknown"
+          }
+        }
+      },
+      "Observation.code.coding.system": {
+        "source": "primary",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "http://loinc.org"
+        }
+      },
+      "Observation.code.coding.code": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "85354-9"
+        }
+      },
+      "Observation.code.coding.display": {
+        "source": "primary",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "Blood pressure panel with all children optional"
+        }
+      },
+      "Observation.code.text": {
+        "source": "primary",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "preferred_display_name"
+        }
+      },
+      "Observation.subject": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Patient",
+          "display_field": "patient_name"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "patient"
+        }
+      },
+      "Observation.effectiveDateTime": {
+        "source": "primary",
+        "datatype": "dateTime",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "result_datetime"
+        }
+      },
+      "Observation.component.code.text": {
+        "source": "components",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "preferred_display_name"
+        }
+      },
+      "Observation.component.code.coding.system": {
+        "source": "components",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "http://loinc.org"
+        }
+      },
+      "Observation.component.code.coding.code": {
+        "source": "components",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "observation_template",
+          "map": {
+            "Systolic Blood Pressure": "8480-6",
+            "Diastolic Blood Pressure": "8462-4"
+          }
+        }
+      },
+      "Observation.component.valueQuantity.value": {
+        "source": "components",
+        "datatype": "decimal",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "result_data"
+        }
+      },
+      "Observation.component.valueQuantity.unit": {
+        "source": "components",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "permitted_unit"
+        }
+      },
+      "Observation.component.valueQuantity.system": {
+        "source": "components",
+        "datatype": "uri",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "http://unitsofmeasure.org"
+        }
+      },
+      "Observation.component.valueQuantity.code": {
+        "source": "components",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "permitted_unit",
+          "map": {
+            "mmHg": "mm[Hg]",
+            "*": "mm[Hg]"
+          }
+        }
+      }
+    },
+    "extensions": [],
+    "slices": []
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Observation",
+      "name": "HLC-OBS-BP-0001",
+      "has_component": 1,
+      "status": "Approved",
+      "patient": "PAT-001",
+      "patient_name": "John Doe",
+      "preferred_display_name": "Blood Pressure",
+      "result_datetime": "2026-06-01T09:30:00"
+    },
+    "components": [
+      {
+        "doctype": "Observation",
+        "name": "HLC-OBS-SYS-0001",
+        "parent_observation": "HLC-OBS-BP-0001",
+        "observation_template": "Systolic Blood Pressure",
+        "preferred_display_name": "Systolic Blood Pressure",
+        "permitted_data_type": "Quantity",
+        "result_data": "120",
+        "permitted_unit": "mmHg"
+      },
+      {
+        "doctype": "Observation",
+        "name": "HLC-OBS-DIA-0001",
+        "parent_observation": "HLC-OBS-BP-0001",
+        "observation_template": "Diastolic Blood Pressure",
+        "preferred_display_name": "Diastolic Blood Pressure",
+        "permitted_data_type": "Quantity",
+        "result_data": "80",
+        "permitted_unit": "mmHg"
+      }
+    ]
+  },
+  "expected": {
+    "resourceType": "Observation",
+    "status": "final",
+    "code": {
+      "coding": [
+        {
+          "system": "http://loinc.org",
+          "code": "85354-9",
+          "display": "Blood pressure panel with all children optional"
+        }
+      ],
+      "text": "Blood Pressure"
+    },
+    "subject": {
+      "reference": "Patient/PAT-001",
+      "type": "Patient",
+      "display": "John Doe"
+    },
+    "effectiveDateTime": "2026-06-01T09:30:00",
+    "component": [
+      {
+        "code": {
+          "text": "Systolic Blood Pressure",
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8480-6"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 120.0,
+          "unit": "mmHg",
+          "system": "http://unitsofmeasure.org",
+          "code": "mm[Hg]"
+        }
+      },
+      {
+        "code": {
+          "text": "Diastolic Blood Pressure",
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8462-4"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 80.0,
+          "unit": "mmHg",
+          "system": "http://unitsofmeasure.org",
+          "code": "mm[Hg]"
+        }
+      }
+    ]
+  }
+}

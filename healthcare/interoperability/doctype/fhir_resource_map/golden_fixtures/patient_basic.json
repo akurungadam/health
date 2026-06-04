@@ -1,0 +1,181 @@
+{
+  "description": "Patient with array name, gender value-map, MRN identifier slice, telecom collection and a managingOrganization reference.",
+  "primary_id": "PAT-001",
+  "compiled": {
+    "meta": {
+      "resource_type": "Patient",
+      "primary_doctype": "Patient",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [
+      "Patient.name"
+    ],
+    "sources": {
+      "primary": {
+        "doctype": "Patient",
+        "kind": "document",
+        "is_primary": true
+      },
+      "phones": {
+        "doctype": "Contact Phone",
+        "kind": "child_table",
+        "is_primary": false,
+        "is_collection": true,
+        "parent": "primary",
+        "link_fieldname": "phone_numbers",
+        "fhir_path": "Patient.telecom"
+      }
+    },
+    "elements": {
+      "Patient.name.family": {
+        "source": "primary",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "last_name"
+        }
+      },
+      "Patient.name.given": {
+        "source": "primary",
+        "datatype": "string",
+        "is_array": true,
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "first_name"
+        }
+      },
+      "Patient.gender": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "sex",
+          "map": {
+            "Male": "male",
+            "Female": "female",
+            "*": "unknown"
+          }
+        }
+      },
+      "Patient.birthDate": {
+        "source": "primary",
+        "datatype": "date",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "dob"
+        }
+      },
+      "Patient.telecom.value": {
+        "source": "phones",
+        "datatype": "string",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "number"
+        }
+      },
+      "Patient.telecom.system": {
+        "source": "phones",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "phone"
+        }
+      },
+      "Patient.managingOrganization": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Organization",
+          "display_field": "org_name"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "org"
+        }
+      }
+    },
+    "extensions": [],
+    "slices": [
+      {
+        "path": "Patient.identifier",
+        "slice_name": "MRN",
+        "source": "primary",
+        "pattern": {
+          "type": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                "code": "MR"
+              }
+            ]
+          },
+          "system": "http://hospital.example.org/identifier/mrn"
+        },
+        "elements": [
+          {
+            "path": "value",
+            "datatype": "string",
+            "value_spec": {
+              "kind": "field",
+              "fieldname": "mrn"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Patient",
+      "name": "PAT-001",
+      "first_name": "John",
+      "last_name": "Doe",
+      "sex": "Male",
+      "dob": "1990-01-02",
+      "org": "ORG-1",
+      "org_name": "Acme Hospital",
+      "mrn": "MRN-12345",
+      "phone_numbers": [
+        {
+          "number": "+1-555-1000"
+        },
+        {
+          "number": "+1-555-2000"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "resourceType": "Patient",
+    "name": [
+      {
+        "family": "Doe",
+        "given": [
+          "John"
+        ]
+      }
+    ],
+    "gender": "male",
+    "birthDate": "1990-01-02",
+    "managingOrganization": {
+      "reference": "Organization/ORG-1",
+      "type": "Organization",
+      "display": "Acme Hospital"
+    },
+    "identifier": [
+      {
+        "type": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+              "code": "MR"
+            }
+          ]
+        },
+        "system": "http://hospital.example.org/identifier/mrn",
+        "value": "MRN-12345"
+      }
+    ]
+  }
+}

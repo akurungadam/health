@@ -113,6 +113,11 @@ class ElementCompiler:
 		if pointer.get("default") is not None:
 			spec["default"] = pointer.get("default")
 
+		# optional inline code translation (local value -> FHIR code), authored in the UI
+		mapping = pointer.get("map")
+		if isinstance(mapping, dict) and mapping:
+			spec["map"] = mapping
+
 		return source, spec
 
 	def _spec_from_columns(self, row):

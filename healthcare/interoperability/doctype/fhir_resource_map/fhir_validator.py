@@ -24,6 +24,7 @@ class MappingValidator:
 		warnings = []
 		self._required(compiled, warnings)
 		self._unknown_mapped(compiled, warnings)
+		self._complex_as_scalar(compiled, warnings)
 		self._unknown_sources(compiled, warnings)
 		self._source_doctypes(compiled, warnings)
 		return warnings
@@ -72,6 +73,42 @@ class MappingValidator:
 			datatype = (sd.get("datatype") or "").strip()
 			# primitive datatypes are lower-cased; complex (or unknown) are not
 			return not (datatype and datatype[0].islower())
+		return False
+
+	def _complex_as_scalar(self, compiled, warnings):
+		"""Warn when a complex-datatype element is fed a bare scalar.
+
+		The runtime passes complex/unknown datatypes through unchanged, so mapping
+		e.g. CodeableConcept or HumanName to a plain field yields a string where a
+		FHIR validator expects an object. References are excluded (the resolver
+		builds their object), as are object-valued json/fixed specs and expressions.
+		"""
+		for path, element in compiled["elements"].items():
+			datatype = (element.get("datatype") or "").strip() or self._sd_datatype(path)
+			if self._is_complex_datatype(datatype) and self._is_scalar_value_spec(element.get("value_spec")):
+				warnings.append(
+					f"Element '{path}' has complex datatype '{datatype}' but is mapped to a scalar value; "
+					f"author it as an object (value_spec kind 'json') or map its sub-elements."
+				)
+
+	def _sd_datatype(self, path):
+		return (self.sd_index.get(path, {}).get("datatype") or "").strip()
+
+	def _is_complex_datatype(self, datatype):
+		"""Complex datatypes are capitalised (CodeableConcept, HumanName, ...);
+		primitives are lower-cased. References build their own object, so skip them."""
+		if not datatype or datatype.lower() == "reference":
+			return False
+		return not datatype[0].islower()
+
+	def _is_scalar_value_spec(self, value_spec):
+		"""True when the spec yields a plain scalar (a field, or a non-object fixed)."""
+		value_spec = value_spec or {}
+		kind = value_spec.get("kind")
+		if kind == "field":
+			return True
+		if kind == "fixed":
+			return not isinstance(value_spec.get("value"), dict | list)
 		return False
 
 	def _unknown_sources(self, compiled, warnings):

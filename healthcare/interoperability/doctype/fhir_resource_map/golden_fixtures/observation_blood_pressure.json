@@ -1,0 +1,263 @@
+{
+  "description": "Blood Pressure Observation authored with two component SLICES (systolic/diastolic) whose values are read from fields on the primary doc, plus status/category(json list)/code as json, subject reference and effectiveDateTime. Primary doctype is Observation. NOTE: bp_systolic/bp_diastolic/signs_date are illustrative fields to exercise the slice mechanism - the realistic Frappe Health BP (components as reverse-linked child Observations) is observation_bp_components.json.",
+  "primary_id": "HLC-OBS-BP-0002",
+  "compiled": {
+    "meta": {
+      "resource_type": "Observation",
+      "primary_doctype": "Observation",
+      "fhir_version": "R4",
+      "profiles": []
+    },
+    "array_paths": [],
+    "sources": {
+      "primary": {
+        "doctype": "Observation",
+        "kind": "document",
+        "is_primary": true
+      }
+    },
+    "elements": {
+      "Observation.status": {
+        "source": "primary",
+        "datatype": "code",
+        "value_spec": {
+          "kind": "fixed",
+          "value": "final"
+        }
+      },
+      "Observation.category": {
+        "source": "primary",
+        "datatype": "CodeableConcept",
+        "value_spec": {
+          "kind": "json",
+          "value": [
+            {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                  "code": "vital-signs",
+                  "display": "Vital Signs"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Observation.code": {
+        "source": "primary",
+        "datatype": "CodeableConcept",
+        "value_spec": {
+          "kind": "json",
+          "value": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "85354-9",
+                "display": "Blood pressure panel with all children optional"
+              }
+            ],
+            "text": "Blood pressure"
+          }
+        }
+      },
+      "Observation.subject": {
+        "source": "primary",
+        "datatype": "Reference",
+        "reference": {
+          "resource_type": "Patient"
+        },
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "patient"
+        }
+      },
+      "Observation.effectiveDateTime": {
+        "source": "primary",
+        "datatype": "dateTime",
+        "value_spec": {
+          "kind": "field",
+          "fieldname": "signs_date"
+        }
+      }
+    },
+    "extensions": [],
+    "slices": [
+      {
+        "path": "Observation.component",
+        "slice_name": "systolic",
+        "source": "primary",
+        "pattern": {
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8480-6",
+                "display": "Systolic blood pressure"
+              }
+            ]
+          }
+        },
+        "elements": [
+          {
+            "path": "valueQuantity.value",
+            "datatype": "decimal",
+            "value_spec": {
+              "kind": "field",
+              "fieldname": "bp_systolic"
+            }
+          },
+          {
+            "path": "valueQuantity.unit",
+            "datatype": "string",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "mmHg"
+            }
+          },
+          {
+            "path": "valueQuantity.system",
+            "datatype": "uri",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "http://unitsofmeasure.org"
+            }
+          },
+          {
+            "path": "valueQuantity.code",
+            "datatype": "code",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "mm[Hg]"
+            }
+          }
+        ]
+      },
+      {
+        "path": "Observation.component",
+        "slice_name": "diastolic",
+        "source": "primary",
+        "pattern": {
+          "code": {
+            "coding": [
+              {
+                "system": "http://loinc.org",
+                "code": "8462-4",
+                "display": "Diastolic blood pressure"
+              }
+            ]
+          }
+        },
+        "elements": [
+          {
+            "path": "valueQuantity.value",
+            "datatype": "decimal",
+            "value_spec": {
+              "kind": "field",
+              "fieldname": "bp_diastolic"
+            }
+          },
+          {
+            "path": "valueQuantity.unit",
+            "datatype": "string",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "mmHg"
+            }
+          },
+          {
+            "path": "valueQuantity.system",
+            "datatype": "uri",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "http://unitsofmeasure.org"
+            }
+          },
+          {
+            "path": "valueQuantity.code",
+            "datatype": "code",
+            "value_spec": {
+              "kind": "fixed",
+              "value": "mm[Hg]"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "sources": {
+    "primary": {
+      "doctype": "Observation",
+      "name": "HLC-OBS-BP-0002",
+      "patient": "PAT-001",
+      "signs_date": "2026-06-01T09:30:00",
+      "bp_systolic": 120,
+      "bp_diastolic": 80
+    }
+  },
+  "expected": {
+    "resourceType": "Observation",
+    "status": "final",
+    "category": [
+      {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+            "code": "vital-signs",
+            "display": "Vital Signs"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "coding": [
+        {
+          "system": "http://loinc.org",
+          "code": "85354-9",
+          "display": "Blood pressure panel with all children optional"
+        }
+      ],
+      "text": "Blood pressure"
+    },
+    "subject": {
+      "reference": "Patient/PAT-001",
+      "type": "Patient"
+    },
+    "effectiveDateTime": "2026-06-01T09:30:00",
+    "component": [
+      {
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8480-6",
+              "display": "Systolic blood pressure"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 120.0,
+          "unit": "mmHg",
+          "system": "http://unitsofmeasure.org",
+          "code": "mm[Hg]"
+        }
+      },
+      {
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "8462-4",
+              "display": "Diastolic blood pressure"
+            }
+          ]
+        },
+        "valueQuantity": {
+          "value": 80.0,
+          "unit": "mmHg",
+          "system": "http://unitsofmeasure.org",
+          "code": "mm[Hg]"
+        }
+      }
+    ]
+  }
+}

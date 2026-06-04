@@ -96,6 +96,54 @@ class TestFHIRCompiler(unittest.TestCase):
 		self.assertFalse(el["is_array"])
 		self.assertTrue(el["is_required"])
 
+	def test_field_pointer_carries_value_map(self):
+		rm = resource_map(
+			element_maps=[
+				element_row(
+					"Patient.gender",
+					{
+						"kind": "field",
+						"source_key": "primary",
+						"fieldname": "sex",
+						"map": {"Male": "male", "Female": "female", "*": "unknown"},
+					},
+					datatype="code",
+				),
+			]
+		)
+		compiled, _ = self.compile(rm)
+		self.assertEqual(
+			compiled["elements"]["Patient.gender"]["value_spec"],
+			{
+				"kind": "field",
+				"fieldname": "sex",
+				"map": {"Male": "male", "Female": "female", "*": "unknown"},
+			},
+		)
+
+	def test_reference_pointer_from_ui_row(self):
+		# a UI-authored reference: datatype Reference + pointer carrying reference_type/display_field
+		rm = resource_map(
+			element_maps=[
+				element_row(
+					"Patient.managingOrganization",
+					{
+						"kind": "field",
+						"source_key": "primary",
+						"fieldname": "org",
+						"reference_type": "Organization",
+						"display_field": "org_name",
+					},
+					datatype="Reference",
+				),
+			]
+		)
+		compiled, _ = self.compile(rm)
+		element = compiled["elements"]["Patient.managingOrganization"]
+		self.assertEqual(element["datatype"], "Reference")
+		self.assertEqual(element["value_spec"], {"kind": "field", "fieldname": "org"})
+		self.assertEqual(element["reference"], {"resource_type": "Organization", "display_field": "org_name"})
+
 	def test_fixed_pointer(self):
 		rm = resource_map(
 			element_maps=[
@@ -437,6 +485,68 @@ class TestFHIRCompiler(unittest.TestCase):
 		unknown = [w for w in warnings if "not in the merged StructureDefinition" in w]
 		self.assertTrue(any("Patient.bogus" in w for w in unknown))
 		self.assertFalse(any("maritalStatus" in w for w in unknown))
+
+	def test_complex_datatype_mapped_as_scalar_warns(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		compiled = {
+			"elements": {
+				# CodeableConcept fed a bare field -> warns
+				"Patient.maritalStatus": {
+					"source": "primary",
+					"datatype": "CodeableConcept",
+					"value_spec": {"kind": "field", "fieldname": "marital_status"},
+				},
+				# same type authored as an object -> fine
+				"Observation.code": {
+					"source": "primary",
+					"datatype": "CodeableConcept",
+					"value_spec": {"kind": "json", "value": {"text": "BP"}},
+				},
+				# a Reference builds its own object -> fine
+				"Patient.managingOrganization": {
+					"source": "primary",
+					"datatype": "Reference",
+					"value_spec": {"kind": "field", "fieldname": "org"},
+				},
+				# a primitive sub-element -> fine
+				"Patient.name.family": {
+					"source": "primary",
+					"datatype": "string",
+					"value_spec": {"kind": "field", "fieldname": "last_name"},
+				},
+			},
+			"sources": {"primary": {"doctype": "Patient"}},
+			"slices": [],
+		}
+		with mock.patch("frappe.db.exists", return_value=True):
+			warnings = MappingValidator({}).validate(compiled)
+
+		scalar_warnings = [w for w in warnings if "complex datatype" in w]
+		self.assertTrue(any("Patient.maritalStatus" in w for w in scalar_warnings))
+		self.assertFalse(any("Observation.code" in w for w in scalar_warnings))
+		self.assertFalse(any("managingOrganization" in w for w in scalar_warnings))
+		self.assertFalse(any("Patient.name.family" in w for w in scalar_warnings))
+
+	def test_complex_datatype_from_sd_index_when_element_datatype_blank(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
+
+		# element carries no datatype; the SD index supplies it
+		sd_index = {"Patient.maritalStatus": {"min": 0, "max": "1", "datatype": "CodeableConcept"}}
+		compiled = {
+			"elements": {
+				"Patient.maritalStatus": {
+					"source": "primary",
+					"datatype": "",
+					"value_spec": {"kind": "field", "fieldname": "marital_status"},
+				}
+			},
+			"sources": {"primary": {"doctype": "Patient"}},
+			"slices": [],
+		}
+		with mock.patch("frappe.db.exists", return_value=True):
+			warnings = MappingValidator(sd_index).validate(compiled)
+		self.assertTrue(any("complex datatype" in w and "maritalStatus" in w for w in warnings))
 
 	def test_required_child_of_unmapped_optional_backbone_not_flagged(self):
 		from healthcare.interoperability.doctype.fhir_resource_map.fhir_validator import MappingValidator
