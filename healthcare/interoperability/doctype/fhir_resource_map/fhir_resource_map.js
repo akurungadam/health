@@ -525,6 +525,7 @@ const MappingDialog = {
 
 		this._applyVisibility(dialog);
 		this._setInitialSourceKey(dialog, pointer, pointerKind);
+		this._stashInitialFieldSelections(dialog, pointer, row);
 		await this._refreshFieldOptions(dialog, sourcesIndex);
 		this._appendKeyboardHint(dialog);
 		ValueMapGrid.render(dialog.fields_dict.value_map?.$wrapper, pointer.map);
@@ -886,13 +887,32 @@ const MappingDialog = {
 		const field = dialog.fields_dict?.[fieldname];
 		if (!field) return;
 
-		const current = String(dialog.get_value(fieldname) || "").trim();
+		// Saved selections are stored bare ("sex") but options are "field|Label",
+		// so installing the options refreshes the Select and clears the bare value
+		// from the DOM. Recover the bare value from the live value, the control's
+		// cached value, or the value stashed at open. _reconcileSelect runs on each
+		// option refresh (incl. early ones before the source resolves, when options
+		// are empty), so __fhir_initial is only consumed once a match actually lands
+		// - and source switches leave a "field|Label" value, caught by the guard.
+		const current = String(
+			dialog.get_value(fieldname) || field.value || field.__fhir_initial || "",
+		).trim();
 		if (!current || current.includes("|")) return;
 
 		const match = String(field.df.options || "")
 			.split("\n")
 			.find(line => line.split("|")[0].trim() === current);
-		if (match) dialog.set_value(fieldname, match);
+		if (match) {
+			dialog.set_value(fieldname, match);
+			field.__fhir_initial = "";
+		}
+	},
+
+	_stashInitialFieldSelections(dialog, pointer, row) {
+		const ff = dialog.fields_dict?.frappe_field;
+		if (ff) ff.__fhir_initial = String(pointer.fieldname || row.frappe_field || "");
+		const rd = dialog.fields_dict?.reference_display_field;
+		if (rd) rd.__fhir_initial = String(pointer.display_field || "");
 	},
 
 	_setSelectOptions(dialog, fieldname, options) {

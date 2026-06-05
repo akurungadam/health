@@ -161,7 +161,7 @@
    "fieldname": "mapping_type",
    "fieldtype": "Select",
    "label": "Mapping Type",
-   "options": "\nFrappe Field\nFixed\nExpression\nJSON"
+   "options": "\nFrappe Field\nFixed\nReference\nExpression\nJSON"
   },
   {
    "fieldname": "source_name",
