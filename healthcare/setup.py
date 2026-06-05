@@ -1770,3 +1770,130 @@ def remove_portal_settings_menu_items():
 	menu_items = frappe.get_hooks("standard_portal_menu_items", app_name="healthcare")
 	for item in menu_items:
 		frappe.db.delete("Portal Menu Item", item)
+
+
+def setup_healthcare_status_codes():
+	"""Seed the single local 'Healthcare Status Code' source code system, the Observation
+	Status FHIR target system, and the Concept Maps that translate local -> FHIR per
+	resource.
+
+	Documents store the local status; the FHIR code is produced at transform time via
+	Concept Map. Idempotent (insert_record skips existing records)."""
+	# Source: one local status system, named by bare code so the value stores directly
+	insert_record(
+		[
+			{
+				"doctype": "Code System",
+				"is_fhir_defined": 0,
+				"name_by_code": 1,
+				"uri": "https://marley.health/cs/status",
+				"code_system": _("Healthcare Status Code"),
+				"description": _("Local workflow statuses; mapped to FHIR via Concept Map."),
+				"experimental": 0,
+				"immutable": 0,
+				"custom": 1,
+			}
+		]
+	)
+
+	# Target: Observation Status (the FHIR observation-status value set)
+	insert_record(
+		[
+			{
+				"doctype": "Code System",
+				"is_fhir_defined": 1,
+				"uri": "http://hl7.org/fhir/observation-status",
+				"code_system": _("Observation Status"),
+				"description": _("Observation Status Codes."),
+				"experimental": 0,
+				"immutable": 0,
+				"custom": 0,
+			}
+		]
+	)
+	observation_status = {
+		"registered": "Registered",
+		"preliminary": "Preliminary",
+		"final": "Final",
+		"amended": "Amended",
+		"corrected": "Corrected",
+		"cancelled": "Cancelled",
+		"entered-in-error": "Entered in Error",
+		"unknown": "Unknown",
+	}
+	insert_record(
+		[
+			{
+				"doctype": "Code Value",
+				"code_system": _("Observation Status"),
+				"code_value": code,
+				"display": _(display),
+				"official_url": "http://hl7.org/fhir/ValueSet/observation-status",
+			}
+			for code, display in observation_status.items()
+		]
+	)
+
+	# Source codes (bare-named): the union of local statuses across resources
+	healthcare_statuses = [
+		"Registered",
+		"Preliminary",
+		"Final",
+		"Amended",
+		"Corrected",
+		"Cancelled",
+		"Entered in Error",
+		"Unknown",
+		"Approved",
+		"Rejected",
+		"Draft",
+		"Completed",
+		"Active",
+		"On Hold",
+		"Stopped",
+		"Revoked",
+		"Ended",
+	]
+	insert_record(
+		[
+			{
+				"doctype": "Code Value",
+				"code_system": _("Healthcare Status Code"),
+				"code_value": status,
+				"display": _(status),
+			}
+			for status in healthcare_statuses
+		]
+	)
+
+	# Concept Maps: local source -> FHIR targets, one per relevant resource status system
+	obs, mr, sr = _("Observation Status"), _("Medication Request Status"), _("Request Status")
+	status_to_fhir = {
+		"Active": [("active", mr), ("active", sr)],
+		"Draft": [("draft", mr), ("draft", sr)],
+		"Completed": [("completed", mr), ("completed", sr)],
+		"On Hold": [("on-hold", mr), ("on-hold", sr)],
+		"Revoked": [("revoked", sr)],
+		"Stopped": [("stopped", mr)],
+		"Ended": [("ended", mr)],
+		"Cancelled": [("cancelled", mr), ("cancelled", obs)],
+		"Registered": [("registered", obs)],
+		"Preliminary": [("preliminary", obs)],
+		"Final": [("final", obs)],
+		"Amended": [("amended", obs)],
+		"Corrected": [("corrected", obs)],
+		"Approved": [("final", obs)],
+		"Rejected": [("entered-in-error", obs)],
+		"Entered in Error": [("entered-in-error", mr), ("entered-in-error", sr), ("entered-in-error", obs)],
+		"Unknown": [("unknown", mr), ("unknown", sr), ("unknown", obs)],
+	}
+	insert_record(
+		[
+			{
+				"doctype": "Concept Map",
+				"source_code": source,
+				"targets": [{"target_code": f"{code}-{system}"} for code, system in targets],
+			}
+			for source, targets in status_to_fhir.items()
+		]
+	)

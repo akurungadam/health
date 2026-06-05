@@ -178,6 +178,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
+   "link_filters": "[[\"Code Value\",\"code_system\",\"=\",\"Healthcare Status Code\"]]",
    "no_copy": 1,
    "options": "Code Value",
    "reqd": 1

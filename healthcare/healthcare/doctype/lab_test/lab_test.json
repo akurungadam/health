@@ -203,10 +203,11 @@
   },
   {
    "fieldname": "status",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Draft\nCompleted\nApproved\nRejected\nCancelled",
+   "link_filters": "[[\"Code Value\",\"code_system\",\"=\",\"Healthcare Status Code\"]]",
+   "options": "Code Value",
    "read_only": 1,
    "search_index": 1
   },

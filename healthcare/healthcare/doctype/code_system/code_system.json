@@ -22,7 +22,8 @@
   "experimental",
   "immutable",
   "complete",
-  "custom"
+  "custom",
+  "name_by_code"
  ],
  "fields": [
   {
@@ -126,6 +127,13 @@
    "fieldname": "complete",
    "fieldtype": "Check",
    "label": "Complete"
+  },
+  {
+   "default": "0",
+   "description": "Name Code Values in this system by their bare code (e.g. \"Final\") instead of \"code-system\". Use for local code systems whose codes are stored directly on documents.",
+   "fieldname": "name_by_code",
+   "fieldtype": "Check",
+   "label": "Name by Code"
   }
  ],
  "links": [

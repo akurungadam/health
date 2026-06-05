@@ -32,18 +32,21 @@ class TerminologyService:
 	"""Read-only terminology lookups over Code Value + Concept Map."""
 
 	@staticmethod
-	def translate(code, system=None):
+	def translate(code, system=None, target_system=None):
 		"""Translate a local ``code`` to its FHIR target codings.
 
-		``system`` (a Code System name) disambiguates the source code. Returns a list
-		of ``{system, code, display}`` codings (empty when nothing matches) so a
-		CodeableConcept can carry several.
+		``system`` (a Code System name) disambiguates the source code; ``target_system``
+		(a Code System name) restricts to one target system - needed when one source maps
+		to several systems (e.g. a Marley status -> a different FHIR code per resource).
+		Returns a list of ``{system, code, display}`` codings (empty when nothing matches).
 		"""
 		codings = []
 		for source_name in TerminologyService._code_value_names(code, system):
 			if not frappe.db.exists("Concept Map", source_name):
 				continue
 			for row in frappe.get_cached_doc("Concept Map", source_name).targets:
+				if target_system and row.target_system != target_system:
+					continue
 				coding = TerminologyService._coding(row.target_code)
 				if coding and coding not in codings:
 					codings.append(coding)
@@ -78,8 +81,8 @@ class TerminologyService:
 
 
 @frappe.whitelist()
-def translate(code, system=None):
-	return TerminologyService.translate(code, system=system)
+def translate(code, system=None, target_system=None):
+	return TerminologyService.translate(code, system=system, target_system=target_system)
 
 
 @frappe.whitelist()
