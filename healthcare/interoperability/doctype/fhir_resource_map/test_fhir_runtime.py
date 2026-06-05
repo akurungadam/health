@@ -456,6 +456,11 @@ class TestDateTimeTimezone(unittest.TestCase):
 	def test_date_only_stays_date(self):
 		self.assertEqual(self.resolver.transform("date", "1990-01-02"), "1990-01-02")
 
+	def test_date_only_value_on_datetime_element_keeps_date_precision(self):
+		# A date-only source mapped to a dateTime element must not gain a spurious
+		# midnight time + timezone (a date-precision dateTime is valid FHIR).
+		self.assertEqual(self.resolver.transform("datetime", "2026-06-01"), "2026-06-01")
+
 
 if __name__ == "__main__":
 	unittest.main()

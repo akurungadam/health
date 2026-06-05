@@ -179,13 +179,24 @@ class ValueResolver:
 		return str(value)[:10]
 
 	def _format_datetime(self, value):
-		dt = self._coerce_datetime(value)
-		if dt is None:
-			return str(value)
+		# A date-only value stays date-precision: that is a valid FHIR dateTime and
+		# inventing a midnight time + timezone would misrepresent the source data.
+		if isinstance(value, datetime):
+			dt = value
+		elif isinstance(value, date):
+			return value.isoformat()
+		else:
+			text = str(value).strip()
+			if not text:
+				return str(value)
+			if "T" not in text and ":" not in text:
+				return text[:10]
+			dt = self._coerce_datetime(text)
+			if dt is None:
+				return str(value)
 		# A FHIR dateTime/instant carrying a time must carry a timezone; a naive
-		# value is assumed to be in the site's timezone. An offset already on the
-		# value is preserved.
-		if isinstance(dt, datetime) and dt.tzinfo is None:
+		# value is assumed to be in the site's timezone. An existing offset is kept.
+		if dt.tzinfo is None:
 			dt = dt.replace(tzinfo=self._system_tzinfo())
 		return dt.isoformat()
 
