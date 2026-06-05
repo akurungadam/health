@@ -189,7 +189,7 @@
       "doctype": "Observation",
       "name": "HLC-OBS-BP-0002",
       "patient": "PAT-001",
-      "signs_date": "2026-06-01T09:30:00",
+      "signs_date": "2026-06-01T09:30:00+05:30",
       "bp_systolic": 120,
       "bp_diastolic": 80
     }
@@ -222,7 +222,7 @@
       "reference": "Patient/PAT-001",
       "type": "Patient"
     },
-    "effectiveDateTime": "2026-06-01T09:30:00",
+    "effectiveDateTime": "2026-06-01T09:30:00+05:30",
     "component": [
       {
         "code": {

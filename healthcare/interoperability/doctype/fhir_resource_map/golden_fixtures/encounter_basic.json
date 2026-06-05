@@ -103,7 +103,7 @@
       "practitioner": "DR-1",
       "practitioner_name": "Dr. Stephen Strange",
       "encounter_date": "2026-06-01",
-      "company": "Acme Hospital"
+      "company": "ACME-HOSP"
     }
   },
   "expected": {
@@ -132,7 +132,7 @@
       "start": "2026-06-01"
     },
     "serviceProvider": {
-      "reference": "Organization/Acme Hospital",
+      "reference": "Organization/ACME-HOSP",
       "type": "Organization"
     }
   }

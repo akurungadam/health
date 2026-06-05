@@ -110,7 +110,7 @@
               }
             ]
           },
-          "system": "http://hospital.example.org/identifier/mrn"
+          "system": "http://acmehospital.org/identifier/mrn"
         },
         "elements": [
           {
@@ -173,7 +173,7 @@
             }
           ]
         },
-        "system": "http://hospital.example.org/identifier/mrn",
+        "system": "http://acmehospital.org/identifier/mrn",
         "value": "MRN-12345"
       }
     ]

@@ -9,7 +9,14 @@ the result to its FHIR datatype, and builds Reference objects. Kept separate
 from FHIRRuntime so the runtime stays focused on source loading and assembly.
 """
 
+import re
+from datetime import date, datetime
+
 import frappe
+
+# FHIR ids must match [A-Za-z0-9.-]{1,64}; Frappe docnames can contain spaces and
+# other characters that are illegal there (e.g. a Patient named "John Doe").
+FHIR_ID_INVALID = re.compile(r"[^A-Za-z0-9.\-]+")
 
 PRIMITIVE_STRING_TYPES = {
 	"uri",
@@ -103,7 +110,7 @@ class ValueResolver:
 
 		reference = {}
 		if resource_type:
-			reference["reference"] = f"{resource_type}/{value}"
+			reference["reference"] = f"{resource_type}/{self._fhir_id(value)}"
 			reference["type"] = resource_type
 		else:
 			reference["reference"] = str(value)
@@ -115,6 +122,16 @@ class ValueResolver:
 				reference["display"] = str(display)
 
 		return reference
+
+	def _fhir_id(self, value):
+		"""Coerce a Frappe docname into a valid FHIR id (slugify illegal chars).
+
+		Deterministic so the same docname always yields the same id; the original
+		docname is preserved in the reference ``display``. Inbound import should
+		match on a stored identifier rather than reverse this slug.
+		"""
+		token = FHIR_ID_INVALID.sub("-", str(value).strip()).strip("-")
+		return token[:64]
 
 	# =========================================================
 	# Datatype coercion
@@ -162,6 +179,35 @@ class ValueResolver:
 		return str(value)[:10]
 
 	def _format_datetime(self, value):
-		if hasattr(value, "isoformat"):
-			return value.isoformat()
-		return str(value)
+		dt = self._coerce_datetime(value)
+		if dt is None:
+			return str(value)
+		# A FHIR dateTime/instant carrying a time must carry a timezone; a naive
+		# value is assumed to be in the site's timezone. An offset already on the
+		# value is preserved.
+		if isinstance(dt, datetime) and dt.tzinfo is None:
+			dt = dt.replace(tzinfo=self._system_tzinfo())
+		return dt.isoformat()
+
+	def _coerce_datetime(self, value):
+		if isinstance(value, (datetime, date)):
+			return value
+		text = str(value).strip()
+		if not text:
+			return None
+		try:
+			return datetime.fromisoformat(text.replace("Z", "+00:00"))
+		except ValueError:
+			pass
+		try:
+			return frappe.utils.get_datetime(text)
+		except Exception:
+			return None
+
+	def _system_tzinfo(self):
+		try:
+			from zoneinfo import ZoneInfo
+
+			return ZoneInfo(frappe.utils.get_system_timezone())
+		except Exception:
+			return datetime.now().astimezone().tzinfo

@@ -426,5 +426,36 @@ class TestSourceLoaderChildTable(unittest.TestCase):
 		self.assertEqual(loader._child_table(source, docs), [{"number": "123"}])
 
 
+class TestDateTimeTimezone(unittest.TestCase):
+	"""A FHIR dateTime/instant with a time must carry a timezone (HL7 validator rule)."""
+
+	def setUp(self):
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_value_resolver import (
+			ValueResolver,
+		)
+
+		self.resolver = ValueResolver()
+
+	def test_existing_offset_preserved(self):
+		self.assertEqual(
+			self.resolver.transform("datetime", "2026-06-01T09:30:00+05:30"),
+			"2026-06-01T09:30:00+05:30",
+		)
+
+	def test_utc_z_normalised(self):
+		self.assertEqual(
+			self.resolver.transform("datetime", "2026-06-01T09:30:00Z"),
+			"2026-06-01T09:30:00+00:00",
+		)
+
+	def test_naive_value_gains_a_timezone(self):
+		# Offset depends on the site timezone; assert one is present, not which.
+		out = self.resolver.transform("datetime", "2026-06-01T09:30:00")
+		self.assertRegex(out, r"^2026-06-01T09:30:00(?:[+-]\d{2}:\d{2}|Z)$")
+
+	def test_date_only_stays_date(self):
+		self.assertEqual(self.resolver.transform("date", "1990-01-02"), "1990-01-02")
+
+
 if __name__ == "__main__":
 	unittest.main()
