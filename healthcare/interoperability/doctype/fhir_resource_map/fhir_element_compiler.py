@@ -118,6 +118,11 @@ class ElementCompiler:
 		if isinstance(mapping, dict) and mapping:
 			spec["map"] = mapping
 
+		# optional terminology translation (Concept Map) - {system, target_system}
+		translate = pointer.get("translate")
+		if isinstance(translate, dict) and translate:
+			spec["translate"] = translate
+
 		return source, spec
 
 	def _spec_from_columns(self, row):

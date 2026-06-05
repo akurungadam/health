@@ -46,12 +46,43 @@ class ValueResolver:
 			value = value_spec["default"]
 
 		datatype = (element.get("datatype") or "").strip().lower()
+		if value_spec.get("translate"):
+			return self._translate(value, value_spec["translate"], datatype)
+
 		if datatype == "reference":
 			if value is None or value == "":
 				return None
 			return self.build_reference(element, value, doc)
 
 		return self.transform(datatype, value)
+
+	def _translate(self, value, config, datatype):
+		"""Resolve a local code to a FHIR coding via the terminology service (Concept Map).
+
+		``config`` = ``{"system": <local Code System>, "target_system": <FHIR Code System>}``.
+		Shapes the result by element datatype: a CodeableConcept gets ``{coding:[...]}``,
+		a Coding the first coding, anything else the bare FHIR code string.
+		"""
+		if value is None or value == "":
+			return None
+
+		from healthcare.healthcare.doctype.concept_map.concept_map import TerminologyService
+
+		codings = TerminologyService.translate(
+			value, system=config.get("system"), target_system=config.get("target_system")
+		)
+		if not codings:
+			self.issues.append(
+				f"No translation for '{value}' ({config.get('system')} -> "
+				f"{config.get('target_system') or 'any'})"
+			)
+			return None
+
+		if datatype == "codeableconcept":
+			return {"coding": codings}
+		if datatype == "coding":
+			return codings[0]
+		return codings[0].get("code")
 
 	def resolve_value_spec(self, value_spec, doc):
 		kind = value_spec.get("kind")
@@ -71,8 +102,11 @@ class ValueResolver:
 		"""Translate a resolved value via an optional ``map`` (e.g. local code -> FHIR code).
 
 		``"map": {"Male": "male", "Female": "female", "*": "unknown"}`` - the ``*``
-		key, if present, is the fallback for unmapped values.
+		key, if present, is the fallback for unmapped values. Skipped when a
+		``translate`` (terminology) spec is present, which takes precedence.
 		"""
+		if value_spec.get("translate"):
+			return value
 		mapping = value_spec.get("map")
 		if not isinstance(mapping, dict) or value is None:
 			return value

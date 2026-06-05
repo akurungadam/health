@@ -462,5 +462,57 @@ class TestDateTimeTimezone(unittest.TestCase):
 		self.assertEqual(self.resolver.transform("datetime", "2026-06-01"), "2026-06-01")
 
 
+class TestTranslateValueSpec(unittest.TestCase):
+	"""value_spec.translate resolves a local code to FHIR codings via the terminology service."""
+
+	def setUp(self):
+		from healthcare.healthcare.doctype.concept_map import concept_map
+		from healthcare.interoperability.doctype.fhir_resource_map.fhir_value_resolver import (
+			ValueResolver,
+		)
+
+		self._concept_map = concept_map
+		self._orig = concept_map.TerminologyService.translate
+		concept_map.TerminologyService.translate = staticmethod(
+			lambda code, system=None, target_system=None: (
+				[{"system": "http://hl7.org/fhir/observation-status", "code": "final", "display": "Final"}]
+				if code == "Final"
+				else []
+			)
+		)
+		self.resolver = ValueResolver()
+
+	def tearDown(self):
+		self._concept_map.TerminologyService.translate = self._orig
+
+	def _resolve(self, datatype, value="Final"):
+		element = {
+			"datatype": datatype,
+			"value_spec": {
+				"kind": "fixed",
+				"value": value,
+				"translate": {"system": "Healthcare Status Code", "target_system": "Observation Status"},
+			},
+		}
+		return self.resolver.resolve(element, {})
+
+	def test_code_element_gets_bare_code(self):
+		self.assertEqual(self._resolve("code"), "final")
+
+	def test_codeableconcept_element_gets_coding_list(self):
+		self.assertEqual(
+			self._resolve("CodeableConcept"),
+			{
+				"coding": [
+					{"system": "http://hl7.org/fhir/observation-status", "code": "final", "display": "Final"}
+				]
+			},
+		)
+
+	def test_no_translation_returns_none_and_logs_issue(self):
+		self.assertIsNone(self._resolve("code", value="Nope"))
+		self.assertTrue(self.resolver.issues)
+
+
 if __name__ == "__main__":
 	unittest.main()
