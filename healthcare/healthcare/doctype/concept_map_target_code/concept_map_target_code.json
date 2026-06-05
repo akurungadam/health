@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-05 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "target_code",
+  "target_system",
+  "equivalence"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "target_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target Code",
+   "options": "Code Value",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "columns": 4,
+   "fetch_from": "target_code.code_system",
+   "fieldname": "target_system",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target System",
+   "options": "Code System",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "default": "equivalent",
+   "fieldname": "equivalence",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Equivalence",
+   "options": "equivalent\nwider\nnarrower\nrelatedto\nunmatched"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Healthcare",
+ "name": "Concept Map Target Code",
+ "owner": "Administrator",
+ "permissions": [],
+ "restrict_to_domain": "Healthcare",
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
