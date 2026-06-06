@@ -106,7 +106,7 @@
    "read_only": 1
   },
   {
-   "fetch_from": "item.item_name",
+   "fetch_from": "item.item_code",
    "fieldname": "item_code",
    "fieldtype": "Data",
    "hide_days": 1,
