@@ -56,6 +56,7 @@ frappe.ui.form.on("Service Request", {
 				},
 			};
 		});
+		frm.set_df_property("template_dt", "only_select", true);
 
 		frm.set_query("status", function () {
 			return {
