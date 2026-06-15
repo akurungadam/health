@@ -14,8 +14,9 @@ healthcare.emergency.TRIAGE_DOCTYPES = [
 	"Patient Appointment",
 	"Therapy Session",
 	"Therapy Plan",
-	"Inpatient Record",
 	"Lab Test",
+	"Inpatient Record",
+	"Emergency Record",
 ];
 
 healthcare.emergency.show_triage = function (frm) {
