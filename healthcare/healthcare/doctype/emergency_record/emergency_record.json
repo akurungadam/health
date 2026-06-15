@@ -247,11 +247,15 @@
    "link_fieldname": "emergency_record"
   },
   {
+   "link_doctype": "Medication Request",
+   "link_fieldname": "emergency_record"
+  },
+  {
    "link_doctype": "Service Request",
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2026-06-15 19:39:05.473529",
+ "modified": "2026-06-15 21:17:08.936836",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
