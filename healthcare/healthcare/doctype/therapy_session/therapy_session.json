@@ -37,7 +37,8 @@
   "more_information_section",
   "service_request",
   "invoiced",
-  "amended_from"
+  "amended_from",
+  "emergency_record"
  ],
  "fields": [
   {
@@ -245,6 +246,13 @@
    "fieldname": "more_information_section",
    "fieldtype": "Section Break",
    "label": "More Information"
+  },
+  {
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record",
+   "read_only": 1
   }
  ],
  "is_submittable": 1,

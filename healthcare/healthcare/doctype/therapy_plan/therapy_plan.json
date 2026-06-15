@@ -27,7 +27,8 @@
   "order_group",
   "column_break_vlgf",
   "practitioner",
-  "practitioner_name"
+  "practitioner_name",
+  "emergency_record"
  ],
  "fields": [
   {
@@ -175,6 +176,13 @@
    "fieldname": "practitioner_name",
    "fieldtype": "Data",
    "label": "Ordered By Practitioner Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record",
    "read_only": 1
   }
  ],
