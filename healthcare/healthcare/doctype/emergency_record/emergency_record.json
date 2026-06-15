@@ -247,11 +247,35 @@
    "link_fieldname": "emergency_record"
   },
   {
+   "link_doctype": "Service Request",
+   "link_fieldname": "emergency_record"
+  },
+  {
    "link_doctype": "Medication Request",
    "link_fieldname": "emergency_record"
   },
   {
-   "link_doctype": "Service Request",
+   "link_doctype": "Observation",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "link_doctype": "Patient Appointment",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "link_doctype": "Therapy Session",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "link_doctype": "Therapy Plan",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "link_doctype": "Inpatient Record",
+   "link_fieldname": "emergency_record"
+  },
+  {
+   "link_doctype": "Lab Test",
    "link_fieldname": "emergency_record"
   }
  ],

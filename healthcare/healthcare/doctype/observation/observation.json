@@ -84,7 +84,8 @@
   "parent_observation",
   "observation_idx",
   "days",
-  "invoiced"
+  "invoiced",
+  "emergency_record"
  ],
  "fields": [
   {
@@ -572,6 +573,13 @@
    "fieldtype": "Link",
    "label": "Appointment",
    "options": "Patient Appointment"
+  },
+  {
+   "fieldname": "emergency_record",
+   "fieldtype": "Link",
+   "label": "Emergency Record",
+   "options": "Emergency Record",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
