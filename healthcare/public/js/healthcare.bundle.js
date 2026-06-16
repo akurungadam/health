@@ -7,3 +7,4 @@ import "./healthcare_note.js";
 import "./healthcare_note.html";
 import "./healthcare_orders.html";
 import "./triage_indicator.js";
+import "./send_to_emergency.js";
