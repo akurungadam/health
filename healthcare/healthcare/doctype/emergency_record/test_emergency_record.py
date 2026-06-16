@@ -204,6 +204,65 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		self.assertEqual(inpatient.admission_instruction, "Severe chest pain")
 		self.assertEqual(inpatient.status, "Admission Scheduled")
 
+	def test_create_sales_invoice(self):
+		frappe.db.set_value("Patient", "_Test Patient", "customer", "_Test Customer")
+		record = create_emergency_record("_Test Patient", attending_practitioner=get_test_practitioner())
+		record.assign_bed("_Test HSU - Occupancy - _TC", check_in=add_to_date(now_datetime(), hours=-2))
+		invoice_name = record.create_sales_invoice()
+		record.reload()
+		self.assertEqual(record.sales_invoice, invoice_name)
+
+		invoice = frappe.get_doc("Sales Invoice", invoice_name)
+		item_codes = [row.item_code for row in invoice.items]
+		self.assertIn("HLC-SI-001", item_codes)
+		bed_item = frappe.db.get_value(
+			"Healthcare Service Unit Type", "_Test Service Unit Type - Occupancy", "item"
+		)
+		self.assertIn(bed_item, item_codes)
+		self.assertEqual(invoice.patient, "_Test Patient")
+
+	def test_create_sales_invoice_blocks_double(self):
+		frappe.db.set_value("Patient", "_Test Patient", "customer", "_Test Customer")
+		record = create_emergency_record("_Test Patient", attending_practitioner=get_test_practitioner())
+		record.create_sales_invoice()
+		self.assertRaises(frappe.ValidationError, record.create_sales_invoice)
+
+	def test_create_sales_invoice_requires_customer(self):
+		frappe.db.set_value("Patient", "_Test Patient", "customer", None)
+		record = create_emergency_record("_Test Patient", attending_practitioner=get_test_practitioner())
+		self.assertRaises(frappe.ValidationError, record.create_sales_invoice)
+
+	def test_emergency_services_surface_in_patient_billing(self):
+		from healthcare.healthcare.utils import get_healthcare_services_to_invoice
+
+		frappe.db.set_value("Patient", "_Test Patient", "customer", "_Test Customer")
+		record = create_emergency_record("_Test Patient", attending_practitioner=get_test_practitioner())
+		record.assign_bed("_Test HSU - Occupancy - _TC", check_in=add_to_date(now_datetime(), hours=-2))
+
+		services = get_healthcare_services_to_invoice("_Test Patient", "_Test Customer", "_Test Company")
+		references = {(row["reference_type"], row["reference_name"]) for row in services}
+		self.assertIn(("Emergency Record", record.name), references)
+		self.assertIn(("Emergency Occupancy", record.occupancies[0].name), references)
+
+	def test_invoiced_occupancy_excluded_from_billing(self):
+		from healthcare.healthcare.utils import get_emergency_services_to_invoice
+
+		patient = frappe.get_doc("Patient", "_Test Patient")
+		record = create_emergency_record("_Test Patient", attending_practitioner=get_test_practitioner())
+		record.assign_bed("_Test HSU - Occupancy - _TC", check_in=add_to_date(now_datetime(), hours=-2))
+		frappe.db.set_value("Emergency Occupancy", record.occupancies[0].name, "invoiced", 1)
+
+		occupancy_refs = [
+			row["reference_name"]
+			for row in get_emergency_services_to_invoice(patient, "_Test Company")
+			if row["reference_type"] == "Emergency Occupancy"
+		]
+		self.assertNotIn(record.occupancies[0].name, occupancy_refs)
+
+	def test_create_insurance_coverage_requires_policy(self):
+		record = create_emergency_record("_Test Patient")
+		self.assertRaises(frappe.ValidationError, record.create_insurance_coverage)
+
 	def test_get_active_triage_returns_colour(self):
 		record = create_emergency_record("_Test Patient")
 		record.record_triage("Emergency")
