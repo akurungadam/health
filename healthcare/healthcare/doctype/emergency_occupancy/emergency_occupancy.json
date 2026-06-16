@@ -9,6 +9,7 @@
   "check_in",
   "left",
   "check_out",
+  "invoiced",
   "insurance_coverage",
   "coverage_status"
  ],
@@ -40,6 +41,13 @@
    "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "Check Out",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "invoiced",
+   "fieldtype": "Check",
+   "label": "Invoiced",
    "read_only": 1
   },
   {

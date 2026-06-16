@@ -39,6 +39,30 @@ frappe.ui.form.on("Emergency Record", {
 				__("Actions"),
 			);
 		}
+
+		if (!frm.is_new() && !frm.doc.sales_invoice) {
+			frm.add_custom_button(
+				__("Sales Invoice"),
+				() =>
+					frm.call("create_sales_invoice").then(r => {
+						if (r.message) {
+							frm.reload_doc();
+							frappe.set_route("Form", "Sales Invoice", r.message);
+						}
+					}),
+				__("Create"),
+			);
+			if (frm.doc.insurance_policy) {
+				frm.add_custom_button(
+					__("Insurance Coverage"),
+					() =>
+						frm
+							.call("create_insurance_coverage")
+							.then(() => frm.reload_doc()),
+					__("Create"),
+				);
+			}
+		}
 	},
 
 	patient(frm) {

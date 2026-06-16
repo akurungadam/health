@@ -13,6 +13,9 @@ from healthcare.healthcare.doctype.observation.observation import (
 	add_observation,
 	record_observation_result,
 )
+from healthcare.healthcare.doctype.patient_insurance_coverage.patient_insurance_coverage import (
+	make_insurance_coverage as generate_insurance_coverage,
+)
 
 
 class EmergencyRecord(Document):
@@ -198,6 +201,99 @@ class EmergencyRecord(Document):
 		)
 		record.insert(ignore_permissions=True)
 		self.inpatient_record = record.name
+
+	@frappe.whitelist()
+	def create_sales_invoice(self):
+		if frappe.db.exists(
+			"Sales Invoice Item",
+			{"reference_dt": self.doctype, "reference_dn": self.name, "docstatus": ["<", 2]},
+		):
+			frappe.throw(_("A Sales Invoice already exists for this Emergency Record"))
+
+		customer = frappe.db.get_value("Patient", self.patient, "customer")
+		if not customer:
+			frappe.throw(
+				_("Please set a Customer for Patient {0} to raise an invoice").format(
+					frappe.bold(self.patient)
+				)
+			)
+
+		invoice = frappe.new_doc("Sales Invoice")
+		invoice.patient = self.patient
+		invoice.customer = customer
+		invoice.company = self.company
+		invoice.due_date = today()
+		invoice.ref_practitioner = self.attending_practitioner
+		self.append_billable_lines(invoice)
+
+		if not invoice.items:
+			frappe.throw(_("Nothing to invoice for this Emergency Record"))
+
+		invoice.set_missing_values()
+		invoice.insert(ignore_permissions=True)
+		self.db_set("sales_invoice", invoice.name)
+		return invoice.name
+
+	def append_billable_lines(self, invoice):
+		if self.consultation_item:
+			invoice.append(
+				"items",
+				{
+					"item_code": self.consultation_item,
+					"qty": 1,
+					"rate": self.consultation_charge or 0,
+					"reference_dt": self.doctype,
+					"reference_dn": self.name,
+					"practitioner": self.attending_practitioner,
+				},
+			)
+		for occupancy in self.occupancies:
+			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			if not unit_type:
+				continue
+			hours = self.occupancy_hours(occupancy)
+			invoice.append(
+				"items",
+				{
+					"item_code": unit_type.item,
+					"qty": occupancy_qty(hours, unit_type.no_of_hours, unit_type.minimum_billable_qty),
+					"rate": unit_type.rate or 0,
+					"uom": unit_type.uom,
+					"reference_dt": "Emergency Occupancy",
+					"reference_dn": occupancy.name,
+				},
+			)
+
+	def occupancy_hours(self, occupancy):
+		check_out = get_datetime(occupancy.check_out) if occupancy.check_out else now_datetime()
+		return flt(time_diff_in_hours(check_out, get_datetime(occupancy.check_in)), 2)
+
+	@frappe.whitelist()
+	def create_insurance_coverage(self):
+		if not self.insurance_policy:
+			frappe.throw(_("Please set an Insurance Policy to create coverage"))
+
+		for occupancy in self.occupancies:
+			if occupancy.insurance_coverage:
+				continue
+			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			if not unit_type:
+				continue
+			qty = occupancy_qty(
+				self.occupancy_hours(occupancy), unit_type.no_of_hours, unit_type.minimum_billable_qty
+			)
+			coverage = generate_insurance_coverage(
+				patient=self.patient,
+				policy=self.insurance_policy,
+				company=self.company,
+				template_dt="Healthcare Service Unit Type",
+				template_dn=unit_type.name,
+				item_code=unit_type.item,
+				qty=qty,
+			)
+			if coverage and coverage.get("coverage"):
+				occupancy.db_set("insurance_coverage", coverage.get("coverage"))
+				occupancy.db_set("coverage_status", coverage.get("coverage_status"))
 
 
 def occupancy_qty(hours, no_of_hours, minimum_billable_qty):
