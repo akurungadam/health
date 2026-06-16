@@ -19,6 +19,7 @@ class EmergencyRecord(Document):
 
 	def validate(self):
 		self.set_patient_age()
+		self.set_consultation_defaults()
 		self.validate_occupancy_dates()
 
 	def set_patient_age(self):
@@ -26,6 +27,15 @@ class EmergencyRecord(Document):
 			return
 		age = frappe.get_cached_doc("Patient", self.patient).calculate_age()
 		self.patient_age = age.get("age_in_string") if age else None
+
+	def set_consultation_defaults(self):
+		if not self.attending_practitioner:
+			return
+		practitioner = frappe.get_cached_doc("Healthcare Practitioner", self.attending_practitioner)
+		if not self.get("consultation_item"):
+			self.consultation_item = practitioner.op_consulting_charge_item
+		if not self.get("consultation_charge"):
+			self.consultation_charge = practitioner.op_consulting_charge
 
 	def validate_occupancy_dates(self):
 		for entry in self.occupancies:

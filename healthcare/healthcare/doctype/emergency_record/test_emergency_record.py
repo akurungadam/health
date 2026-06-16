@@ -20,6 +20,19 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		self.assertTrue(record.patient_age)
 		self.assertIn("Year", record.patient_age)
 
+	def test_consultation_defaults_from_practitioner(self):
+		practitioner = get_test_practitioner()
+		record = create_emergency_record("_Test Patient", attending_practitioner=practitioner)
+		self.assertEqual(record.consultation_item, "HLC-SI-001")
+		self.assertEqual(record.consultation_charge, 500)
+
+	def test_consultation_fee_manual_override_preserved(self):
+		practitioner = get_test_practitioner()
+		record = create_emergency_record(
+			"_Test Patient", attending_practitioner=practitioner, consultation_charge=999
+		)
+		self.assertEqual(record.consultation_charge, 999)
+
 	def test_record_triage_sets_acuity_and_status(self):
 		record = create_emergency_record("_Test Patient")
 		record.record_triage("Urgent")
@@ -213,9 +226,7 @@ def create_emergency_record(patient, **extra):
 
 
 def get_test_practitioner():
-	return frappe.db.get_value(
-		"Healthcare Practitioner", {"last_name": "_Test Healthcare Practitioner 0"}, "name"
-	)
+	return frappe.db.get_value("Healthcare Practitioner", {"last_name": "Healthcare Practitioner 0"}, "name")
 
 
 def occupancy_status(service_unit):

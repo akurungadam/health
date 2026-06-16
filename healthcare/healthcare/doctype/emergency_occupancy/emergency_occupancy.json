@@ -8,7 +8,9 @@
   "service_unit",
   "check_in",
   "left",
-  "check_out"
+  "check_out",
+  "insurance_coverage",
+  "coverage_status"
  ],
  "fields": [
   {
@@ -38,6 +40,20 @@
    "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "Check Out",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurance_coverage",
+   "fieldtype": "Link",
+   "label": "Insurance Coverage",
+   "options": "Patient Insurance Coverage",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "insurance_coverage.status",
+   "fieldname": "coverage_status",
+   "fieldtype": "Data",
+   "label": "Coverage Status",
    "read_only": 1
   }
  ],

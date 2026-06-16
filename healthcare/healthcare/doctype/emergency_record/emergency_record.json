@@ -9,6 +9,7 @@
  "field_order": [
   "naming_series",
   "patient",
+  "patient_description",
   "patient_name",
   "patient_sex",
   "patient_age",
@@ -36,9 +37,17 @@
   "disposition_section",
   "disposition",
   "disposition_datetime",
+  "disposition_notes",
   "column_break_disp",
   "inpatient_record",
-  "disposition_notes"
+  "billing_section",
+  "consultation_item",
+  "consultation_charge",
+  "sales_invoice",
+  "column_break_billing",
+  "insurance_policy",
+  "insurance_payor",
+  "invoiced"
  ],
  "fields": [
   {
@@ -54,7 +63,6 @@
    "in_standard_filter": 1,
    "label": "Patient",
    "options": "Patient",
-   "reqd": 1,
    "search_index": 1
   },
   {
@@ -180,6 +188,8 @@
    "options": "Healthcare Practitioner"
   },
   {
+   "fetch_from": "attending_practitioner.department",
+   "fetch_if_empty": 1,
    "fieldname": "medical_department",
    "fieldtype": "Link",
    "label": "Medical Department",
@@ -238,6 +248,60 @@
    "fieldname": "disposition_notes",
    "fieldtype": "Small Text",
    "label": "Disposition Notes"
+  },
+  {
+   "fieldname": "patient_description",
+   "fieldtype": "Data",
+   "label": "Patient Description"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "billing_section",
+   "fieldtype": "Section Break",
+   "label": "Billing"
+  },
+  {
+   "fieldname": "consultation_item",
+   "fieldtype": "Link",
+   "label": "Consultation Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "consultation_charge",
+   "fieldtype": "Currency",
+   "label": "Emergency Consultation Fee"
+  },
+  {
+   "fieldname": "insurance_policy",
+   "fieldtype": "Link",
+   "label": "Insurance Policy",
+   "options": "Patient Insurance Policy"
+  },
+  {
+   "fetch_from": "insurance_policy.insurance_payor",
+   "fieldname": "insurance_payor",
+   "fieldtype": "Link",
+   "label": "Insurance Payor",
+   "options": "Insurance Payor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_billing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "invoiced",
+   "fieldtype": "Check",
+   "label": "Invoiced",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -247,39 +311,15 @@
    "link_fieldname": "emergency_record"
   },
   {
-   "link_doctype": "Service Request",
-   "link_fieldname": "emergency_record"
-  },
-  {
    "link_doctype": "Medication Request",
    "link_fieldname": "emergency_record"
   },
   {
-   "link_doctype": "Observation",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "link_doctype": "Patient Appointment",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "link_doctype": "Therapy Session",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "link_doctype": "Therapy Plan",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "link_doctype": "Inpatient Record",
-   "link_fieldname": "emergency_record"
-  },
-  {
-   "link_doctype": "Lab Test",
+   "link_doctype": "Service Request",
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2026-06-15 21:17:08.936836",
+ "modified": "2026-06-16 18:38:52.998211",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",
