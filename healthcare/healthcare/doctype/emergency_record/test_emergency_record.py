@@ -4,7 +4,10 @@
 import frappe
 from frappe.utils import add_to_date, now_datetime
 
-from healthcare.healthcare.doctype.emergency_record.emergency_record import get_active_triage
+from healthcare.healthcare.doctype.emergency_record.emergency_record import (
+	get_active_triage,
+	occupancy_qty,
+)
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -70,6 +73,30 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		record.reload()
 		self.assertFalse(record.service_unit)
 		self.assertEqual(occupancy_status(bed), "Vacant")
+
+	def test_occupancy_qty_blocks_and_minimum(self):
+		self.assertEqual(occupancy_qty(2, 1, 1), 2)
+		self.assertEqual(occupancy_qty(2.5, 1, 1), 3)
+		self.assertEqual(occupancy_qty(48, 24, 1), 2)
+		self.assertEqual(occupancy_qty(0, 24, 5), 5)
+
+	def test_occupancy_billable_items(self):
+		bed = "_Test HSU - Occupancy - _TC"
+		record = create_emergency_record("_Test Patient")
+		record.assign_bed(bed, check_in=add_to_date(now_datetime(), hours=-2))
+		items = record.get_occupancy_billable_items()
+		expected_item, rate = frappe.db.get_value(
+			"Healthcare Service Unit Type", "_Test Service Unit Type - Occupancy", ["item", "rate"]
+		)
+		self.assertEqual(len(items), 1)
+		self.assertEqual(items[0]["item_code"], expected_item)
+		self.assertEqual(items[0]["qty"], 1)
+		self.assertEqual(items[0]["rate"], rate)
+
+	def test_non_billable_unit_has_no_charge(self):
+		record = create_emergency_record("_Test Patient")
+		record.assign_bed("_Test HSU - OT - _TC")
+		self.assertEqual(record.get_occupancy_billable_items(), [])
 
 	def test_occupied_bed_cannot_be_reassigned(self):
 		bed = "_Test HSU - Occupancy - _TC"
