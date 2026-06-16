@@ -114,7 +114,7 @@ class EmergencyRecord(Document):
 				"status": ["!=", "Cancelled"],
 			},
 			fields=["observation_template", "result_data", "permitted_unit", "posting_date"],
-			order_by="creation",
+			order_by="creation desc",
 		)
 
 	@frappe.whitelist()
