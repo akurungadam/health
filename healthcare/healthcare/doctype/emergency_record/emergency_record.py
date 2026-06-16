@@ -2,11 +2,12 @@
 # For license information, please see license.txt
 
 import json
+from math import ceil
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_datetime, now_datetime, today
+from frappe.utils import flt, get_datetime, now_datetime, time_diff_in_hours, today
 
 from healthcare.healthcare.doctype.observation.observation import (
 	add_observation,
@@ -94,6 +95,41 @@ class EmergencyRecord(Document):
 				)
 
 	@frappe.whitelist()
+	def get_occupancy_billable_items(self):
+		item_hours = {}
+		for occupancy in self.occupancies:
+			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			if not unit_type:
+				continue
+			check_out = get_datetime(occupancy.check_out) if occupancy.check_out else now_datetime()
+			hours = flt(time_diff_in_hours(check_out, get_datetime(occupancy.check_in)), 2)
+			detail = item_hours.setdefault(
+				unit_type.item,
+				{"item": unit_type.item, "uom": unit_type.uom, "rate": unit_type.rate, "hours": 0},
+			)
+			detail["hours"] += hours
+			detail["no_of_hours"] = unit_type.no_of_hours
+			detail["minimum_billable_qty"] = unit_type.minimum_billable_qty
+
+		items = []
+		for detail in item_hours.values():
+			qty = occupancy_qty(detail["hours"], detail["no_of_hours"], detail["minimum_billable_qty"])
+			if qty > 0:
+				items.append(
+					{"item_code": detail["item"], "qty": qty, "rate": detail["rate"], "uom": detail["uom"]}
+				)
+		return items
+
+	def get_billable_service_unit_type(self, service_unit):
+		service_unit_type = frappe.db.get_value("Healthcare Service Unit", service_unit, "service_unit_type")
+		if not service_unit_type:
+			return None
+		unit_type = frappe.get_cached_doc("Healthcare Service Unit Type", service_unit_type)
+		if not unit_type.is_billable or not unit_type.item:
+			return None
+		return unit_type
+
+	@frappe.whitelist()
 	def add_vital_signs(self, vitals):
 		vitals = json.loads(vitals) if isinstance(vitals, str) else vitals
 		results = [self.create_vital_observation(vital) for vital in vitals]
@@ -162,6 +198,11 @@ class EmergencyRecord(Document):
 		)
 		record.insert(ignore_permissions=True)
 		self.inpatient_record = record.name
+
+
+def occupancy_qty(hours, no_of_hours, minimum_billable_qty):
+	blocks = ceil(hours / no_of_hours) if no_of_hours else hours
+	return max(blocks, minimum_billable_qty or 0)
 
 
 @frappe.whitelist()
