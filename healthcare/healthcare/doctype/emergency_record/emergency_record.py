@@ -26,6 +26,16 @@ class EmergencyRecord(Document):
 		self.set_patient_age()
 		self.set_consultation_defaults()
 		self.validate_occupancy_dates()
+		self.update_patient_emergency_record()
+
+	def after_insert(self):
+		if self.patient:
+			frappe.db.set_value("Patient", self.patient, "emergency_record", self.name)
+
+	def update_patient_emergency_record(self):
+		if self.patient and self.status in ("Closed", "Cancelled"):
+			if frappe.db.get_value("Patient", self.patient, "emergency_record") == self.name:
+				frappe.db.set_value("Patient", self.patient, "emergency_record", None)
 
 	def set_patient_age(self):
 		if not self.patient:

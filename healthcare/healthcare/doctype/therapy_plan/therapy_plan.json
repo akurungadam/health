@@ -179,6 +179,7 @@
    "read_only": 1
   },
   {
+   "fetch_from": "patient.emergency_record",
    "fieldname": "emergency_record",
    "fieldtype": "Link",
    "label": "Emergency Record",
@@ -194,7 +195,7 @@
    "link_fieldname": "therapy_plan"
   }
  ],
- "modified": "2026-04-25 14:28:01.138405",
+ "modified": "2026-06-17 18:11:51.318190",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Therapy Plan",
