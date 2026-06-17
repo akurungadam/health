@@ -596,6 +596,10 @@ def get_inpatient_services_to_invoice(patient, company):
 
 
 def get_emergency_services_to_invoice(patient, company):
+	from healthcare.healthcare.doctype.emergency_record.emergency_record import (
+		get_billable_service_unit_type,
+	)
+
 	services_to_invoice = []
 	er = frappe.qb.DocType("Emergency Record")
 	eo = frappe.qb.DocType("Emergency Occupancy")
@@ -626,7 +630,7 @@ def get_emergency_services_to_invoice(patient, company):
 		.where((er.patient == patient.name) & (er.company == company) & (eo.invoiced == 0))
 	).run(as_dict=True)
 	for occupancy in occupancies:
-		unit_type = get_billable_unit_type(occupancy.service_unit)
+		unit_type = get_billable_service_unit_type(occupancy.service_unit)
 		if not unit_type:
 			continue
 		coverage_line = get_emergency_coverage_line(occupancy, company)
@@ -645,19 +649,14 @@ def get_emergency_services_to_invoice(patient, company):
 	return services_to_invoice
 
 
-def get_billable_unit_type(service_unit):
-	unit_type = frappe.db.get_value("Healthcare Service Unit", service_unit, "service_unit_type")
-	if not unit_type:
-		return None
-	unit_type = frappe.get_cached_doc("Healthcare Service Unit Type", unit_type)
-	return unit_type if unit_type.is_billable and unit_type.item else None
-
-
 def get_emergency_occupancy_qty(occupancy, unit_type):
+	# Reuse the single source of truth so the Sales Invoice pull path bills the same
+	# quantity as the Emergency Record push path (create_sales_invoice / coverage).
+	from healthcare.healthcare.doctype.emergency_record.emergency_record import occupancy_qty
+
 	check_out = occupancy.check_out or frappe.utils.now_datetime()
 	hours = flt(time_diff_in_hours(check_out, occupancy.check_in))
-	qty = hours / (unit_type.no_of_hours or 1) if hours > 0 else 0.5
-	return max(qty, unit_type.minimum_billable_qty or 0)
+	return occupancy_qty(hours, unit_type.no_of_hours, unit_type.minimum_billable_qty)
 
 
 def get_emergency_coverage_line(occupancy, company):
