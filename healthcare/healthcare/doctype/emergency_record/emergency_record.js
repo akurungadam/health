@@ -75,11 +75,13 @@ frappe.ui.form.on("Emergency Record", {
 			const rows = (r.message || [])
 				.map(
 					v =>
-						`<tr><td>${
-							v.observation_template
-						}</td><td>${frappe.utils.escape_html(v.result_data || "")} ${
-							v.permitted_unit || ""
-						}</td></tr>`,
+						`<tr><td>${frappe.utils.escape_html(
+							v.observation_template || "",
+						)}</td><td>${frappe.utils.escape_html(
+							v.result_data || "",
+						)} ${frappe.utils.escape_html(
+							v.permitted_unit || "",
+						)}</td></tr>`,
 				)
 				.join("");
 			frm.fields_dict.vital_signs_html.$wrapper.html(
