@@ -30,7 +30,9 @@ from healthcare.setup import setup_healthcare
 
 
 @frappe.whitelist()
-def get_healthcare_services_to_invoice(patient, customer, company, link_customer=False):
+def get_healthcare_services_to_invoice(
+	patient: str, customer: str, company: str, link_customer: bool = False
+) -> list[dict]:
 	patient = frappe.get_doc("Patient", patient)
 	items_to_invoice = []
 	if patient:
