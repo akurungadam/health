@@ -66,7 +66,9 @@ def get_data(filters):
 		set_acuity(record)
 		set_minutes_in_department(record)
 
-	return sorted(records, key=lambda row: (row.get("priority") or 9999, row.get("arrival_datetime")))
+	return sorted(
+		records, key=lambda row: (row.get("priority") or 9999, row.get("arrival_datetime") or now_datetime())
+	)
 
 
 def set_acuity(record):
@@ -89,8 +91,8 @@ def set_acuity(record):
 
 def set_minutes_in_department(record):
 	if record.get("arrival_datetime"):
-		record["minutes_in_department"] = int(
-			time_diff_in_seconds(now_datetime(), record["arrival_datetime"]) // 60
+		record["minutes_in_department"] = max(
+			0, int(time_diff_in_seconds(now_datetime(), record["arrival_datetime"]) // 60)
 		)
 	else:
 		record["minutes_in_department"] = 0
