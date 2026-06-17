@@ -22,6 +22,7 @@ healthcare.emergency.TRIAGE_DOCTYPES = [
 
 healthcare.emergency.show_triage = function (frm) {
 	if (frm.is_new() || !frm.doc.patient) {
+		frm.dashboard.set_headline("");
 		return;
 	}
 	frappe
@@ -33,6 +34,7 @@ healthcare.emergency.show_triage = function (frm) {
 		)
 		.then(triage => {
 			if (!triage) {
+				frm.dashboard.set_headline("");
 				return;
 			}
 			const color = triage.color || "#a6b1b9";
@@ -45,7 +47,8 @@ healthcare.emergency.show_triage = function (frm) {
 					</a>
 				</span>`,
 			);
-		});
+		})
+		.catch(() => frm.dashboard.set_headline(""));
 };
 
 healthcare.emergency.TRIAGE_DOCTYPES.forEach(doctype => {
