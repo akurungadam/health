@@ -105,7 +105,7 @@ class EmergencyRecord(Document):
 	def get_occupancy_billable_items(self) -> list[dict]:
 		item_hours = {}
 		for occupancy in self.occupancies:
-			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			unit_type = get_billable_service_unit_type(occupancy.service_unit)
 			if not unit_type:
 				continue
 			check_out = get_datetime(occupancy.check_out) if occupancy.check_out else now_datetime()
@@ -126,15 +126,6 @@ class EmergencyRecord(Document):
 					{"item_code": detail["item"], "qty": qty, "rate": detail["rate"], "uom": detail["uom"]}
 				)
 		return items
-
-	def get_billable_service_unit_type(self, service_unit):
-		service_unit_type = frappe.db.get_value("Healthcare Service Unit", service_unit, "service_unit_type")
-		if not service_unit_type:
-			return None
-		unit_type = frappe.get_cached_doc("Healthcare Service Unit Type", service_unit_type)
-		if not unit_type.is_billable or not unit_type.item:
-			return None
-		return unit_type
 
 	@frappe.whitelist()
 	def add_vital_signs(self, vitals: list[dict] | str) -> list[dict]:
@@ -252,7 +243,7 @@ class EmergencyRecord(Document):
 				},
 			)
 		for occupancy in self.occupancies:
-			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			unit_type = get_billable_service_unit_type(occupancy.service_unit)
 			if not unit_type:
 				continue
 			hours = self.occupancy_hours(occupancy)
@@ -280,7 +271,7 @@ class EmergencyRecord(Document):
 		for occupancy in self.occupancies:
 			if occupancy.insurance_coverage:
 				continue
-			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
+			unit_type = get_billable_service_unit_type(occupancy.service_unit)
 			if not unit_type:
 				continue
 			qty = occupancy_qty(
@@ -303,6 +294,16 @@ class EmergencyRecord(Document):
 def occupancy_qty(hours, no_of_hours, minimum_billable_qty):
 	blocks = ceil(hours / no_of_hours) if no_of_hours else hours
 	return max(blocks, minimum_billable_qty or 0)
+
+
+def get_billable_service_unit_type(service_unit):
+	service_unit_type = frappe.db.get_value("Healthcare Service Unit", service_unit, "service_unit_type")
+	if not service_unit_type:
+		return None
+	unit_type = frappe.get_cached_doc("Healthcare Service Unit Type", service_unit_type)
+	if not unit_type.is_billable or not unit_type.item:
+		return None
+	return unit_type
 
 
 @frappe.whitelist()
