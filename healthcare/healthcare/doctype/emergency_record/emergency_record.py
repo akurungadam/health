@@ -79,7 +79,10 @@ class EmergencyRecord(Document):
 		self.save()
 
 	def occupy_service_unit(self, service_unit, check_in):
-		if frappe.get_cached_value("Healthcare Service Unit", service_unit, "occupancy_status") != "Vacant":
+		current_status = frappe.db.get_value(
+			"Healthcare Service Unit", service_unit, "occupancy_status", for_update=True
+		)
+		if current_status != "Vacant":
 			frappe.throw(
 				_("Service Unit {0} is already occupied. Please choose a vacant one.").format(
 					frappe.bold(service_unit)
