@@ -850,21 +850,21 @@ def get_item_group_records():
 def create_triage_levels():
 	levels = [
 		{
-			"triage_level": _("Emergency"),
+			"triage_level": "Emergency",
 			"code": "RED",
 			"color": "#e24c4c",
 			"priority": 1,
 			"target_reassessment_mins": 0,
 		},
 		{
-			"triage_level": _("Urgent"),
+			"triage_level": "Urgent",
 			"code": "YELLOW",
 			"color": "#ecad4b",
 			"priority": 2,
 			"target_reassessment_mins": 30,
 		},
 		{
-			"triage_level": _("Non-urgent"),
+			"triage_level": "Non-urgent",
 			"code": "GREEN",
 			"color": "#4caf50",
 			"priority": 3,
