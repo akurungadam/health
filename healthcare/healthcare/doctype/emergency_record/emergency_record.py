@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+from datetime import datetime
 from math import ceil
 
 import frappe
@@ -51,7 +52,7 @@ class EmergencyRecord(Document):
 				frappe.throw(_("Row #{0}: Check Out cannot be before Check In").format(entry.idx))
 
 	@frappe.whitelist()
-	def record_triage(self, triage_level):
+	def record_triage(self, triage_level: str) -> None:
 		self.triage_level = triage_level
 		self.triage_datetime = now_datetime()
 		if self.status == "Registered":
@@ -59,7 +60,7 @@ class EmergencyRecord(Document):
 		self.save()
 
 	@frappe.whitelist()
-	def assign_bed(self, service_unit, check_in=None):
+	def assign_bed(self, service_unit: str, check_in: datetime | str | None = None) -> None:
 		self.occupy_service_unit(service_unit, check_in or now_datetime())
 		self.service_unit = service_unit
 		if self.status in ("Registered", "Triaged"):
@@ -67,12 +68,12 @@ class EmergencyRecord(Document):
 		self.save()
 
 	@frappe.whitelist()
-	def transfer_bed(self, service_unit, check_in=None):
+	def transfer_bed(self, service_unit: str, check_in: datetime | str | None = None) -> None:
 		self.release_current_bed(now_datetime())
 		self.assign_bed(service_unit, check_in)
 
 	@frappe.whitelist()
-	def release_bed(self):
+	def release_bed(self) -> None:
 		self.release_current_bed(now_datetime())
 		self.service_unit = None
 		self.save()
@@ -98,7 +99,7 @@ class EmergencyRecord(Document):
 				)
 
 	@frappe.whitelist()
-	def get_occupancy_billable_items(self):
+	def get_occupancy_billable_items(self) -> list[dict]:
 		item_hours = {}
 		for occupancy in self.occupancies:
 			unit_type = self.get_billable_service_unit_type(occupancy.service_unit)
@@ -133,7 +134,7 @@ class EmergencyRecord(Document):
 		return unit_type
 
 	@frappe.whitelist()
-	def add_vital_signs(self, vitals):
+	def add_vital_signs(self, vitals: list[dict] | str) -> list[dict]:
 		vitals = json.loads(vitals) if isinstance(vitals, str) else vitals
 		results = [self.create_vital_observation(vital) for vital in vitals]
 		record_observation_result(json.dumps(results))
@@ -153,7 +154,7 @@ class EmergencyRecord(Document):
 		return {"observation": observation, "result": vital.get("result")}
 
 	@frappe.whitelist()
-	def get_vital_signs(self):
+	def get_vital_signs(self) -> list[dict]:
 		return frappe.get_all(
 			"Observation",
 			filters={
@@ -167,7 +168,7 @@ class EmergencyRecord(Document):
 		)
 
 	@frappe.whitelist()
-	def set_disposition(self, disposition, notes=None):
+	def set_disposition(self, disposition: str, notes: str | None = None) -> None:
 		self.disposition = disposition
 		self.disposition_notes = notes
 		self.disposition_datetime = now_datetime()
@@ -203,7 +204,7 @@ class EmergencyRecord(Document):
 		self.inpatient_record = record.name
 
 	@frappe.whitelist()
-	def create_sales_invoice(self):
+	def create_sales_invoice(self) -> str:
 		if frappe.db.exists(
 			"Sales Invoice Item",
 			{"reference_dt": self.doctype, "reference_dn": self.name, "docstatus": ["<", 2]},
@@ -269,7 +270,7 @@ class EmergencyRecord(Document):
 		return flt(time_diff_in_hours(check_out, get_datetime(occupancy.check_in)), 2)
 
 	@frappe.whitelist()
-	def create_insurance_coverage(self):
+	def create_insurance_coverage(self) -> None:
 		if not self.insurance_policy:
 			frappe.throw(_("Please set an Insurance Policy to create coverage"))
 
@@ -302,7 +303,7 @@ def occupancy_qty(hours, no_of_hours, minimum_billable_qty):
 
 
 @frappe.whitelist()
-def get_active_triage(patient):
+def get_active_triage(patient: str) -> dict | None:
 	records = frappe.get_all(
 		"Emergency Record",
 		filters={"patient": patient, "status": ["not in", ["Closed", "Cancelled"]]},
