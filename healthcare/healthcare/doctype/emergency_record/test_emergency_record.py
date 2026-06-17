@@ -23,6 +23,15 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		self.assertTrue(record.patient_age)
 		self.assertIn("Year", record.patient_age)
 
+	def test_patient_stamped_on_registration(self):
+		record = create_emergency_record("_Test Patient")
+		self.assertEqual(frappe.db.get_value("Patient", "_Test Patient", "emergency_record"), record.name)
+
+	def test_patient_cleared_on_disposition(self):
+		record = create_emergency_record("_Test Patient")
+		record.set_disposition("Discharged")
+		self.assertIsNone(frappe.db.get_value("Patient", "_Test Patient", "emergency_record"))
+
 	def test_consultation_defaults_from_practitioner(self):
 		practitioner = get_test_practitioner()
 		record = create_emergency_record("_Test Patient", attending_practitioner=practitioner)

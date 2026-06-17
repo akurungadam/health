@@ -585,6 +585,7 @@
    "show_dashboard": 1
   },
   {
+   "fetch_from": "patient.emergency_record",
    "fieldname": "emergency_record",
    "fieldtype": "Link",
    "label": "Emergency Record",
@@ -607,7 +608,7 @@
    "link_fieldname": "inpatient_record"
   }
  ],
- "modified": "2025-12-25 09:36:36.211469",
+ "modified": "2026-06-17 18:11:51.318190",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Inpatient Record",
