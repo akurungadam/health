@@ -40,6 +40,14 @@ frappe.ui.form.on("Emergency Record", {
 			);
 		}
 
+		if (!frm.is_new() && frm.doc.patient && frm.doc.patient.startsWith("ER-")) {
+			frm.add_custom_button(
+				__("Identify Patient"),
+				() => identify_dialog(frm),
+				__("Actions"),
+			);
+		}
+
 		if (!frm.is_new() && !frm.doc.sales_invoice) {
 			frm.add_custom_button(
 				__("Sales Invoice"),
@@ -210,6 +218,27 @@ function disposition_dialog(frm) {
 				.then(() => frm.reload_doc()),
 		__("Set Disposition"),
 		__("Save"),
+	);
+}
+
+function identify_dialog(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "target_patient",
+				fieldtype: "Link",
+				options: "Patient",
+				label: __("Merge Into Patient"),
+				reqd: 1,
+				get_query: () => ({ filters: { name: ["!=", frm.doc.patient] } }),
+			},
+		],
+		values =>
+			frm
+				.call("merge_patient", { target_patient: values.target_patient })
+				.then(() => frm.reload_doc()),
+		__("Identify Patient"),
+		__("Merge"),
 	);
 }
 
