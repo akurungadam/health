@@ -1,0 +1,35 @@
+name: Close stale PRs
+
+on:
+  schedule:
+    - cron: "30 1 * * *"   # daily at 01:30 UTC
+  workflow_dispatch:        # lets you trigger manually too
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # --- target PRs only, leave issues alone ---
+          days-before-issue-stale: -1      # -1 = never touch issues
+          days-before-issue-close: -1
+
+          # --- timing for PRs ---
+          days-before-pr-stale: 30         # mark stale after 30 days idle
+          days-before-pr-close: 14         # close 14 days after that
+
+          # --- only consider PRs updated after this date ---
+          start-date: "2024-01-01T00:00:00Z"
+
+          stale-pr-label: "stale"
+          stale-pr-message: >
+            This PR has had no activity for 60 days and is now marked stale.
+            It will be closed in 14 days unless there is new activity.
+          close-pr-message: >
+            Closing this PR due to prolonged inactivity. Feel free to reopen.
+          exempt-pr-labels: "pinned,security,work-in-progress"
