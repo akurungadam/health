@@ -8,6 +8,7 @@ from math import ceil
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.model.naming import make_autoname
 from frappe.utils import flt, get_datetime, now_datetime, time_diff_in_hours, today
 
 from healthcare.healthcare.doctype.observation.observation import (
@@ -28,9 +29,34 @@ class EmergencyRecord(Document):
 		self.validate_occupancy_dates()
 		self.update_patient_emergency_record()
 
+	def before_insert(self):
+		if not self.patient:
+			self.patient = self.create_provisional_patient()
+
+	def create_provisional_patient(self):
+		patient = frappe.new_doc("Patient")
+		patient.first_name = self.get("patient_description") or _("Unidentified Patient")
+		patient.sex = self.get("gender") or "Other"
+		patient.naming_series = "ER-.YYYY.-"
+		patient.name = make_autoname("ER-.YYYY.-", "Patient", patient)
+		patient.flags.name_set = True
+		patient.insert(ignore_permissions=True)
+		return patient.name
+
 	def after_insert(self):
 		if self.patient:
 			frappe.db.set_value("Patient", self.patient, "emergency_record", self.name)
+
+	@frappe.whitelist()
+	def merge_patient(self, target_patient: str) -> str:
+		if not self.patient:
+			frappe.throw(_("There is no patient to merge"))
+		if target_patient == self.patient:
+			frappe.throw(_("Select a different Patient to merge into"))
+		frappe.rename_doc("Patient", self.patient, target_patient, merge=True)
+		if self.status not in ("Closed", "Cancelled"):
+			frappe.db.set_value("Patient", target_patient, "emergency_record", self.name)
+		return target_patient
 
 	def update_patient_emergency_record(self):
 		if self.patient and self.status in ("Closed", "Cancelled"):
