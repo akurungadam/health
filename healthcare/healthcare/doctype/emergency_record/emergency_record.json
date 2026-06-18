@@ -10,6 +10,7 @@
   "naming_series",
   "patient",
   "patient_description",
+  "gender",
   "patient_name",
   "patient_sex",
   "patient_age",
@@ -250,9 +251,18 @@
    "label": "Disposition Notes"
   },
   {
+   "description": "Use for an unidentified patient (e.g. unconscious arrival). A provisional Patient is created from this.",
    "fieldname": "patient_description",
    "fieldtype": "Data",
    "label": "Patient Description"
+  },
+  {
+   "default": "Other",
+   "depends_on": "eval:!doc.patient",
+   "fieldname": "gender",
+   "fieldtype": "Link",
+   "label": "Gender (if unidentified)",
+   "options": "Gender"
   },
   {
    "collapsible": 1,
@@ -319,7 +329,7 @@
    "link_fieldname": "emergency_record"
   }
  ],
- "modified": "2026-06-16 18:38:52.998211",
+ "modified": "2026-06-18 13:50:07.543590",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Emergency Record",

@@ -109,7 +109,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Series",
-   "options": "HLC-PAT-.YYYY.-",
+   "options": "HLC-PAT-.YYYY.-\nER-.YYYY.-",
    "print_hide": 1,
    "report_hide": 1,
    "set_only_once": 1
@@ -622,7 +622,7 @@
   }
  ],
  "max_attachments": 50,
- "modified": "2026-06-17 18:11:51.318190",
+ "modified": "2026-06-18 13:50:07.543590",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient",
