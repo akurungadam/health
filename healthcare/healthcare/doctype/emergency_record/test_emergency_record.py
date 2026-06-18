@@ -23,6 +23,23 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		self.assertTrue(record.patient_age)
 		self.assertIn("Year", record.patient_age)
 
+	def test_provisional_patient_created_when_unidentified(self):
+		record = create_unidentified_record("Unconscious male approx 40", gender="Male")
+		self.assertTrue(record.patient)
+		self.assertTrue(record.patient.startswith("ER-"))
+		self.assertEqual(
+			frappe.db.get_value("Patient", record.patient, "first_name"), "Unconscious male approx 40"
+		)
+		self.assertEqual(frappe.db.get_value("Patient", record.patient, "sex"), "Male")
+
+	def test_merge_patient_into_existing(self):
+		record = create_unidentified_record("Unidentified", gender="Other")
+		provisional = record.patient
+		record.merge_patient("_Test Patient")
+		self.assertFalse(frappe.db.exists("Patient", provisional))
+		self.assertEqual(frappe.db.get_value("Emergency Record", record.name, "patient"), "_Test Patient")
+		self.assertEqual(frappe.db.get_value("Patient", "_Test Patient", "emergency_record"), record.name)
+
 	def test_patient_stamped_on_registration(self):
 		record = create_emergency_record("_Test Patient")
 		self.assertEqual(frappe.db.get_value("Patient", "_Test Patient", "emergency_record"), record.name)
@@ -316,6 +333,21 @@ def create_emergency_record(patient, **extra):
 	}
 	values.update(extra)
 	record = frappe.get_doc(values)
+	record.insert(ignore_permissions=True)
+	return record
+
+
+def create_unidentified_record(patient_description, gender="Other"):
+	record = frappe.get_doc(
+		{
+			"doctype": "Emergency Record",
+			"company": "_Test Company",
+			"arrival_datetime": now_datetime(),
+			"arrival_mode": "Ambulance",
+			"patient_description": patient_description,
+			"gender": gender,
+		}
+	)
 	record.insert(ignore_permissions=True)
 	return record
 
