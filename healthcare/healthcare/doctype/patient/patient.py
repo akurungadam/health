@@ -186,7 +186,8 @@ class Patient(Document):
 	@frappe.whitelist()
 	def renew_registration(self):
 		"""Create a fresh registration and re-enable the patient (when no fee is collected)."""
-		create_patient_registration(self.name)
+		if not frappe.db.exists("Patient Registration", {"patient": self.name, "status": "Active"}):
+			create_patient_registration(self.name)
 		self.db_set("status", "Active")
 
 	@frappe.whitelist()

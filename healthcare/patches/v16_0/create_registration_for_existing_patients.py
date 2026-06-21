@@ -13,10 +13,13 @@ def execute():
 		fields=["name", "creation"],
 	)
 
-	for patient in patients:
+	for index, patient in enumerate(patients):
 		registration = frappe.new_doc("Patient Registration")
 		registration.patient = patient.name
 		registration.start_date = patient.creation
 		registration.valid_till = None
 		registration.status = "Active"
 		registration.insert(ignore_permissions=True)
+
+		if index % 500 == 0:
+			frappe.db.commit()
