@@ -22,6 +22,9 @@ from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings impor
 	get_receivable_account,
 	send_registration_sms,
 )
+from healthcare.healthcare.doctype.patient_registration.patient_registration import (
+	create_patient_registration,
+)
 
 
 class Patient(Document):
@@ -42,6 +45,7 @@ class Patient(Document):
 		if frappe.db.get_single_value("Healthcare Settings", "collect_registration_fee"):
 			frappe.db.set_value("Patient", self.name, "status", "Disabled")
 		else:
+			create_patient_registration(self.name)
 			send_registration_sms(self)
 		self.reload()
 
@@ -178,6 +182,12 @@ class Patient(Document):
 			return
 		age_str = f"{age.years!s} {_('Year(s)')} {age.months!s} {_('Month(s)')} {age.days!s} {_('Day(s)')}"
 		return age_str
+
+	@frappe.whitelist()
+	def renew_registration(self):
+		"""Create a fresh registration and re-enable the patient (when no fee is collected)."""
+		create_patient_registration(self.name)
+		self.db_set("status", "Active")
 
 	@frappe.whitelist()
 	def invoice_patient_registration(self):
