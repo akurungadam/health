@@ -22,10 +22,16 @@ frappe.ui.form.on('Patient', {
 			erpnext.toggle_naming_series();
 		}
 
-		if (frappe.defaults.get_default('collect_registration_fee') && frm.doc.status == 'Disabled') {
-			frm.add_custom_button(__('Invoice Patient Registration'), function () {
-				invoice_registration(frm);
-			});
+		if (frm.doc.status == 'Disabled') {
+			if (frappe.defaults.get_default('collect_registration_fee')) {
+				frm.add_custom_button(__('Invoice Patient Registration'), function () {
+					invoice_registration(frm);
+				});
+			} else {
+				frm.add_custom_button(__('Renew Registration'), function () {
+					renew_registration(frm);
+				});
+			}
 		}
 
 		if (frm.doc.patient_name && frappe.user.has_role('Physician')) {
@@ -136,6 +142,18 @@ let create_encounter = function (frm) {
 		'patient': frm.doc.name,
 	};
 	frappe.new_doc('Patient Encounter');
+};
+
+let renew_registration = function (frm) {
+	frappe.call({
+		doc: frm.doc,
+		method: 'renew_registration',
+		callback: function (data) {
+			if (!data.exc) {
+				frm.reload_doc();
+			}
+		}
+	});
 };
 
 let invoice_registration = function (frm) {
