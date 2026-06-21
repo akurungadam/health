@@ -6,6 +6,7 @@ from frappe.utils import add_days, getdate
 
 from healthcare.healthcare.doctype.patient_registration.patient_registration import (
 	create_patient_registration,
+	expire_registrations,
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
@@ -41,3 +42,26 @@ class TestPatientRegistration(HealthcareTestSuite):
 		registration.save(ignore_permissions=True)
 
 		self.assertEqual(registration.status, "Expired")
+
+	def test_scheduler_expires_and_disables_patient(self):
+		patient = self.get_patient()
+		frappe.db.set_value("Patient", patient, "status", "Active")
+		registration = create_patient_registration(patient)
+		registration.db_set("valid_till", add_days(getdate(), -1))
+
+		expire_registrations()
+
+		self.assertEqual(frappe.db.get_value("Patient Registration", registration.name, "status"), "Expired")
+		self.assertEqual(frappe.db.get_value("Patient", patient, "status"), "Disabled")
+
+	def test_scheduler_keeps_patient_with_active_registration(self):
+		frappe.db.set_single_value("Healthcare Settings", "registration_validity", 0)
+		patient = self.get_patient()
+		frappe.db.set_value("Patient", patient, "status", "Active")
+		lapsed = create_patient_registration(patient)
+		lapsed.db_set("valid_till", add_days(getdate(), -1))
+		create_patient_registration(patient, start_date=getdate())  # never-expiring registration
+
+		expire_registrations()
+
+		self.assertEqual(frappe.db.get_value("Patient", patient, "status"), "Active")
