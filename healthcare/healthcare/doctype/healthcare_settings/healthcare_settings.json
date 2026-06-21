@@ -16,6 +16,7 @@
   "collect_registration_fee",
   "registration_item",
   "registration_fee",
+  "registration_validity",
   "show_payment_popup",
   "enable_free_follow_ups",
   "max_visits",
@@ -103,6 +104,14 @@
    "mandatory_depends_on": "eval:doc.collect_registration_fee == 1",
    "non_negative": 1,
    "options": "Currency"
+  },
+  {
+   "default": "0",
+   "description": "Number of days a Patient Registration stays valid. Set to 0 for registrations that never expire.",
+   "fieldname": "registration_validity",
+   "fieldtype": "Int",
+   "label": "Registration Validity (Days)",
+   "non_negative": 1
   },
   {
    "depends_on": "eval:doc.enable_free_follow_ups == 1",
@@ -513,7 +522,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2025-12-25 09:36:33.073374",
+ "modified": "2026-06-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
