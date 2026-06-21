@@ -1053,8 +1053,8 @@ def manage_invoice_submit_cancel(doc, method):
 						is_registration = item.item_name == "Registration Fee"
 
 					if is_registration:
-						status = "Active" if method == "on_submit" else "Disabled"
-						frappe.db.set_value("Patient", item.reference_dn, "status", status)
+						if method == "on_submit":
+							frappe.db.set_value("Patient", item.reference_dn, "status", "Active")
 						manage_registration_on_invoice(item.reference_dn, doc, method)
 
 		if method == "on_submit" and frappe.db.get_single_value(
@@ -1094,9 +1094,16 @@ def manage_registration_on_invoice(patient, sales_invoice, method):
 	"""Create a Patient Registration on registration invoice submit, cancel it on invoice cancel."""
 	from healthcare.healthcare.doctype.patient_registration.patient_registration import (
 		create_patient_registration,
+		disable_patient_without_active_registration,
 	)
 
 	if method == "on_submit":
+		exists = frappe.db.exists(
+			"Patient Registration",
+			{"sales_invoice": sales_invoice.name, "status": ["!=", "Cancelled"]},
+		)
+		if exists:
+			return
 		create_patient_registration(
 			patient,
 			sales_invoice=sales_invoice.name,
@@ -1109,6 +1116,7 @@ def manage_registration_on_invoice(patient, sales_invoice, method):
 		)
 		if registration:
 			frappe.db.set_value("Patient Registration", registration, "status", "Cancelled")
+		disable_patient_without_active_registration(patient)
 
 
 def update_insurance_coverage(sales_invoice):
