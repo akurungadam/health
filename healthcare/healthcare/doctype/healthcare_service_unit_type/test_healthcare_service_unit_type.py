@@ -18,3 +18,18 @@ class TestHealthcareServiceUnitType(HealthcareTestSuite):
 		unit_type.disabled = 1
 		unit_type.save()
 		self.assertEqual(frappe.db.get_value("Item", unit_type.item, "disabled"), 1)
+
+	def test_billable_item_cannot_be_shared_between_types(self):
+		existing = frappe.get_doc(
+			"Healthcare Service Unit Type", {"service_unit_type": "_Test Inpatient Rooms"}
+		)
+		duplicate = frappe.get_doc(
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": "_Test Shared Item Rooms",
+				"inpatient_occupancy": 1,
+				"is_billable": 1,
+				"item": existing.item,
+			}
+		)
+		self.assertRaises(frappe.ValidationError, duplicate.insert)
