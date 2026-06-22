@@ -107,6 +107,7 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:doc.collect_registration_fee == 1",
    "description": "Number of days a Patient Registration stays valid. Set to 0 for registrations that never expire.",
    "fieldname": "registration_validity",
    "fieldtype": "Int",
@@ -522,7 +523,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-06-21 12:00:00.000000",
+ "modified": "2026-06-21 16:41:08.414871",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
