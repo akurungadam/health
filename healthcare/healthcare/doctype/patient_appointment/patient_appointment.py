@@ -140,7 +140,7 @@ class PatientAppointment(Document):
 		elif appointment_date > today and self.status not in ["Scheduled", "Confirmed"]:
 			self.status = "Scheduled"
 
-		elif appointment_date < today and self.status not in ["No Show", "Checked In", "Checked Out"]:
+		elif appointment_date < today and self.status not in ["No Show"]:
 			self.status = "No Show"
 
 	def validate_overlaps(self):
