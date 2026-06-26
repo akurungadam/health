@@ -4,7 +4,6 @@
 
 import datetime
 import json
-from typing import Optional
 
 import frappe
 from frappe import _
@@ -1023,7 +1022,9 @@ def validate_practitioner_schedules(schedule_entry, practitioner):
 
 
 @frappe.whitelist()
-def check_in_appointment(appointment_id, practitioner=None, service_unit=None):
+def check_in_appointment(
+	appointment_id: str, practitioner: str | None = None, service_unit: str | None = None
+) -> "PatientAppointment":
 	appointment = frappe.get_doc("Patient Appointment", appointment_id)
 	if appointment.status in ["Cancelled", "Closed", "Checked Out"]:
 		frappe.throw(
