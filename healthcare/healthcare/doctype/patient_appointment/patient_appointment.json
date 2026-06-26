@@ -177,8 +177,7 @@
    "in_standard_filter": 1,
    "label": "Healthcare Practitioner",
    "options": "Healthcare Practitioner",
-   "search_index": 1,
-   "set_only_once": 1
+   "search_index": 1
   },
   {
    "fetch_from": "practitioner.department",
@@ -585,7 +584,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2026-06-17 18:11:51.318190",
+ "modified": "2026-06-26 18:11:41.318190",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Patient Appointment",
