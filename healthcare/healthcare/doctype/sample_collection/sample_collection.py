@@ -77,8 +77,7 @@ class SampleCollection(Document):
 
 @frappe.whitelist()
 def create_observation(selected, sample_collection, component_observations=None, child_name=None):
-	frappe.enqueue(
-		"healthcare.healthcare.doctype.sample_collection.sample_collection.insert_observation",
+	insert_observation(
 		selected=selected,
 		sample_collection=sample_collection,
 		component_observations=component_observations,
