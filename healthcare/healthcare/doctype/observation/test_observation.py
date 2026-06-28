@@ -241,6 +241,21 @@ class TestObservation(HealthcareTestSuite):
 
 		self.assertEqual(flt(result["formula_2_result"]), 2)
 
+	def test_sanitize_input_strips_unsafe_html(self):
+		observation = frappe.new_doc("Observation")
+		observation.result_text = "<p>Normal</p><script>alert('xyz')</script>"
+		observation.result_interpretation = "<b>High</b><img src=xyz onerror=alert(1)>"
+		observation.note = "<span onclick='steal_data()'>Note</span>"
+
+		observation.sanitize_input()
+
+		self.assertNotIn("<script", observation.result_text)
+		self.assertIn("Normal", observation.result_text)
+		self.assertNotIn("onerror", observation.result_interpretation)
+		self.assertIn("High", observation.result_interpretation)
+		self.assertNotIn("onclick", observation.note)
+		self.assertIn("Note", observation.note)
+
 	def run_formula_test_case(
 		self,
 		patient,
