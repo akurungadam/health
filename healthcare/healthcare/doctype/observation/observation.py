@@ -22,6 +22,7 @@ class Observation(Document):
 		self.set_status()
 		self.reference = get_observation_reference(self)
 		self.validate_input()
+		self.sanitize_input()
 
 	def on_update(self):
 		set_diagnostic_report_status(self)
@@ -117,6 +118,13 @@ class Observation(Document):
 						frappe.bold(self.result_data), frappe.bold(self.permitted_data_type)
 					)
 				)
+
+	def sanitize_input(self):
+		html_fields = ["result_text", "result_interpretation", "note"]
+		for field in html_fields:
+			value = self.get(field)
+			if value:
+				self.set(field, frappe.utils.sanitize_html(value))
 
 	def render_templates(self):
 		if self.result_template and not self.result_text:
