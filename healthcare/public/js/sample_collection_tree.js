@@ -289,7 +289,7 @@ healthcare.SampleCollectionTree = class SampleCollectionTree {
 				.sample-tree-children { padding-left: 22px; }
 				.sample-tree-label {
 					display: flex; align-items: center; gap: 8px;
-					padding: 5px 8px; border-radius: var(--border-radius);
+					padding: 10px 8px; border-radius: var(--border-radius);
 				}
 				.sample-tree-label:hover { background: var(--bg-light-gray); }
 				.sample-tree-caret {
