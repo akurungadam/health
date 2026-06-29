@@ -268,12 +268,11 @@ frappe.ui.form.on("Patient Appointment", {
 
 		if (
 			!frm.doc.__islocal &&
-			["Open", "Confirmed"].includes(frm.doc.status) &&
+			["Open", "Confirmed", "No Show"].includes(frm.doc.status) &&
 			frm.doc.appointment_based_on_check_in
 		) {
 			frm.add_custom_button(__("Check In"), () => {
-				frm.set_value("status", "Checked In");
-				frm.save();
+				check_in_appointment(frm);
 			});
 		}
 
@@ -1276,6 +1275,51 @@ let update_status = function (frm, status) {
 			});
 		},
 	);
+};
+
+let check_in_appointment = function (frm) {
+	let d = new frappe.ui.Dialog({
+		title: __("Check In"),
+		fields: [
+			{
+				fieldtype: "Link",
+				options: "Healthcare Practitioner",
+				fieldname: "practitioner",
+				label: __("Practitioner"),
+				default: frm.doc.practitioner,
+			},
+			{ fieldtype: "Column Break" },
+			{
+				fieldtype: "Link",
+				options: "Healthcare Service Unit",
+				fieldname: "service_unit",
+				label: __("Service Unit"),
+				default: frm.doc.service_unit,
+				get_query: function () {
+					return { filters: { company: frm.doc.company } };
+				},
+			},
+		],
+		primary_action_label: __("Check In"),
+		primary_action: function (values) {
+			frappe.call({
+				method: "healthcare.healthcare.doctype.patient_appointment.patient_appointment.check_in_appointment",
+				args: {
+					appointment_id: frm.doc.name,
+					practitioner: values.practitioner,
+					service_unit: values.service_unit,
+				},
+				freeze: true,
+				callback: function (data) {
+					if (!data.exc) {
+						d.hide();
+						frm.reload_doc();
+					}
+				},
+			});
+		},
+	});
+	d.show();
 };
 
 let calculate_age = function (birth) {

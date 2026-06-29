@@ -4,7 +4,6 @@
 
 import datetime
 import json
-from typing import Optional
 
 import frappe
 from frappe import _
@@ -132,15 +131,18 @@ class PatientAppointment(Document):
 		today = getdate()
 		appointment_date = getdate(self.appointment_date)
 
-		# If appointment is created for today set status as Open else Scheduled
+		if self.status in ["Checked In", "Checked Out", "Closed", "Cancelled", "No Show"]:
+			return
+
 		if appointment_date == today:
-			if self.status not in ["Checked In", "Checked Out", "Open", "Confirmed"]:
+			if self.status not in ["Open", "Confirmed"]:
 				self.status = "Open"
 
-		elif appointment_date > today and self.status not in ["Scheduled", "Confirmed"]:
-			self.status = "Scheduled"
+		elif appointment_date > today:
+			if self.status not in ["Scheduled", "Confirmed"]:
+				self.status = "Scheduled"
 
-		elif appointment_date < today and self.status != "No Show":
+		elif appointment_date < today:
 			self.status = "No Show"
 
 	def validate_overlaps(self):
@@ -1017,6 +1019,28 @@ def validate_practitioner_schedules(schedule_entry, practitioner):
 			),
 			title=_("Practitioner Schedule Not Found"),
 		)
+
+
+@frappe.whitelist()
+def check_in_appointment(
+	appointment_id: str, practitioner: str | None = None, service_unit: str | None = None
+) -> "PatientAppointment":
+	appointment = frappe.get_doc("Patient Appointment", appointment_id)
+	if appointment.status in ["Cancelled", "Closed", "Checked Out"]:
+		frappe.throw(
+			_("Cannot check in a {0} appointment").format(frappe.bold(appointment.status)),
+			title=_("Not Allowed"),
+		)
+
+	appointment.status = "Checked In"
+
+	if practitioner:
+		appointment.practitioner = practitioner
+	if service_unit:
+		appointment.service_unit = service_unit
+
+	appointment.save()
+	return appointment
 
 
 @frappe.whitelist()
