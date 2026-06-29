@@ -76,7 +76,12 @@ class SampleCollection(Document):
 
 
 @frappe.whitelist()
-def create_observation(selected, sample_collection, component_observations=None, child_name=None):
+def create_observation(
+	selected: str,
+	sample_collection: str,
+	component_observations: str | None = None,
+	child_name: str | None = None,
+) -> None:
 	insert_observation(
 		selected=selected,
 		sample_collection=sample_collection,
