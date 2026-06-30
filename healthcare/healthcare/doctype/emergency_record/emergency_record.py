@@ -67,7 +67,8 @@ class EmergencyRecord(Document):
 		if not self.patient:
 			return
 		age = frappe.get_cached_doc("Patient", self.patient).calculate_age()
-		self.patient_age = age.get("age_in_string") if age else None
+		if age:
+			self.patient_age = age.get("age_in_string")
 
 	def set_consultation_defaults(self):
 		if not self.attending_practitioner:

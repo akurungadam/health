@@ -23,6 +23,11 @@ class TestEmergencyRecord(HealthcareTestSuite):
 		self.assertTrue(record.patient_age)
 		self.assertIn("Year", record.patient_age)
 
+	def test_manual_age_preserved_without_dob(self):
+		frappe.db.set_value("Patient", "_Test Patient", "dob", None)
+		record = create_emergency_record("_Test Patient", patient_age="40 Years")
+		self.assertEqual(record.patient_age, "40 Years")
+
 	def test_provisional_patient_created_when_unidentified(self):
 		record = create_unidentified_record("Unconscious male approx 40", gender="Male")
 		self.assertTrue(record.patient)
