@@ -1078,6 +1078,7 @@ def make_encounter(source_name, target_doc=None):
 		{
 			"Patient Appointment": {
 				"doctype": "Patient Encounter",
+				"field_no_map": ["naming_series"],
 				"field_map": [
 					["appointment", "name"],
 					["patient", "patient"],
