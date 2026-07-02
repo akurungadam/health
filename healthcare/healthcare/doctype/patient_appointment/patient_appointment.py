@@ -1071,7 +1071,7 @@ def send_confirmation_msg(doc):
 
 
 @frappe.whitelist()
-def make_encounter(source_name, target_doc=None):
+def make_encounter(source_name: str, target_doc: Document | None = None) -> Document:
 	doc = get_mapped_doc(
 		"Patient Appointment",
 		source_name,
