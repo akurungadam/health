@@ -24,6 +24,7 @@ from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings impor
 )
 from healthcare.healthcare.doctype.patient_registration.patient_registration import (
 	create_patient_registration,
+	has_active_patient_registration,
 )
 
 
@@ -186,8 +187,10 @@ class Patient(Document):
 	@frappe.whitelist()
 	def renew_registration(self):
 		"""Create a fresh registration and re-enable the patient (when no fee is collected)."""
-		if not frappe.db.exists("Patient Registration", {"patient": self.name, "status": "Active"}):
-			create_patient_registration(self.name)
+		if has_active_patient_registration(self.name):
+			frappe.throw(_("Patient already has an active registration."))
+
+		create_patient_registration(self.name)
 		self.db_set("status", "Active")
 
 	@frappe.whitelist()

@@ -61,9 +61,13 @@ def expire_registrations():
 		disable_patient_without_active_registration(patient)
 
 
+def has_active_patient_registration(patient):
+	"""Return True if the patient has a non-expired registration."""
+	return bool(frappe.db.exists("Patient Registration", {"patient": patient, "status": "Active"}))
+
+
 def disable_patient_without_active_registration(patient):
-	if frappe.db.exists("Patient Registration", {"patient": patient, "status": "Active"}):
+	if has_active_patient_registration(patient):
 		return
-	if frappe.db.get_value("Patient", patient, "status") == "Disabled":
-		return
+
 	frappe.db.set_value("Patient", patient, "status", "Disabled")
