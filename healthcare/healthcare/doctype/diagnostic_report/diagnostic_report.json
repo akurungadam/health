@@ -53,7 +53,8 @@
    "fieldtype": "Link",
    "label": "Inpatient Record",
    "options": "Inpatient Record",
-   "read_only": 1
+   "read_only": 1,
+   "fetch_if_empty": 1
   },
   {
    "fieldname": "column_break_v6l1",
