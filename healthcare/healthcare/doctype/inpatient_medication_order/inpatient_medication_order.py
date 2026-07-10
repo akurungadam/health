@@ -31,6 +31,9 @@ class InpatientMedicationOrder(Document):
 			frappe.throw(_("No Inpatient Record found against patient {0}").format(self.patient))
 
 	def validate_duplicate(self):
+		if not self.patient_encounter:
+			return
+
 		existing_mo = frappe.db.exists(
 			"Inpatient Medication Order",
 			{
@@ -87,3 +90,4 @@ class InpatientMedicationOrder(Document):
 			return
 		for drug in patient_encounter.drug_prescription:
 			self.add_order_entries(drug)
+

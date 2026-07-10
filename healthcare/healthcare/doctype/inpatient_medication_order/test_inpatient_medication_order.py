@@ -85,6 +85,17 @@ class TestInpatientMedicationOrder(HealthcareTestSuite):
 		ipmo.reload()
 		self.assertEqual(ipmo.status, "Completed")
 
+	def test_multiple_orders_without_patient_encounter(self):
+		first_ipmo = create_ipmo(self.patient)
+		first_ipmo.insert()
+
+		second_ipmo = create_ipmo(self.patient)
+		second_ipmo.start_date = add_days(getdate(), 2)
+		second_ipmo.insert()
+
+		self.assertTrue(first_ipmo.name)
+		self.assertTrue(second_ipmo.name)
+
 	def tearDown(self):
 		if frappe.db.get_value("Patient", self.patient, "inpatient_record"):
 			# cleanup - Discharge
@@ -158,3 +169,5 @@ def create_ipme(filters, update_stock=0):
 	ipme = ipme.get_medication_orders()
 
 	return ipme
+
+
