@@ -169,5 +169,3 @@ def create_ipme(filters, update_stock=0):
 	ipme = ipme.get_medication_orders()
 
 	return ipme
-
-
