@@ -94,7 +94,12 @@ class TestInpatientMedicationOrder(HealthcareTestSuite):
 		second_ipmo.insert()
 
 		self.assertTrue(first_ipmo.name)
+		self.assertEqual(first_ipmo.docstatus, 0)
+		self.assertFalse(first_ipmo.patient_encounter)
+
 		self.assertTrue(second_ipmo.name)
+		self.assertEqual(second_ipmo.docstatus, 0)
+		self.assertFalse(second_ipmo.patient_encounter)
 
 	def tearDown(self):
 		if frappe.db.get_value("Patient", self.patient, "inpatient_record"):
