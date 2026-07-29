@@ -6,6 +6,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
 from frappe.utils import now_datetime
 
@@ -129,12 +130,12 @@ class ServiceRequest(ServiceRequestController):
 
 
 @frappe.whitelist()
-def set_service_request_status(service_request, status):
+def set_service_request_status(service_request: str, status: str) -> None:
 	frappe.db.set_value("Service Request", service_request, "status", status)
 
 
 @frappe.whitelist()
-def make_clinical_procedure(service_request, appointment=None):
+def make_clinical_procedure(service_request: str, appointment: str | None = None) -> "Document | None":
 	if not service_request:
 		return
 
@@ -191,7 +192,7 @@ def make_clinical_procedure(service_request, appointment=None):
 
 
 @frappe.whitelist()
-def make_lab_test(service_request):
+def make_lab_test(service_request: str) -> "Document | None":
 	if not service_request:
 		return
 
@@ -231,7 +232,7 @@ def make_lab_test(service_request):
 
 
 @frappe.whitelist()
-def make_observation(service_request, appointment=None):
+def make_observation(service_request: str, appointment: str | None = None) -> tuple | None:
 	if not service_request:
 		return
 
@@ -438,7 +439,9 @@ def check_observation_sample_exist(service_request):
 
 
 @frappe.whitelist()
-def make_appointment(source_name, target_doc=None, ignore_permissions=False):
+def make_appointment(
+	source_name: str, target_doc: "str | Document | None" = None, ignore_permissions: bool = False
+) -> "Document":
 	def postprocess(source, target):
 		set_missing_values(source, target)
 
@@ -447,7 +450,7 @@ def make_appointment(source_name, target_doc=None, ignore_permissions=False):
 			"Healthcare Practitioner", source.referred_to_practitioner, "department"
 		)
 
-	doclist = get_mapped_doc(
+	doc = get_mapped_doc(
 		"Service Request",
 		source_name,
 		{
@@ -468,4 +471,4 @@ def make_appointment(source_name, target_doc=None, ignore_permissions=False):
 		ignore_permissions=ignore_permissions,
 	)
 
-	return doclist
+	return doc
