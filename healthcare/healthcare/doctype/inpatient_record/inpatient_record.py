@@ -394,13 +394,13 @@ def create_inpatient_record(admission_order):
 
 
 @frappe.whitelist()
-def schedule_discharge(discharge_order):
+def schedule_discharge(discharge_order: str):
 	discharge_order = json.loads(discharge_order)
 	inpatient_record_id = frappe.db.get_value("Patient", discharge_order["patient"], "inpatient_record")
 
 	if inpatient_record_id:
 		inpatient_record = frappe.get_doc("Inpatient Record", inpatient_record_id)
-		check_out_inpatient(inpatient_record)
+
 		set_details_from_ip_order(inpatient_record, discharge_order)
 		inpatient_record.status = "Discharge Scheduled"
 		inpatient_record.save(ignore_permissions=True)
@@ -454,6 +454,7 @@ def discharge_patient(inpatient_record):
 
 	validate_incomplete_service_requests(inpatient_record)
 
+	check_out_inpatient(inpatient_record)
 	inpatient_record.discharge_datetime = now_datetime()
 	inpatient_record.status = "Discharged"
 
