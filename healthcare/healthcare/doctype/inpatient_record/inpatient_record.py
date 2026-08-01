@@ -811,7 +811,7 @@ def set_total(self):
 
 
 def validate_incomplete_service_requests(inpatient_record):
-	if not frappe.db.get_single_value(
+	if frappe.db.get_single_value(
 		"Healthcare Settings", "allow_discharge_despite_pending_healthcare_services"
 	):
 		return
