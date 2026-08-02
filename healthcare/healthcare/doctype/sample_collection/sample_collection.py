@@ -40,10 +40,7 @@ class SampleCollection(Document):
 					if not any((comp["status"] == "Open") for comp in component_observations):
 						obs.status = "Collected"
 
-		if not any((obs.get("status") == "Open") for obs in self.observation_sample_collection):
-			self.status = "Collected"
-		else:
-			self.status = "Partly Collected"
+		self.status = get_collection_status(self.observation_sample_collection)
 
 	# def before_submit(self):
 	# 	if [sample for sample in self.observation_sample_collection if sample.status != "Collected"]:
@@ -228,12 +225,23 @@ def update_child_status(context):
 def update_collection_status(context):
 	if not context.sample_collection:
 		return
-	non_collected = frappe.db.get_all(
+	child_rows = frappe.db.get_all(
 		"Observation Sample Collection",
-		{"parent": context.sample_collection, "status": ["!=", "Collected"]},
+		{"parent": context.sample_collection},
+		["status"],
 	)
-	status = "Partly Collected" if non_collected else "Collected"
+	status = get_collection_status(child_rows)
 	frappe.db.set_value("Sample Collection", context.sample_collection, "status", status)
+
+
+def get_collection_status(child_rows):
+	if not child_rows:
+		return "Pending"
+	if all(row.get("status") == "Collected" for row in child_rows):
+		return "Collected"
+	if all(row.get("status") == "Open" for row in child_rows):
+		return "Pending"
+	return "Partly Collected"
 
 
 def parent_observation(context, obs):
