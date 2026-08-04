@@ -75,7 +75,7 @@ class PatientEncounter(Document):
 
 	@staticmethod
 	@frappe.whitelist()
-	def get_applicable_treatment_plans(encounter):
+	def get_applicable_treatment_plans(encounter: dict) -> list[dict]:
 		patient = frappe.get_doc("Patient", encounter["patient"])
 
 		plan_filters = {}
@@ -120,8 +120,8 @@ class PatientEncounter(Document):
 		return plans
 
 	@frappe.whitelist()
-	def set_treatment_plans(self, treatment_plans=None):
-		for treatment_plan in treatment_plans:
+	def set_treatment_plans(self, treatment_plans: list[str] | None = None) -> None:
+		for treatment_plan in treatment_plans or []:
 			self.set_treatment_plan(treatment_plan)
 
 	def set_treatment_plan(self, plan):
@@ -321,7 +321,7 @@ class PatientEncounter(Document):
 		return order
 
 	@frappe.whitelist()
-	def add_clinical_note(self, note, note_type=None):
+	def add_clinical_note(self, note: str, note_type: str | None = None) -> None:
 		clinical_note_doc = frappe.new_doc("Clinical Note")
 		clinical_note_doc.patient = self.patient
 		clinical_note_doc.reference_doc = "Patient Encounter"
@@ -332,18 +332,18 @@ class PatientEncounter(Document):
 		clinical_note_doc.insert()
 
 	@frappe.whitelist()
-	def edit_clinical_note(self, note, note_name):
+	def edit_clinical_note(self, note: str, note_name: str) -> None:
 		clinical_note_doc = frappe.get_doc("Clinical Note", note_name)
 		clinical_note_doc.note = note
 		clinical_note_doc.save()
 
 	@frappe.whitelist()
-	def delete_clinical_note(self, note_name):
+	def delete_clinical_note(self, note_name: str) -> None:
 		if frappe.db.exists("Clinical Note", note_name):
 			frappe.delete_doc("Clinical Note", note_name)
 
 	@frappe.whitelist()
-	def get_clinical_notes(self, patient):
+	def get_clinical_notes(self, patient: str) -> list[dict]:
 		return frappe.get_all(
 			"Clinical Note",
 			{
@@ -354,7 +354,7 @@ class PatientEncounter(Document):
 
 
 @frappe.whitelist()
-def make_ip_medication_order(source_name, target_doc=None):
+def make_ip_medication_order(source_name: str, target_doc: Document | str | None = None) -> Document:
 	def set_missing_values(source, target):
 		target.start_date = source.encounter_date
 		for entry in source.drug_prescription:
@@ -457,7 +457,7 @@ def set_codification_table_from_diagnosis(doc):
 
 
 @frappe.whitelist()
-def create_service_request(encounter):
+def create_service_request(encounter: str) -> None:
 	encounter_doc = frappe.get_doc("Patient Encounter", encounter)
 	if not frappe.db.exists("Service Request", {"order_group": encounter}):
 		encounter_doc.make_service_request()
@@ -480,7 +480,7 @@ def create_service_request(encounter):
 
 
 @frappe.whitelist()
-def create_medication_request(encounter):
+def create_medication_request(encounter: str) -> None:
 	encounter_doc = frappe.get_doc("Patient Encounter", encounter)
 	if not frappe.db.exists("Medication Request", {"order_group": encounter}):
 		encounter_doc.make_medication_request()
@@ -488,7 +488,9 @@ def create_medication_request(encounter):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_medications_query(doctype, txt, searchfield, start, page_len, filters):
+def get_medications_query(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | None
+):
 	filters = filters or {}
 	linked_items = get_linked_medication_items(txt, start, page_len, filters)
 	warehouse = get_default_warehouse(filters.get("company"))
@@ -540,7 +542,7 @@ def get_actual_quantities(item_codes, warehouse):
 		filters={"warehouse": warehouse, "item_code": ["in", item_codes]},
 		fields=["item_code", "actual_qty"],
 	)
-	return {bin.item_code: bin.actual_qty for bin in bins}
+	return {bin_row.item_code: bin_row.actual_qty for bin_row in bins}
 
 
 def get_default_warehouse(company=None):
@@ -563,18 +565,18 @@ def get_search_columns(row, warehouse, quantities):
 
 
 @frappe.whitelist()
-def get_medications(medication):
+def get_medications(medication: str) -> list[dict]:
 	return frappe.get_all("Medication Linked Item", {"parent": medication}, ["item"])
 
 
 @frappe.whitelist()
-def cancel_request(doctype, request):
+def cancel_request(doctype: str, request: str) -> None:
 	request_doc = frappe.get_doc(doctype, request)
 	request_doc.cancel()
 
 
 @frappe.whitelist()
-def create_service_request_from_widget(encounter, data, medication_request=False):
+def create_service_request_from_widget(encounter: str, data: str, medication_request: bool = False) -> None:
 	data = json.loads(data)
 	encounter_doc = frappe.get_doc("Patient Encounter", encounter)
 	if medication_request:
@@ -588,7 +590,7 @@ def create_service_request_from_widget(encounter, data, medication_request=False
 
 
 @frappe.whitelist()
-def get_encounter_details(doc):
+def get_encounter_details(doc: str):
 	doc = json.loads(doc)
 	if doc.get("__islocal") == 0:
 		doc = frappe.get_doc(doc.doctype, doc.docname)
@@ -632,7 +634,7 @@ def get_value_map(status_codes):
 
 
 @frappe.whitelist()
-def create_patient_referral(encounter, references):
+def create_patient_referral(encounter: str, references: list[dict] | str) -> None:
 	if isinstance(references, str):
 		references = json.loads(references)
 
