@@ -435,7 +435,7 @@ class PatientAppointment(Document):
 		self.notify_update()
 
 	@frappe.whitelist()
-	def get_therapy_types(self):
+	def get_therapy_types(self) -> list[str] | None:
 		if not self.therapy_plan:
 			return
 
@@ -499,7 +499,7 @@ class PatientAppointment(Document):
 
 
 @frappe.whitelist()
-def check_payment_reqd(patient, practitioner=None):
+def check_payment_reqd(patient: str, practitioner: str | None = None) -> dict | bool:
 	"""
 	return True if patient need to be invoiced when show_payment_popup enabled or have no fee validity
 	return False show_payment_popup is disabled
@@ -528,7 +528,9 @@ def check_payment_reqd(patient, practitioner=None):
 
 
 @frappe.whitelist()
-def invoice_appointment(appointment_name, discount_percentage=0, discount_amount=0):
+def invoice_appointment(
+	appointment_name: str, discount_percentage: float = 0, discount_amount: float = 0
+) -> None:
 	appointment_doc = frappe.get_doc("Patient Appointment", appointment_name)
 	settings = frappe.get_single("Healthcare Settings")
 
@@ -596,7 +598,7 @@ def create_sales_invoice(appointment_doc, discount_percentage=0, discount_amount
 
 
 @frappe.whitelist()
-def update_fee_validity(appointment):
+def update_fee_validity(appointment: str | PatientAppointment) -> None:
 	if isinstance(appointment, str):
 		appointment = json.loads(appointment)
 		appointment = frappe.get_doc(appointment)
@@ -701,7 +703,7 @@ def check_sales_invoice_exists(appointment):
 @frappe.whitelist()
 def get_availability_data(
 	date: str, practitioner: str, appointment: str | dict | PatientAppointment | None = None
-):
+) -> dict:
 	"""
 	Get availability data of 'practitioner' on 'date'
 	:param date: Date to check in schedule
@@ -1044,7 +1046,7 @@ def check_in_appointment(
 
 
 @frappe.whitelist()
-def update_status(appointment_id, status):
+def update_status(appointment_id: str, status: str) -> None:
 	frappe.db.set_value("Patient Appointment", appointment_id, "status", status)
 	appointment_booked = True
 	if status == "Cancelled":
@@ -1140,7 +1142,7 @@ def send_message(doc, message):
 
 
 @frappe.whitelist()
-def get_events(start: str, end: str, filters: str | None = None):
+def get_events(start: str, end: str, filters: str | None = None) -> list[dict]:
 	"""Returns events for Gantt / Calendar view rendering.
 
 	:param start: Start date-time.
@@ -1196,7 +1198,7 @@ def get_events(start: str, end: str, filters: str | None = None):
 
 
 @frappe.whitelist()
-def get_procedure_prescribed(patient):
+def get_procedure_prescribed(patient: str) -> list[tuple]:
 	return frappe.db.sql(
 		"""
 			SELECT
@@ -1214,7 +1216,7 @@ def get_procedure_prescribed(patient):
 
 
 @frappe.whitelist()
-def get_prescribed_therapies(patient):
+def get_prescribed_therapies(patient: str) -> list[tuple]:
 	return frappe.db.sql(
 		"""
 			SELECT
