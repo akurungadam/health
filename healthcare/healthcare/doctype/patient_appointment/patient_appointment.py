@@ -597,11 +597,18 @@ def create_sales_invoice(appointment_doc, discount_percentage=0, discount_amount
 	appointment_doc.notify_update()
 
 
-@frappe.whitelist()
-def update_fee_validity(appointment: str | PatientAppointment) -> None:
+def get_appointment_doc(appointment: str | dict | PatientAppointment) -> PatientAppointment:
 	if isinstance(appointment, str):
 		appointment = json.loads(appointment)
+	if isinstance(appointment, dict):
 		appointment = frappe.get_doc(appointment)
+
+	return appointment
+
+
+@frappe.whitelist()
+def update_fee_validity(appointment: str | dict | PatientAppointment) -> None:
+	appointment = get_appointment_doc(appointment)
 
 	fee_validity = manage_fee_validity(appointment)
 	if fee_validity:
