@@ -719,7 +719,7 @@ def get_availability_data(
 
 	check_employee_wise_availability(date, practitioner_doc)
 
-	available_slotes = []
+	available_slots = []
 	if isinstance(appointment, str):
 		appointment = frappe.get_doc(json.loads(appointment))
 
@@ -734,12 +734,12 @@ def get_availability_data(
 			"docstatus": 1,
 		},
 	):
-		available_slotes = get_availability_slots(practitioner_doc, date, appointment.appointment_type)
+		available_slots = get_availability_slots(practitioner_doc, date, appointment.appointment_type)
 
 	slot_details = []
 	if practitioner_doc.practitioner_schedules:
 		slot_details = get_available_slots(practitioner_doc, date)
-	elif not len(available_slotes):
+	elif not len(available_slots):
 		frappe.throw(
 			_(
 				"{0} does not have a Healthcare Practitioner Schedule / Availability. Add it in Healthcare Practitioner master / Practitioner Availability"
@@ -747,8 +747,8 @@ def get_availability_data(
 			title=_("Practitioner Schedule Not Found"),
 		)
 
-	if available_slotes and len(available_slotes):
-		slot_details += available_slotes
+	if available_slots and len(available_slots):
+		slot_details += available_slots
 	if not slot_details:
 		# TODO: return available slots in nearby dates
 		frappe.throw(
@@ -898,13 +898,13 @@ def get_availability_slots(practitioner_doc, date, appointment_type):
 	if not len(availability_details):
 		return []
 
-	available_slotes = []
+	available_slots = []
 	for availability in availability_details:
 		data = build_availability_data(availability, appointment_type, date, practitioner_doc)
 		if data:
-			available_slotes.append(data)
+			available_slots.append(data)
 
-	return available_slotes
+	return available_slots
 
 
 def build_availability_data(availability, appointment_type, date, practitioner_doc):
