@@ -700,7 +700,7 @@ def check_sales_invoice_exists(appointment):
 
 @frappe.whitelist()
 def get_availability_data(
-	date: str, practitioner: str, appointment: str | dict | "PatientAppointment" | None = None
+	date: str, practitioner: str, appointment: str | dict | PatientAppointment | None = None
 ):
 	"""
 	Get availability data of 'practitioner' on 'date'
@@ -1024,7 +1024,7 @@ def validate_practitioner_schedules(schedule_entry, practitioner):
 @frappe.whitelist()
 def check_in_appointment(
 	appointment_id: str, practitioner: str | None = None, service_unit: str | None = None
-) -> "PatientAppointment":
+) -> PatientAppointment:
 	appointment = frappe.get_doc("Patient Appointment", appointment_id)
 	if appointment.status in ["Cancelled", "Closed", "Checked Out"]:
 		frappe.throw(
