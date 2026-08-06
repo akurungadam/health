@@ -727,8 +727,7 @@ def get_availability_data(
 	check_employee_wise_availability(date, practitioner_doc)
 
 	available_slots = []
-	if isinstance(appointment, str):
-		appointment = frappe.get_doc(json.loads(appointment))
+	appointment = get_appointment_doc(appointment)
 
 	if frappe.db.exists(
 		"Practitioner Availability",
