@@ -708,9 +708,7 @@ def check_sales_invoice_exists(appointment):
 
 
 @frappe.whitelist()
-def get_availability_data(
-	date: str, practitioner: str, appointment: str | dict | PatientAppointment | None = None
-) -> dict:
+def get_availability_data(date: str, practitioner: str, appointment: str | dict | PatientAppointment) -> dict:
 	"""
 	Get availability data of 'practitioner' on 'date'
 	:param date: Date to check in schedule
