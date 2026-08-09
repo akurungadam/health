@@ -235,9 +235,7 @@ def update_collection_status(context):
 
 
 def get_collection_status(child_rows):
-	if not child_rows:
-		return "Pending"
-	if all(row.get("status") == "Collected" for row in child_rows):
+	if all(row.get("status") == "Collected" for row in child_rows) or not child_rows:
 		return "Collected"
 	if all(row.get("status") == "Open" for row in child_rows):
 		return "Pending"
