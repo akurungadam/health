@@ -45,8 +45,13 @@ class Observation(Document):
 		self.render_templates()
 
 	def after_insert(self):
-		if self.appointment:
-			frappe.db.set_value("Patient Appointment", self.appointment, "status", "Closed")
+		# Observation has no `appointment` field - only `service_request` and
+		# `imaging_appointment` - and nothing in the app sets one, so attribute access
+		# raised on every insert. Read it defensively until whoever owns this decides
+		# whether the field should exist or the close belongs elsewhere.
+		appointment = self.get("appointment")
+		if appointment:
+			frappe.db.set_value("Patient Appointment", appointment, "status", "Closed")
 
 	def on_submit(self):
 		if self.service_request:

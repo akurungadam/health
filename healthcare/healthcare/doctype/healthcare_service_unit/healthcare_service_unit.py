@@ -10,6 +10,8 @@ from frappe.contacts.address_and_contact import load_address_and_contact
 from frappe.utils import cint, cstr
 from frappe.utils.nestedset import NestedSet
 
+AE_TITLE_MAX_LENGTH = 16
+
 
 class HealthcareServiceUnit(NestedSet):
 	nsm_parent_field = "parent_healthcare_service_unit"
@@ -29,7 +31,11 @@ class HealthcareServiceUnit(NestedSet):
 		else:
 			self.name = self.healthcare_service_unit_name
 
-		self.ae_title = self.name.replace(" ", "").upper()
+		# Only a modality has an AE Title, and DICOM caps it at 16 characters - deriving one
+		# for every service unit made any unit with a longer name unsaveable. An admin can
+		# still set their own; this only fills a blank.
+		if self.get("is_modality") and not self.ae_title:
+			self.ae_title = self.name.replace(" ", "").upper()[:AE_TITLE_MAX_LENGTH]
 
 	def on_update(self):
 		super().on_update()
