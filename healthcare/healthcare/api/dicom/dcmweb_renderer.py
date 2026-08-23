@@ -6,6 +6,7 @@ import json
 from werkzeug.wrappers import Response
 
 import frappe
+from frappe import _
 from frappe.auth import validate_auth_via_api_keys
 from frappe.website.page_renderers.base_renderer import BaseRenderer
 
@@ -35,6 +36,7 @@ DICOM_STATUS_CODES = {
 	"UPSNotYetClaimed": "C302H",
 	"UPSAlreadyInProgress": "C303H",
 	"UPSAlreadyCompleted": "C304H",
+	"NotAuthorized": "0124H",
 }
 
 
@@ -46,6 +48,17 @@ class DICOMWebRenderer(BaseRenderer):
 		return self.path.startswith("dicom-web")
 
 	def render(self):
+		"""Dispatch a DICOMweb request, refusing it cleanly when it is not authenticated.
+
+		An AuthenticationError raised in a handler would otherwise leave this renderer as
+		a traceback rather than a response a modality can read.
+		"""
+		try:
+			return self.dispatch()
+		except frappe.AuthenticationError as error:
+			return self.respond(401, self.dicom_error("NotAuthorized", str(error)))
+
+	def dispatch(self):
 		path = frappe.request.path
 		method = frappe.request.method
 		path = path.rstrip("/")
@@ -76,7 +89,7 @@ class DICOMWebRenderer(BaseRenderer):
 			elif method == "PUT":
 				return self.handle_update_workitem(workitem_id)
 
-		elif path == "/dicom-web/echo":  # no auth
+		elif path == "/dicom-web/echo":
 			self.authenticate_request()
 			result = get_dicomweb_verification()
 			log_modality_message(
@@ -88,7 +101,7 @@ class DICOMWebRenderer(BaseRenderer):
 			)
 			return self.respond(200, result)
 
-		elif path == "/dicom-web/conformance":  # no auth
+		elif path == "/dicom-web/conformance":
 			self.authenticate_request()
 			result = get_conformance_statement()
 			log_modality_message(
@@ -252,5 +265,17 @@ class DICOMWebRenderer(BaseRenderer):
 		return {"Status": DICOM_STATUS_CODES.get(code_key, "0110H"), "ErrorComment": message}
 
 	def authenticate_request(self):
+		"""Establish who is calling, and refuse the request if nobody was.
+
+		``validate_auth_via_api_keys`` sets the session user when the key is good and
+		returns silently when it is not - an absent header unpacks to a one-element list,
+		raises ValueError inside it, and is swallowed. So on its own it authenticates
+		nothing: the caller stays Guest and the handler serves the worklist anyway.
+
+		Frappe guards this on the next line of its own ``validate_auth``; page renderers
+		bypass that path entirely, so the same check has to be made here.
+		"""
 		auth_header = frappe.get_request_header("Authorization", "").split(" ")
 		validate_auth_via_api_keys(auth_header)
+		if frappe.session.user in ("", "Guest"):
+			raise frappe.AuthenticationError(_("A valid API key is required for DICOMweb."))

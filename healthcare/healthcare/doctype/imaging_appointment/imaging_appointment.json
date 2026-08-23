@@ -302,13 +302,9 @@
   {
    "link_doctype": "Imaging Study",
    "link_fieldname": "imaging_appointment"
-  },
-  {
-   "link_doctype": "Observation",
-   "link_fieldname": "imaging_appointment"
   }
  ],
- "modified": "2025-09-02 17:20:25.204535",
+ "modified": "2025-09-02 17:00:00.204535",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Imaging Appointment",
