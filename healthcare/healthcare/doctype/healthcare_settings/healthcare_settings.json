@@ -517,6 +517,54 @@
    "label": "Registration Item",
    "mandatory_depends_on": "eval:doc.collect_registration_fee == 1",
    "options": "Item"
+  },
+  {
+   "description": "Tested with Orthanc only",
+   "fieldname": "radiology_section",
+   "fieldtype": "Section Break",
+   "label": "Radiology - PACS Settings"
+  },
+  {
+   "fieldname": "pacs_ae_title",
+   "fieldtype": "Data",
+   "label": "PACS AE Title"
+  },
+  {
+   "fieldname": "pacs_base_url",
+   "fieldtype": "Data",
+   "label": "PACS Base URL"
+  },
+  {
+   "default": "/dicom-web/instances?SeriesInstanceUID={series_uid}",
+   "description": "Not configurable by end user",
+   "fieldname": "qido_rs_url",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "QIDO-RS URL",
+   "read_only": 1
+  },
+  {
+   "default": "/dicom-web/studies/{study_uid}/series/{series_uid}/instances/{sop_instance_uid}/frames/1/rendered",
+   "description": "Not configurable by end user",
+   "fieldname": "wado_rs_url",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "WADO-RS URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_dbvh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pacs_username",
+   "fieldtype": "Data",
+   "label": "PACS Username"
+  },
+  {
+   "fieldname": "pacs_password",
+   "fieldtype": "Password",
+   "label": "PACS Password"
   }
  ],
  "issingle": 1,

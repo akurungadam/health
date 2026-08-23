@@ -1,17 +1,8 @@
+// Fetches QIDO/WADO with the server's PACS credentials, for studies this user may read.
+const DICOM_PROXY = "/api/method/healthcare.healthcare.api.dicom.proxy.fetch";
+
 frappe.ui.form.on("Imaging Study", {
 	async refresh(frm) {
-		const [pacs_base_url, pacs_username] = await Promise.all([
-			frappe.db.get_single_value("Healthcare Settings", "pacs_base_url"),
-			frappe.db.get_single_value("Healthcare Settings", "pacs_username"),
-		]);
-
-		// TODO: REMOVE, prompt instead?
-		const pacs_password = await frappe
-			.call({
-				method: "healthcare.healthcare.doctype.healthcare_settings.healthcare_settings.get_pacs_password",
-			})
-			.then(r => r.message);
-
 		if (!frm.doc.__islocal && frm.doc.preview_json) {
 			let series_list = JSON.parse(frm.doc.preview_json || "[]");
 
@@ -81,11 +72,11 @@ frappe.ui.form.on("Imaging Study", {
 						"objectUID",
 						series.Instances?.[0]?.SOPInstanceUID || "",
 					);
-					url.searchParams.set("pacs_base_url", pacs_base_url);
-					url.searchParams.set("pacs_username", pacs_username);
-					url.searchParams.set("pacs_password", pacs_password);
-					url.searchParams.set("wadoRoot", `${pacs_base_url}/dicom-web`);
-					url.searchParams.set("qidoRoot", `${pacs_base_url}/dicom-web`);
+					// The viewer reaches the PACS through this site, which adds the
+					// credentials server-side. Nothing secret goes in the URL: a query
+					// string lands in history, access logs and Referer headers.
+					url.searchParams.set("proxy", DICOM_PROXY);
+					url.searchParams.set("study", frm.doc.name);
 
 					const d = new frappe.ui.Dialog({
 						title: `Study: ${frm.doc.study_instance_uid}`,

@@ -402,9 +402,9 @@
   {
    "fieldname": "sales_invoice_status",
    "fieldtype": "Data",
+   "is_virtual": 1,
    "label": "Sales Invoice Status",
-   "read_only": 1,
-   "is_virtual": 1
+   "read_only": 1
   },
   {
    "fieldname": "column_break_zrac",
@@ -603,6 +603,37 @@
    "fieldtype": "Link",
    "label": "Emergency Record",
    "options": "Emergency Record",
+   "read_only": 1
+  },
+  {
+   "fieldname": "imaging_study",
+   "fieldtype": "Link",
+   "label": "Imaging Study",
+   "options": "Imaging Study",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.observation_category == \"Imaging\"",
+   "description": "Accession Number",
+   "fieldname": "imaging_appointment",
+   "fieldtype": "Link",
+   "label": "Imaging Appointment",
+   "options": "Imaging Appointment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "station_ae",
+   "fieldtype": "Data",
+   "label": "Station AE",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.observation_category == \"Imaging\"",
+   "fetch_from": "observation_template.service_unit",
+   "fieldname": "modality",
+   "fieldtype": "Link",
+   "label": "Modality",
+   "options": "Healthcare Service Unit Type",
    "read_only": 1
   }
  ],
