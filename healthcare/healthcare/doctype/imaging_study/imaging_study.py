@@ -71,7 +71,7 @@ class ImagingStudy(Document):
 				item.get("00080018", {}).get("Value", [None])[0] for item in instances if "00080018" in item
 			]
 		except Exception as e:
-			frappe.log_error(f"{str(e)}\n{url}", "QIDO-RS failure")
+			frappe.log_error(f"{e!s}\n{url}", "QIDO-RS failure")
 			return []
 
 	def fetch_and_attach_preview(self, config, study_uid, series_uid, instance_uid, auth):
@@ -87,7 +87,7 @@ class ImagingStudy(Document):
 			jpeg = resp.content
 			return self.attach_preview_file(series_uid, jpeg)
 		except Exception as e:
-			frappe.log_error(f"{str(e)}\n{url}", "WADO-RS preview failed")
+			frappe.log_error(f"{e!s}\n{url}", "WADO-RS preview failed")
 			return None
 
 	def get_config(self):

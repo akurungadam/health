@@ -1,17 +1,19 @@
 frappe.ui.form.on("Imaging Study", {
 	async refresh(frm) {
 		const [pacs_base_url, pacs_username] = await Promise.all([
-			frappe.db.get_single_value('Healthcare Settings', 'pacs_base_url'),
-			frappe.db.get_single_value('Healthcare Settings', 'pacs_username')
+			frappe.db.get_single_value("Healthcare Settings", "pacs_base_url"),
+			frappe.db.get_single_value("Healthcare Settings", "pacs_username"),
 		]);
 
 		// TODO: REMOVE, prompt instead?
-		const pacs_password = await frappe.call({
-			method: 'healthcare.healthcare.doctype.healthcare_settings.healthcare_settings.get_pacs_password'
-		}).then(r => r.message);
+		const pacs_password = await frappe
+			.call({
+				method: "healthcare.healthcare.doctype.healthcare_settings.healthcare_settings.get_pacs_password",
+			})
+			.then(r => r.message);
 
 		if (!frm.doc.__islocal && frm.doc.preview_json) {
-			let series_list = JSON.parse(frm.doc.preview_json || "[]")	;
+			let series_list = JSON.parse(frm.doc.preview_json || "[]");
 
 			let html = `
 				<div class="series-container" style="display:flex; flex-wrap:wrap; gap:16px; margin-bottom:1em;">
@@ -34,10 +36,14 @@ frappe.ui.form.on("Imaging Study", {
 							justify-content:space-between;
 							box-shadow:0 2px 5px rgba(0,0,0,0.05);">
 						<img src="${series.preview_url}" style="width:100%; height:auto; border-radius:5px;" />
-						<div style="font-size: 0.85rem; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${series.SeriesDescription || series.SeriesInstanceUID}">
+						<div style="font-size: 0.85rem; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${
+							series.SeriesDescription || series.SeriesInstanceUID
+						}">
 							${series.SeriesDescription || series.SeriesInstanceUID}
 						</div>
-						<div style="color: #888888;">${series.InstanceCount || "0"} ${series.Modality} images</div>
+						<div style="color: #888888;">${series.InstanceCount || "0"} ${
+							series.Modality
+						} images</div>
 					</div>
 				`;
 			});
@@ -64,12 +70,17 @@ frappe.ui.form.on("Imaging Study", {
 					cards.css("border", "1px solid #ccc");
 					card.css("border", "3px solid #ccc");
 
-					// const site = frappe.boot.developer_mode ? "http://localhost:8080" : "/viewer" // "http://localhost:5173" : "/viewer";
-					const site = "/viewer";
+					// Where `yarn build` in viewer/ puts the app: vite's base is
+					// /assets/healthcare/viewer/ and its outDir is healthcare/public/viewer,
+					// which Frappe serves from there. "/viewer" is not a route and 404s.
+					const site = "/assets/healthcare/viewer/";
 					const url = new URL(site, window.location.origin);
 					url.searchParams.set("studyUID", frm.doc.study_instance_uid);
 					url.searchParams.set("seriesUID", series.SeriesInstanceUID);
-					url.searchParams.set("objectUID", series.Instances?.[0]?.SOPInstanceUID || '');
+					url.searchParams.set(
+						"objectUID",
+						series.Instances?.[0]?.SOPInstanceUID || "",
+					);
 					url.searchParams.set("pacs_base_url", pacs_base_url);
 					url.searchParams.set("pacs_username", pacs_username);
 					url.searchParams.set("pacs_password", pacs_password);
@@ -81,20 +92,20 @@ frappe.ui.form.on("Imaging Study", {
 						size: "large",
 						fields: [
 							{
-							fieldname: "viewer_html",
-							fieldtype: "HTML",
-							options: `
+								fieldname: "viewer_html",
+								fieldtype: "HTML",
+								options: `
 								<iframe
 									src="${url.toString()}"
 									width="100%" height="600" frameborder="0"
 								></iframe>
 							`,
-							}
-						]
+							},
+						],
 					});
 					d.show();
 				});
 			});
 		}
-	}
+	},
 });

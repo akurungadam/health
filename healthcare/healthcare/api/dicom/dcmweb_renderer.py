@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from werkzeug.wrappers import Response
 
@@ -40,6 +42,85 @@ DICOM_STATUS_CODES = {
 }
 
 
+WORKITEMS_PATH = "/dicom-web/workitems"
+SUCCESS_STATUS = "0000H"
+FAILURE_STATUS = "0110H"
+
+
+@dataclass(frozen=True)
+class Operation:
+	"""One DICOMweb operation: what to run, and what to call it in the modality log.
+
+	``call`` takes the renderer, the request payload and the workitem reference, because
+	that is the widest signature any of them needs; the narrower ones ignore what they
+	do not use.
+	"""
+
+	call: Callable
+	message_type: str
+	success: str
+	failure: str
+	logs_request: bool = True
+
+
+WORKLIST = Operation(
+	call=lambda _renderer, payload, _reference: get_ups_tasks(filters=payload),
+	message_type="UPS RS",
+	success="UPS RS served",
+	failure="UPS-RS failed",
+)
+
+# (method, trailing action) -> what it does. A PUT carries no action segment.
+WORKITEM_OPERATIONS = {
+	("POST", "claim"): Operation(
+		call=lambda renderer, payload, reference: process_ups_claim(reference, payload, renderer.ae_title()),
+		message_type="UPS Claim",
+		success="Claim accepted",
+		failure="Claim failed",
+	),
+	("POST", "cancelrequest"): Operation(
+		call=lambda renderer, payload, reference: cancel_ups(reference, payload, renderer.ae_title()),
+		message_type="UPS Cancel",
+		success="Cancelled",
+		failure="Cancel failed",
+		logs_request=False,
+	),
+	("POST", "workitemevent"): Operation(
+		call=lambda renderer, payload, reference: handle_workitem_event(
+			reference, payload, renderer.ae_title()
+		),
+		message_type="UPS WorkitemEvent",
+		success="Workitem updated",
+		failure="Workitem event failed",
+	),
+	("PUT", ""): Operation(
+		call=lambda renderer, payload, reference: update_from_modality(
+			reference, payload, renderer.ae_title()
+		),
+		message_type="UPS Update",
+		success="Updated",
+		failure="Update failed",
+	),
+}
+
+CAPABILITIES = {
+	"/dicom-web/echo": Operation(
+		call=lambda _renderer, _payload, _reference: get_dicomweb_verification(),
+		message_type="Verification",
+		success="DICOMWeb Verification completed successfully",
+		failure="Verification failed",
+		logs_request=False,
+	),
+	"/dicom-web/conformance": Operation(
+		call=lambda _renderer, _payload, _reference: get_conformance_statement(),
+		message_type="Conformance",
+		success="DICOM Conformance served successfully",
+		failure="Conformance failed",
+		logs_request=False,
+	),
+}
+
+
 class DICOMWebRenderer(BaseRenderer):
 	def __init__(self, path, http_status_code=None):
 		super().__init__(path, http_status_code)
@@ -59,200 +140,77 @@ class DICOMWebRenderer(BaseRenderer):
 			return self.respond(401, self.dicom_error("NotAuthorized", str(error)))
 
 	def dispatch(self):
-		path = frappe.request.path
+		path = frappe.request.path.rstrip("/")
 		method = frappe.request.method
-		path = path.rstrip("/")
 
-		if path == "/dicom-web/workitems":
-			if method == "GET":
-				filters = frappe.request.args or {}
-				return self.handle_get_workitems(filters)
-			elif method == "POST":
-				try:
-					filters = json.loads(frappe.request.get_data(as_text=True) or "{}")
-				except Exception:
-					return self.respond(400, self.dicom_error("InvalidAttributeValue", "Invalid JSON body"))
-				return self.handle_get_workitems(filters)
-
-		elif path.startswith("/dicom-web/workitems/"):
-			workitem_id = path.split("/")[-2]
-
-			if method == "POST" and path.endswith("/claim"):
-				return self.handle_claim(workitem_id)
-
-			elif method == "POST" and path.endswith("/cancelrequest"):
-				return self.handle_cancel(workitem_id)
-
-			elif method == "POST" and path.endswith("/workitemevent"):
-				return self.handle_workitem_event(workitem_id)
-
-			elif method == "PUT":
-				return self.handle_update_workitem(workitem_id)
-
-		elif path == "/dicom-web/echo":
-			self.authenticate_request()
-			result = get_dicomweb_verification()
-			log_modality_message(
-				ae_title=frappe.get_request_header("X-AE-TITLE") or "Unknown",
-				message_type="Verification",
-				response_payload=result,
-				status_code="0000H",
-				status_text="DICOMWeb Verification completed successfully",
-			)
-			return self.respond(200, result)
-
-		elif path == "/dicom-web/conformance":
-			self.authenticate_request()
-			result = get_conformance_statement()
-			log_modality_message(
-				ae_title=frappe.get_request_header("X-AE-TITLE") or "Unknown",
-				message_type="Conformance",
-				response_payload=result,
-				status_code="0000H",
-				status_text="DICOM Conformance served successfully",
-			)
-			return self.respond(200, result)
-
+		if path == WORKITEMS_PATH:
+			return self.serve_worklist(method)
+		if path.startswith(f"{WORKITEMS_PATH}/"):
+			return self.serve_workitem(method, path)
+		if path in CAPABILITIES:
+			return self.serve(CAPABILITIES[path])
 		return self.respond(404, self.dicom_error("NoSuchObjectInstance", "UPS task not found"))
 
-	def handle_get_workitems(self, filters):
-		self.authenticate_request()
-		ae_title = frappe.get_request_header("X-AE-TITLE")
+	def serve_worklist(self, method):
+		"""The worklist itself, whose filters arrive in the query string or a JSON body."""
+		if method == "GET":
+			return self.serve(WORKLIST, payload=dict(frappe.request.args or {}))
+		if method == "POST":
+			try:
+				filters = self.request_body()
+			except ValueError:
+				return self.respond(400, self.dicom_error("InvalidAttributeValue", "Invalid JSON body"))
+			return self.serve(WORKLIST, payload=filters)
+		return self.respond(404, self.dicom_error("NoSuchObjectInstance", "UPS task not found"))
+
+	def serve_workitem(self, method, path):
+		"""One workitem, addressed as /workitems/<id>/<action> - or PUT with no action."""
+		parts = path[len(WORKITEMS_PATH) + 1 :].split("/")
+		workitem_id, action = parts[0], (parts[1] if len(parts) > 1 else "")
+		operation = WORKITEM_OPERATIONS.get((method, action))
+		if not operation:
+			return self.respond(404, self.dicom_error("NoSuchObjectInstance", "UPS task not found"))
 		try:
-			result = get_ups_tasks(filters=filters)
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS RS",
-				request_payload=filters,
-				response_payload=result,
-				status_code="0000H",
-				status_text="UPS RS served",
-			)
-			return self.respond(200, result)
-		except Exception as e:
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS RS",
-				request_payload=filters,
-				status_code="0110H",
-				status_text=str(e),
-			)
-			return self.respond(400, self.dicom_error("ProcessingFailure", f"UPS-RS failed: {e}"))
+			body = self.request_body()
+		except ValueError:
+			return self.respond(400, self.dicom_error("InvalidAttributeValue", "Invalid JSON body"))
+		return self.serve(operation, payload=body, reference=workitem_id)
 
-	def handle_claim(self, workitem_id):
+	def serve(self, operation, payload=None, reference=None):
+		"""Run one operation, log how it went, and answer.
+
+		Every DICOMweb operation has the same shape - authenticate, act, log, respond - so
+		it lives here once. What differs between them is only what to call and what to
+		call it in the log, which is what an Operation carries.
+		"""
 		self.authenticate_request()
-		ae_title = frappe.get_request_header("X-AE-TITLE")
-
+		ae_title = self.ae_title()
 		try:
-			body = json.loads(frappe.request.get_data(as_text=True) or "{}")
-			result = process_ups_claim(workitem_id, body, ae_title)
+			result = operation.call(self, payload, reference)
+		except Exception as error:
+			self.log(operation, ae_title, payload, reference, status_text=str(error))
+			return self.respond(400, self.dicom_error("ProcessingFailure", f"{operation.failure}: {error}"))
+		self.log(operation, ae_title, payload, reference, result=result)
+		return self.respond(200, result)
 
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Claim",
-				request_payload=body,
-				response_payload=result,
-				status_code="0000H",
-				status_text="Claim accepted",
-				reference=workitem_id,
-			)
-			return self.respond(200, result)
-		except Exception as e:
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Claim",
-				request_payload=body,
-				status_code="0110H",
-				status_text=str(e),
-				reference=workitem_id,
-			)
-			return self.respond(400, self.dicom_error("ProcessingFailure", f"Claim failed: {e}"))
+	def log(self, operation, ae_title, payload, reference, result=None, status_text=None):
+		log_modality_message(
+			ae_title=ae_title,
+			message_type=operation.message_type,
+			request_payload=payload if operation.logs_request else None,
+			response_payload=result,
+			status_code=SUCCESS_STATUS if result is not None else FAILURE_STATUS,
+			status_text=status_text or operation.success,
+			**({"reference": reference} if reference else {}),
+		)
 
-	def handle_cancel(self, workitem_id):
-		self.authenticate_request()
-		ae_title = frappe.get_request_header("X-AE-TITLE")
+	def request_body(self):
+		"""The JSON body, or an empty one. Raises ValueError when it is not JSON.
 
-		try:
-			body = json.loads(frappe.request.get_data(as_text=True) or "{}")
-			result = cancel_ups(workitem_id, body, ae_title)
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Cancel",
-				request_payload=None,
-				response_payload=result,
-				status_code="0000H",
-				status_text="Cancelled",
-				reference=workitem_id,
-			)
-			return self.respond(200, result)
-		except Exception as e:
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Cancel",
-				request_payload=None,
-				status_code="0110H",
-				status_text=str(e),
-				reference=workitem_id,
-			)
-			return self.respond(400, self.dicom_error("ProcessingFailure", f"Cancel failed: {e}"))
-
-	def handle_workitem_event(self, workitem_id):
-		self.authenticate_request()
-		ae_title = frappe.get_request_header("X-AE-TITLE")
-
-		try:
-			body = json.loads(frappe.request.get_data(as_text=True) or "{}")
-			result = handle_workitem_event(workitem_id, body, ae_title)
-
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS WorkitemEvent",
-				request_payload=body,
-				response_payload=result,
-				status_code="0000H",
-				status_text="Workitem updated",
-				reference=workitem_id,
-			)
-			return self.respond(200, result)
-		except Exception as e:
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS WorkitemEvent",
-				request_payload=body,
-				status_code="0110H",
-				status_text=str(e),
-				reference=workitem_id,
-			)
-			return self.respond(400, self.dicom_error("ProcessingFailure", f"Workitem event failed: {e}"))
-
-	def handle_update_workitem(self, workitem_id):
-		self.authenticate_request()
-		ae_title = frappe.get_request_header("X-AE-TITLE")
-
-		try:
-			body = json.loads(frappe.request.get_data(as_text=True) or "{}")
-			result = update_from_modality(workitem_id, body, ae_title)
-
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Update",
-				request_payload=body,
-				response_payload=result,
-				status_code="0000H",
-				status_text="Updated",
-				reference=workitem_id,
-			)
-			return self.respond(200, result)
-		except Exception as e:
-			log_modality_message(
-				ae_title=ae_title,
-				message_type="UPS Update",
-				request_payload=body,
-				status_code="0110H",
-				status_text=str(e),
-				reference=workitem_id,
-			)
-			return self.respond(400, self.dicom_error("ProcessingFailure", f"Update failed: {e}"))
+		Parsed before the operation runs rather than inside its try, so a malformed body
+		is reported as such instead of surfacing later as an unbound name.
+		"""
+		return json.loads(frappe.request.get_data(as_text=True) or "{}")
 
 	def respond(self, status, data, content_type="application/json"):
 		return Response(
@@ -263,6 +221,9 @@ class DICOMWebRenderer(BaseRenderer):
 
 	def dicom_error(self, code_key, message):
 		return {"Status": DICOM_STATUS_CODES.get(code_key, "0110H"), "ErrorComment": message}
+
+	def ae_title(self):
+		return frappe.get_request_header("X-AE-TITLE") or "Unknown"
 
 	def authenticate_request(self):
 		"""Establish who is calling, and refuse the request if nobody was.
