@@ -12,4 +12,5 @@ import "./sample_collection_tree.js";
 import "./nursing_workspace/nursing_workspace.js";
 import "./nursing_workspace/snapshot.js";
 import "./nursing_workspace/panes/vitals_pane.js";
+import "./nursing_workspace/panes/intake_output_pane.js";
 import "./nursing_workspace/attach.js";
