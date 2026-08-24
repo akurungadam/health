@@ -9,3 +9,7 @@ import "./healthcare_orders.html";
 import "./triage_indicator.js";
 import "./send_to_emergency.js";
 import "./sample_collection_tree.js";
+import "./nursing_workspace/nursing_station.js";
+import "./nursing_workspace/snapshot.js";
+import "./nursing_workspace/panes/vitals_pane.js";
+import "./nursing_workspace/attach.js";
