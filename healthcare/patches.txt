@@ -32,3 +32,4 @@ healthcare.patches.v15_0.add_custom_fields_if_not_exists
 healthcare.patches.v16_0.create_emergency_masters
 healthcare.patches.v16_0.add_pain_score_and_vital_sign_units
 healthcare.patches.v16_0.create_intake_output_types
+healthcare.patches.v16_0.create_clinical_note_types
