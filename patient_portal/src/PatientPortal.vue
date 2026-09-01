@@ -79,8 +79,8 @@ let set_logged_in_patient = createResource({
 		}
 	},
 	onError(error) {
-		dialog_message = error.messages?.[0] || error;
-		dialog_title = __('Failed to load appointments');
+		dialog_message.value = error.messages?.[0] || error;
+		dialog_title.value = __('Failed to load appointments');
 		alert_dialog.value = true;
 	}
 });
