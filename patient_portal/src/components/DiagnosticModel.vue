@@ -21,11 +21,11 @@
 				</div>
 
 				<p class="mt-2 text-md text-gray-800 truncate">
-					Tests: {{ item.tests.length }}
+					{{ __('Tests: {0}', [item.tests.length]) }}
 				</p>
 
 				<p v-if="item.ref_practitioner" class="mt-1 text-xs text-gray-600 whitespace-nowrap truncate">
-					Practitioner: {{ item.ref_practitioner }}
+					{{ __('Practitioner: {0}', [item.ref_practitioner]) }}
 				</p>
 				<p v-if="item.diagnostic_report" class="mt-1 text-xs text-gray-600 whitespace-nowrap truncate">
 					# {{ item.diagnostic_report }}
@@ -43,21 +43,21 @@
 			class="flex flex-col items-center justify-center flex-grow text-center p-6"
 		>
 			<FeatherIcon name="file-text" class="w-12 h-12 text-gray-400 mb-3" />
-			<h2 class="text-lg font-semibold text-gray-700">No Records Found</h2>
-			<p class="text-sm text-gray-500">Looks like you don’t have any orders yet.</p>
+			<h2 class="text-lg font-semibold text-gray-700">{{ __('No Records Found') }}</h2>
+			<p class="text-sm text-gray-500">{{ __("Looks like you don’t have any orders yet.") }}</p>
 		</div>
 
 		<div v-if="paginatedOrders.length" class="flex justify-center items-center space-x-2 mt-auto pt-2">
 			<Button variant="subtle" :disabled="currentPage === 1" @click="currentPage--">
-				Prev
+				{{ __('Prev') }}
 			</Button>
 
 			<span class="text-sm text-gray-600">
-				Page {{ currentPage }} of {{ totalPages }}
+				{{ __('Page {0} of {1}', [currentPage, totalPages]) }}
 			</span>
 
 			<Button variant="subtle" :disabled="currentPage === totalPages" @click="currentPage++">
-				Next
+				{{ __('Next') }}
 			</Button>
 		</div>
 	</div>
@@ -67,7 +67,7 @@
 	}">
 		<template #body-title>
 			<div>
-				<h2 class="text-xl font-semibold text-gray-900">Test Details</h2>
+				<h2 class="text-xl font-semibold text-gray-900">{{ __('Test Details') }}</h2>
 			</div>
 			<div class="py-2 flex items-center justify-between gap-2">
 				<p class="text-sm text-gray-500"># {{ selectedOrder.order_name }}</p>
@@ -92,13 +92,13 @@
 					<!-- Patient Info -->
 					<div class="flex-1">
 						<h2 class="text-lg font-semibold text-gray-900">{{ selectedOrder.patient_name }}</h2>
-						<p class="text-sm text-gray-600">Ordered by: {{ selectedOrder.ref_practitioner }}</p>
+						<p class="text-sm text-gray-600">{{ __('Ordered by: {0}', [selectedOrder.ref_practitioner]) }}</p>
 					</div>
 
 					<!-- Order Status -->
 					<Button v-if="selectedOrder.invoice" :ref_for="true" theme="gray" size="sm"
 						@click="print('Sales Invoice', selectedOrder.invoice)">
-						<Tooltip :text="'Print Invoice'" placement="top">
+						<Tooltip :text="__('Print Invoice')" placement="top">
 							<slot name="icon">
 								<FeatherIcon :name="'printer'" class="size-3 text-ink-white-7" />
 							</slot>
@@ -107,15 +107,15 @@
 				</div>
 
 				<div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mt-4">
-					<p><span class="font-medium text-gray-700">Order #:</span>
+					<p><span class="font-medium text-gray-700">{{ __('Order #:') }}</span>
 						{{ selectedOrder.order_name }}
 						<Badge :variant="'outline'" size="sm" :theme="getStatusColor(selectedOrder.billing_status)">
 							{{ selectedOrder.billing_status }}
 						</Badge>
 					</p>
-					<p><span class="font-medium text-gray-700">Collection Point:</span> {{ selectedOrder.collection_point || '-' }}</p>
+					<p><span class="font-medium text-gray-700">{{ __('Collection Point:') }}</span> {{ selectedOrder.collection_point || '-' }}</p>
 					<p v-if="selectedOrder.order_date">
-						<span class="font-medium text-gray-700">Order Date:</span> {{ formatDate(selectedOrder.order_date) }}
+						<span class="font-medium text-gray-700">{{ __('Order Date:') }}</span> {{ formatDate(selectedOrder.order_date) }}
 					</p>
 				</div>
 			</div>
@@ -123,10 +123,10 @@
 			<!-- Test Report Section -->
 			<div class="mt-6">
 				<div class="flex items-center justify-between gap-2 py-2">
-					<h3 class="text-lg font-semibold text-gray-900">Test Report Details</h3>
+					<h3 class="text-lg font-semibold text-gray-900">{{ __('Test Report Details') }}</h3>
 					<Button v-if="selectedOrder.diagnostic_report_status && selectedOrder.diagnostic_report_status != 'Open'" :ref_for="true" theme="gray" size="sm"
 						@click="print('Diagnostic Report', selectedOrder.diagnostic_report)">
-						<Tooltip :text="'Print Report'" placement="top">
+						<Tooltip :text="__('Print Report')" placement="top">
 							<slot name="icon">
 								<FeatherIcon :name="'printer'" class="size-3 text-ink-white-7" />
 							</slot>
@@ -143,21 +143,21 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status || "Pending" }}
+									{{ order.observation_status || __('Pending') }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
 								<div class="grid grid-cols-3 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-									<div>Test</div>
-									<div>Result</div>
-									<div>Reference</div>
+									<div>{{ __('Test') }}</div>
+									<div>{{ __('Result') }}</div>
+									<div>{{ __('Reference') }}</div>
 								</div>
 
 								<div class="grid grid-cols-3 px-3 py-2 text-sm">
 									<div>
 										<p class="font-medium text-gray-800">{{ order.observation_template }}</p>
 										<p v-if="order.collection_date_time">
-											<span class="text-gray-700 text-xs">Collected On:</span> {{ formatDateTime(order.collection_date_time) }}
+											<span class="text-gray-700 text-xs">{{ __('Collected On:') }}</span> {{ formatDateTime(order.collection_date_time) }}
 										</p>
 									</div>
 									<div class="font-semibold flex items-center">
@@ -174,14 +174,14 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status || "Pending" }}
+									{{ order.observation_status || __('Pending') }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
 								<div class="grid grid-cols-3 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-									<div>Test</div>
-									<div>Result</div>
-									<div>Reference</div>
+									<div>{{ __('Test') }}</div>
+									<div>{{ __('Result') }}</div>
+									<div>{{ __('Reference') }}</div>
 								</div>
 
 								<div v-for="(comp, i) in order.children" :key="i"
@@ -191,11 +191,11 @@
 											<p class="font-medium text-gray-800">{{ comp.observation_template }}</p>
 											<Badge v-if="comp.observation_status" :variant="'outline'" size="sm"
 												:theme="getStatusColor(comp.observation_status)">
-												{{ comp.observation_status || "Pending" }}
+												{{ comp.observation_status || __('Pending') }}
 											</Badge>
 										</div>
 										<p v-if="comp.collection_date_time">
-											<span class="text-gray-700 text-xs">Collected On:</span> {{ formatDateTime(comp.collection_date_time) }}
+											<span class="text-gray-700 text-xs">{{ __('Collected On:') }}</span> {{ formatDateTime(comp.collection_date_time) }}
 										</p>
 									</div>
 									<div class="font-semibold flex items-center">
@@ -326,7 +326,7 @@ function print(doctype, docname) {
 				);
 
 				if (!w) {
-					alert("Please enable pop-ups");
+					alert(__('Please enable pop-ups'));
 					return;
 				}
 			}

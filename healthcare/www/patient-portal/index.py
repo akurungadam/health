@@ -3,6 +3,7 @@ import os
 
 import frappe
 from frappe import _
+from frappe.translate import get_all_translations
 from frappe.utils import get_bench_path
 
 
@@ -36,6 +37,8 @@ def get_context(context):
 	context.body_class = "portal-page"
 
 	context.assets = get_vite_assets()
+
+	context.translated_messages = get_all_translations(frappe.local.lang or "en")
 
 
 def get_vite_assets(entry="src/patient_portal.js"):

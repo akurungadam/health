@@ -16,7 +16,7 @@
 		<!-- Weekdays -->
 		<div class="grid grid-cols-7 gap-0 text-center text-gray-600 text-sm mb-1 font-medium">
 			<div v-for="w in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="w"
-				:class="w==='Su'||w==='Sa' ? 'text-red-500' : ''">{{ w }}</div>
+				:class="w==='Su'||w==='Sa' ? 'text-red-500' : ''">{{ __(w) }}</div>
 		</div>
 
 		<!-- Days -->
