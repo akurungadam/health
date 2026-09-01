@@ -27,7 +27,7 @@ function translate(message, replace, context = null) {
 	}
 
 	const hasPlaceholders = /{\d+}/.test(message)
-	if (!hasPlaceholders) {
+	if (!hasPlaceholders || !replace || typeof replace !== 'object') {
 		return translatedMessage
 	}
 
