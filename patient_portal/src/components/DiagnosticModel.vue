@@ -143,7 +143,7 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status || __('Pending') }}
+									{{ order.observation_status }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
@@ -174,7 +174,7 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status || __('Pending') }}
+									{{ order.observation_status }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
@@ -191,7 +191,7 @@
 											<p class="font-medium text-gray-800">{{ comp.observation_template }}</p>
 											<Badge v-if="comp.observation_status" :variant="'outline'" size="sm"
 												:theme="getStatusColor(comp.observation_status)">
-												{{ comp.observation_status || __('Pending') }}
+												{{ comp.observation_status }}
 											</Badge>
 										</div>
 										<p v-if="comp.collection_date_time">
