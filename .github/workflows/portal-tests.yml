@@ -4,11 +4,16 @@ on:
   pull_request:
     paths:
       - "patient_portal/**"
+      - "frappe-ui/**"
       - ".github/workflows/portal-tests.yml"
   push:
     branches: [develop]
     paths:
       - "patient_portal/**"
+      - "frappe-ui/**"
+
+permissions:
+  contents: read
 
 concurrency:
   group: portal-tests-${{ github.event.number || github.ref }}
@@ -22,6 +27,8 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v7
