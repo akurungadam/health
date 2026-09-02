@@ -29,7 +29,7 @@
 							<h3 class="text-xs font-medium text-gray-500 truncate">{{ item.name }}</h3>
 							<Badge :variant="'outline'"
 								:theme="getStatusColor(item.status)">
-								{{ item.status }}
+								{{ __(item.status) }}
 							</Badge>
 						</div>
 
@@ -43,7 +43,7 @@
 						</p>
 						<p class="mt-1 text-xs text-gray-600 whitespace-nowrap">
 							<FeatherIcon name="clock" class="inline w-3 h-3 me-1 text-gray-500" />
-							{{ item.appointment_time }} ({{ item.duration }} {{ __('mins') }})
+							{{ formatTime(item.appointment_time) }} ({{ item.duration }} {{ __('mins') }})
 						</p>
 					</Card>
 				</div>
@@ -94,7 +94,7 @@
 					:variant="'outline'"
 					size="sm"
 					:theme="getStatusColor(selectedAppointment.status)">
-					{{ selectedAppointment.status }}
+					{{ __(selectedAppointment.status) }}
 				</Badge>
 			</div>
 		</template>
@@ -128,7 +128,7 @@
 								{{ formatDate(selectedAppointment.appointment_date) }}
 							</p>
 							<p class="mt-1 text-sm text-gray-600">
-								{{ selectedAppointment.appointment_time }} ({{ selectedAppointment.duration }} {{ __('mins') }})
+								{{ formatTime(selectedAppointment.appointment_time) }} ({{ selectedAppointment.duration }} {{ __('mins') }})
 							</p>
 						</div>
 					</section>
@@ -322,6 +322,16 @@ function print(doctype, docname) {
 		}
 	});
 	get_print_format.fetch();
+}
+
+function formatTime(timeStr) {
+	if (!timeStr) return ''
+
+	const [hours, minutes] = String(timeStr).split(':')
+	const date = new Date()
+	date.setHours(Number(hours), Number(minutes), 0, 0)
+
+	return date.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDate(dateStr) {
