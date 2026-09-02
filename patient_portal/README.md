@@ -74,11 +74,29 @@ import { getLocale } from '@/translation'
 new Date(dateStr).toLocaleDateString(getLocale(), { month: 'long', day: 'numeric' })
 ```
 
-Month and weekday names produced by `Intl` follow from this; they are not translated through
-`__()`.
+Month and weekday names come from `Intl` and follow the same locale; they are not translated
+through `__()`. The calendar's weekday header is generated from `Intl.DateTimeFormat`, so nothing
+about it needs a catalog entry.
 
 ### Checking a translation
 
 Set your user's language in Desk (**My Settings → Language**), reload `/patient-portal`, and
 confirm the strings change. Right-to-left languages need no extra work: the page extends
 `templates/web.html`, so it inherits the framework's `dir` handling.
+
+## Tests
+
+```sh
+cd patient_portal
+yarn install
+yarn test
+```
+
+`src/translation.spec.js` covers the localization mechanism against a non-English catalog:
+lookup, context keys, placeholder substitution, the source-string fallback, and locale
+resolution. `.github/workflows/portal-tests.yml` runs it on every pull request that touches
+`patient_portal/`.
+
+It exercises `translation.js` directly with a stubbed `frappe-ui` config, so it does not cover
+the wiring in `patient_portal.js` or any component's rendering — a component test harness would
+be needed for that.
