@@ -92,7 +92,7 @@
 					<!-- Patient Info -->
 					<div class="flex-1">
 						<h2 class="text-lg font-semibold text-gray-900">{{ selectedOrder.patient_name }}</h2>
-						<p class="text-sm text-gray-600">{{ __('Ordered by: {0}', [selectedOrder.ref_practitioner]) }}</p>
+						<p v-if="selectedOrder.ref_practitioner" class="text-sm text-gray-600">{{ __('Ordered by: {0}', [selectedOrder.ref_practitioner]) }}</p>
 					</div>
 
 					<!-- Order Status -->
@@ -216,6 +216,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import { getLocale } from '@/translation';
 
 import {
 	createResource,
@@ -251,7 +252,7 @@ function orderDetails(order) {
 }
 
 function formatDate(dateStr) {
-	return new Date(dateStr).toLocaleDateString("en-IN", {
+	return new Date(dateStr).toLocaleDateString(getLocale(), {
 		weekday: "long",
 		year: "numeric",
 		month: "long",
@@ -260,7 +261,7 @@ function formatDate(dateStr) {
 }
 
 function formatDateTime(dateStr) {
-	return new Date(dateStr).toLocaleString("en-IN", {
+	return new Date(dateStr).toLocaleString(getLocale(), {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
