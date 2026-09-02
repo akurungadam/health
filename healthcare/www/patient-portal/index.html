@@ -12,6 +12,7 @@
 <script type="module" src="/assets/healthcare/frontend/{{ assets.file }}"></script>
 
 <script>
+	window.portal_lang = {{ lang | tojson }};
 	window.translated_messages = {{ translated_messages | tojson }};
 </script>
 {% endblock page_content %}

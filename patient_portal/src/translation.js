@@ -1,5 +1,14 @@
 import { getConfig } from 'frappe-ui'
 
+export function getLocale() {
+	const lang = window.portal_lang || navigator.language
+	try {
+		return Intl.getCanonicalLocales(lang)[0] || 'en'
+	} catch (e) {
+		return 'en'
+	}
+}
+
 export default function translationPlugin(app) {
 	app.config.globalProperties.__ = translate
 	window.__ = translate

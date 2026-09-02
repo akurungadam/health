@@ -229,6 +229,7 @@
 import { ref, computed } from 'vue'
 import BookAppointmentModel from '@/components/BookAppointmentModel.vue'
 import { formatCurrency } from "@/utils/formatters"
+import { getLocale } from "@/translation"
 
 import {
 	createResource,
@@ -324,7 +325,7 @@ function print(doctype, docname) {
 }
 
 function formatDate(dateStr) {
-	return new Date(dateStr).toLocaleDateString("en-IN", {
+	return new Date(dateStr).toLocaleDateString(getLocale(), {
 		weekday: "long",
 		year: "numeric",
 		month: "long",

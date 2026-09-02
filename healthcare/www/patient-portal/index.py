@@ -38,7 +38,8 @@ def get_context(context):
 
 	context.assets = get_vite_assets()
 
-	context.translated_messages = get_all_translations(frappe.local.lang or "en")
+	context.lang = frappe.local.lang or "en"
+	context.translated_messages = get_all_translations(context.lang)
 
 
 def get_vite_assets(entry="src/patient_portal.js"):
