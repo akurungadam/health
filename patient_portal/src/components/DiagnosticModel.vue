@@ -16,7 +16,7 @@
 					<h3 class="text-xs font-medium text-gray-500 truncate"># {{ item.order_name }}</h3>
 					<Badge v-if="item.diagnostic_report_status" :variant="'outline'"
 						:theme="item.diagnostic_report_status == 'Approved' ? 'green' : 'orange'">
-						{{ item.diagnostic_report_status }}
+						{{ __(item.diagnostic_report_status) }}
 					</Badge>
 				</div>
 
@@ -73,7 +73,7 @@
 				<p class="text-sm text-gray-500"># {{ selectedOrder.order_name }}</p>
 				<Badge v-if="selectedOrder.diagnostic_report_status" :variant="'outline'"
 					:theme="selectedOrder.diagnostic_report_status == 'Approved' ? 'green' : 'orange'">
-					{{ selectedOrder.diagnostic_report_status }}
+					{{ __(selectedOrder.diagnostic_report_status) }}
 				</Badge>
 			</div>
 		</template>
@@ -110,7 +110,7 @@
 					<p><span class="font-medium text-gray-700">{{ __('Order #:') }}</span>
 						{{ selectedOrder.order_name }}
 						<Badge :variant="'outline'" size="sm" :theme="getStatusColor(selectedOrder.billing_status)">
-							{{ selectedOrder.billing_status }}
+							{{ __(selectedOrder.billing_status) }}
 						</Badge>
 					</p>
 					<p><span class="font-medium text-gray-700">{{ __('Collection Point:') }}</span> {{ selectedOrder.collection_point || '-' }}</p>
@@ -143,7 +143,7 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status }}
+									{{ __(order.observation_status) }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
@@ -174,7 +174,7 @@
 								<p class="font-medium text-gray-800 py-2">{{ order.observation_template }}</p>
 								<Badge v-if="order.observation_status" :variant="'outline'" size="sm"
 									:theme="getStatusColor(order.observation_status)">
-									{{ order.observation_status }}
+									{{ __(order.observation_status) }}
 								</Badge>
 							</div>
 							<div class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
@@ -191,7 +191,7 @@
 											<p class="font-medium text-gray-800">{{ comp.observation_template }}</p>
 											<Badge v-if="comp.observation_status" :variant="'outline'" size="sm"
 												:theme="getStatusColor(comp.observation_status)">
-												{{ comp.observation_status }}
+												{{ __(comp.observation_status) }}
 											</Badge>
 										</div>
 										<p v-if="comp.collection_date_time">
