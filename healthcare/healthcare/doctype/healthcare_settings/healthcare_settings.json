@@ -20,6 +20,7 @@
   "enable_free_follow_ups",
   "max_visits",
   "valid_days",
+  "apply_free_follow_ups_on_encounters",
   "inpatient_settings_section",
   "allow_discharge_despite_unbilled_services",
   "allow_discharge_despite_pending_healthcare_services",
@@ -111,6 +112,14 @@
    "fieldtype": "Int",
    "label": "Valid Number of Days",
    "mandatory_depends_on": "eval:doc.enable_free_follow_ups == 1"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.enable_free_follow_ups == 1",
+   "description": "Apply free follow ups to Patient Encounters created without an Appointment",
+   "fieldname": "apply_free_follow_ups_on_encounters",
+   "fieldtype": "Check",
+   "label": "Apply Free Follow-ups on Encounters"
   },
   {
    "description": "You can configure default Items for billing consultation charges, procedure consumption items and inpatient visits",
@@ -513,7 +522,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2025-12-25 09:36:33.073374",
+ "modified": "2026-09-05 19:48:52.083200",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",
