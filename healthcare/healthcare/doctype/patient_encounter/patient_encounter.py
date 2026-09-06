@@ -13,6 +13,7 @@ from frappe.utils import add_days, get_link_to_form, getdate
 from healthcare.healthcare.doctype.fee_validity.fee_validity import (
 	cancel_fee_validity,
 	manage_fee_validity,
+	validate_fee_validity_cancellation,
 )
 from healthcare.healthcare.utils import get_medical_codes
 
@@ -48,6 +49,9 @@ class PatientEncounter(Document):
 			manage_fee_validity(self)
 
 	def before_cancel(self):
+		if not self.appointment:
+			validate_fee_validity_cancellation(self)
+
 		orders = frappe.get_all("Service Request", {"order_group": self.name})
 		for order in orders:
 			order_doc = frappe.get_doc("Service Request", order.name)
