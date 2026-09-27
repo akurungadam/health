@@ -160,7 +160,7 @@ var get_healthcare_services_to_invoice = function (frm, link_customer) {
 				patient: patient,
 				customer: frm.doc.customer,
 				company: frm.doc.company,
-				link_customer: link_customer,
+				link_customer: confirmed_link_customer(frm, patient, link_customer),
 			};
 			var columns = ["service", "reference_name", "reference_type"];
 			get_healthcare_items(
@@ -193,6 +193,10 @@ var get_healthcare_services_to_invoice = function (frm, link_customer) {
 	});
 	set_primary_action(frm, dialog, $results, true);
 	dialog.show();
+};
+
+var confirmed_link_customer = function (frm, patient, link_customer) {
+	return patient === frm.doc.patient ? link_customer : 0;
 };
 
 // only the newest lookup may render, an earlier response must not append to a newer selection
@@ -458,7 +462,7 @@ var get_drugs_to_invoice = function (frm, link_customer) {
 				encounter: encounter,
 				company: frm.doc.company,
 				customer: frm.doc.customer,
-				link_customer: link_customer,
+				link_customer: confirmed_link_customer(frm, patient, link_customer),
 			},
 			["drug_code", "quantity", "description"],
 		);
