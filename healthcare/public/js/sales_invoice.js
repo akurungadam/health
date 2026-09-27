@@ -174,8 +174,7 @@ var get_healthcare_services_to_invoice = function (frm, link_customer) {
 			);
 		} else if (!patient) {
 			selected_patient = "";
-			$results.empty();
-			$results.append($placeholder);
+			clear_healthcare_items($results, $placeholder);
 		}
 	};
 	$wrapper = dialog.fields_dict.results_area.$wrapper.append(`<div class="results"
@@ -196,6 +195,19 @@ var get_healthcare_services_to_invoice = function (frm, link_customer) {
 	dialog.show();
 };
 
+// only the newest lookup may render, an earlier response must not append to a newer selection
+var next_lookup = function ($results) {
+	let lookup = ($results.data("lookup") || 0) + 1;
+	$results.data("lookup", lookup);
+	return lookup;
+};
+
+var clear_healthcare_items = function ($results, $placeholder) {
+	next_lookup($results);
+	$results.empty();
+	$results.append($placeholder);
+};
+
 var get_healthcare_items = function (
 	frm,
 	invoice_healthcare_services,
@@ -205,12 +217,14 @@ var get_healthcare_items = function (
 	args,
 	columns,
 ) {
-	var me = this;
+	let lookup = next_lookup($results);
 	$results.empty();
 	frappe.call({
 		method: method,
 		args: args,
 		callback: function (data) {
+			if ($results.data("lookup") !== lookup) return;
+
 			if (data.message && data.message.length) {
 				$results.append(make_list_row(columns, invoice_healthcare_services));
 				for (let i = 0; i < data.message.length; i++) {
@@ -427,8 +441,7 @@ var get_drugs_to_invoice = function (frm, link_customer) {
 		let encounter = dialog.get_value("encounter");
 		if (!patient) {
 			selected_filters = "";
-			$results.empty();
-			$results.append($placeholder);
+			clear_healthcare_items($results, $placeholder);
 			return;
 		}
 		let filters = `${patient}::${encounter || ""}`;
