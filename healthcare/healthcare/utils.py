@@ -1286,13 +1286,19 @@ def manage_doc_for_appointment(dt_from_appointment, appointment, invoiced):
 
 
 @frappe.whitelist()
-def get_drugs_to_invoice(patient, customer, encounter=None, company=None, link_customer=False):
+def get_drugs_to_invoice(
+	patient: str,
+	customer: str,
+	encounter: str | None = None,
+	company: str | None = None,
+	link_customer: bool = False,
+) -> list[dict]:
 	"""Billable Medication Requests of a Patient, optionally limited to one Patient Encounter"""
-	patient = frappe.get_doc("Patient", patient)
-	validate_customer_created(patient, customer, link_customer)
+	patient_doc = frappe.get_doc("Patient", patient)
+	validate_customer_created(patient_doc, customer, link_customer)
 	drugs_to_invoice = [
 		get_medication_request_line(medication_request)
-		for medication_request in get_billable_medication_requests(patient.name, encounter, company)
+		for medication_request in get_billable_medication_requests(patient_doc.name, encounter, company)
 	]
 	return [drug for drug in drugs_to_invoice if drug]
 
