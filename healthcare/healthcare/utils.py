@@ -1287,13 +1287,22 @@ def manage_doc_for_appointment(dt_from_appointment, appointment, invoiced):
 
 @frappe.whitelist()
 def get_drugs_to_invoice(
-	patient: str,
-	customer: str,
 	encounter: str | None = None,
-	company: str | None = None,
+	customer: str | None = None,
 	link_customer: bool = False,
+	patient: str | None = None,
+	company: str | None = None,
 ) -> list[dict]:
-	"""Billable Medication Requests of a Patient, optionally limited to one Patient Encounter"""
+	"""Billable Medication Requests of a Patient, optionally limited to one Patient Encounter
+
+	`encounter` leads the signature for clients written before a Patient could be asked for directly
+	"""
+	if not patient and not encounter:
+		frappe.throw(_("Patient or Patient Encounter is required to list Prescriptions"))
+
+	if not patient:
+		patient = frappe.db.get_value("Patient Encounter", encounter, "patient")
+
 	patient_doc = frappe.get_doc("Patient", patient)
 	validate_customer_created(patient_doc, customer, link_customer)
 	drugs_to_invoice = [

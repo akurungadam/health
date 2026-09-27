@@ -59,7 +59,7 @@ class TestMedicationRequest(HealthcareTestSuite):
 		medication_request.submit()
 		self.assertFalse(medication_request.order_group)
 
-		drugs = get_drugs_to_invoice(patient, get_customer(patient), company="_Test Company")
+		drugs = get_drugs_to_invoice(patient=patient, customer=get_customer(patient), company="_Test Company")
 		self.assertIn(medication_request.name, [drug.get("reference_name") for drug in drugs])
 
 	def test_medication_request_of_draft_encounter_is_billable(self):
@@ -74,8 +74,23 @@ class TestMedicationRequest(HealthcareTestSuite):
 		self.assertEqual(encounter.docstatus, 0)
 
 		drugs = get_drugs_to_invoice(
-			patient, get_customer(patient), encounter=encounter.name, company="_Test Company"
+			patient=patient,
+			customer=get_customer(patient),
+			encounter=encounter.name,
+			company="_Test Company",
 		)
+		self.assertEqual(len(drugs), 1)
+		self.assertEqual(drugs[0].get("reference_type"), "Medication Request")
+
+	def test_drugs_to_invoice_accepts_the_former_encounter_call(self):
+		"""clients written before a Patient could be asked for pass the Encounter positionally"""
+		patient = frappe.get_list("Patient", pluck="name")[0]
+		practitioner = frappe.get_list("Healthcare Practitioner", pluck="name")[0]
+		medication = frappe.get_doc("Medication", "Tablet Paracetamol 300Milligram")
+
+		encounter = create_encounter(patient, practitioner, "drug_prescription", medication, submit=True)
+
+		drugs = get_drugs_to_invoice(encounter.name, get_customer(patient))
 		self.assertEqual(len(drugs), 1)
 		self.assertEqual(drugs[0].get("reference_type"), "Medication Request")
 
@@ -89,7 +104,10 @@ class TestMedicationRequest(HealthcareTestSuite):
 		standalone_request.submit()
 
 		drugs = get_drugs_to_invoice(
-			patient, get_customer(patient), encounter=encounter.name, company="_Test Company"
+			patient=patient,
+			customer=get_customer(patient),
+			encounter=encounter.name,
+			company="_Test Company",
 		)
 		self.assertNotIn(standalone_request.name, [drug.get("reference_name") for drug in drugs])
 
