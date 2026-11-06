@@ -121,7 +121,9 @@ class TestOTBooking(HealthcareTestSuite):
 		booking.save()
 
 
-def make_booking(test, start, theatre=None, templates=None, patient=0, surgeon=0, primaries=1):
+def make_booking(
+	test, start, theatre=None, templates=None, patient=0, surgeon=0, primaries=1, priority="Elective"
+):
 	team = [{"practitioner": test.practitioners[surgeon], "role": "Surgeon", "is_primary": primaries >= 1}]
 	if primaries >= 2:
 		team.append({"practitioner": test.practitioners[2], "role": "Surgeon", "is_primary": 1})
@@ -132,6 +134,7 @@ def make_booking(test, start, theatre=None, templates=None, patient=0, surgeon=0
 			"company": "_Test Company",
 			"theatre": theatre or test.theatre,
 			"scheduled_start": start,
+			"priority": priority,
 			"procedures": [{"procedure_template": name} for name in templates or [test.template.name]],
 			"team": team,
 		}

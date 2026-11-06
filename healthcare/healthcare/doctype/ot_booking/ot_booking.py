@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, cint, getdate
 
+from healthcare.healthcare.doctype.ot_booking.availability import validate_availability
 from healthcare.healthcare.doctype.ot_booking.booking_procedures import (
 	create_procedures,
 	sync_procedures,
@@ -29,6 +30,7 @@ class OTBooking(Document):
 		self.validate_service_requests()
 		self.validate_primary_surgeon()
 		validate_no_conflicts(self)
+		validate_availability(self)
 
 	def on_update(self):
 		sync_procedures(self)

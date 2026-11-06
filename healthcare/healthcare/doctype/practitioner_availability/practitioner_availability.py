@@ -212,6 +212,29 @@ class PractitionerAvailability(Document):
 			)
 
 
+def find_unavailable_blocks(scopes, start, end):
+	"""Unavailable blocks of any of `scopes` that overlap `start` to `end`. A block covers
+	its start to end time on every day from its start date to its end date."""
+	start, end = get_datetime(start), get_datetime(end)
+	blocks = frappe.get_all(
+		"Practitioner Availability",
+		fields=["name", "scope", "start_date", "end_date", "start_time", "end_time"],
+		filters={
+			"type": "Unavailable",
+			"docstatus": ("!=", 2),
+			"scope": ["in", scopes],
+			"start_date": ["<=", getdate(end)],
+			"end_date": [">=", getdate(start)],
+		},
+		order_by="start_date asc, start_time asc",
+	)
+	return [block for block in blocks if overlaps_daily_window(block, start, end)]
+
+
+def overlaps_daily_window(block, start, end):
+	return get_time(start) < get_time(block.end_time) and get_time(block.start_time) < get_time(end)
+
+
 def daterange(start_date, end_date):
 	start_date = getdate(start_date)
 	end_date = getdate(end_date)
