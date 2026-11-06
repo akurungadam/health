@@ -33,3 +33,16 @@ class TestHealthcareServiceUnitType(HealthcareTestSuite):
 			}
 		)
 		self.assertRaises(frappe.ValidationError, duplicate.insert)
+
+
+def create_theatre_type(name, is_ot=1):
+	if frappe.db.exists("Healthcare Service Unit Type", name):
+		return frappe.get_doc("Healthcare Service Unit Type", name)
+	return frappe.get_doc(
+		{
+			"doctype": "Healthcare Service Unit Type",
+			"service_unit_type": name,
+			"inpatient_occupancy": 1,
+			"is_ot": is_ot,
+		}
+	).insert()
