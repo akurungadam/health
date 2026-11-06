@@ -1,11 +1,14 @@
 # Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-import unittest
-
 import frappe
 from frappe.utils import add_days, get_datetime, nowdate
 
+from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_leave import (
+	create_approved_leave,
+	link_new_employee,
+	skip_without_hrms,
+)
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -16,8 +19,6 @@ from healthcare.healthcare.doctype.patient_appointment.test_patient_appointment 
 	create_practitioner_availability,
 )
 from healthcare.tests.utils import HealthcareTestSuite
-
-HRMS_INSTALLED = "hrms" in frappe.get_installed_apps()
 
 
 class TestAvailability(HealthcareTestSuite):
@@ -89,16 +90,18 @@ class TestAvailability(HealthcareTestSuite):
 		frappe.db.set_single_value("Healthcare Settings", "ot_holiday_list", holiday_list)
 		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_holiday_list", saved)
 
-	@unittest.skipUnless(HRMS_INSTALLED, "HRMS is not installed")
+	@skip_without_hrms
 	def test_a_surgeon_on_leave_is_refused(self):
-		employee = create_employee()
-		frappe.db.set_value("Healthcare Practitioner", self.practitioners[0], "employee", employee)
-		self.addCleanup(
-			frappe.db.set_value, "Healthcare Practitioner", self.practitioners[0], "employee", None
-		)
-		create_approved_leave(employee, self.day)
+		create_approved_leave(link_new_employee(self, self.practitioners[0]), self.day, self.day)
 
 		self.assertRaisesRegex(frappe.ValidationError, "is on leave", make_booking, self, self.at(9))
+
+	@skip_without_hrms
+	def test_a_surgeon_on_half_day_leave_is_only_warned_about(self):
+		employee = link_new_employee(self, self.practitioners[0])
+		create_approved_leave(employee, self.day, self.day, half_day_date=self.day)
+
+		make_booking(self, self.at(9))
 
 
 def create_holiday_list(day, is_half_day=0):
@@ -112,34 +115,3 @@ def create_holiday_list(day, is_half_day=0):
 		}
 	)
 	return holiday_list.insert(ignore_if_duplicate=True).name
-
-
-def create_employee():
-	employee = frappe.get_doc(
-		{
-			"doctype": "Employee",
-			"first_name": "_Test OT Surgeon",
-			"company": "_Test Company",
-			"gender": "Female",
-			"date_of_birth": "1980-01-01",
-			"date_of_joining": "2010-01-01",
-		}
-	)
-	return employee.insert(ignore_permissions=True).name
-
-
-def create_approved_leave(employee, day):
-	leave = frappe.get_doc(
-		{
-			"doctype": "Leave Application",
-			"employee": employee,
-			"leave_type": frappe.db.get_value("Leave Type", {}),
-			"from_date": day,
-			"to_date": day,
-			"status": "Approved",
-		}
-	)
-	# skip the leave balance and approver rules; the booking only reads approved leave
-	leave.flags.ignore_validate = True
-	leave.insert(ignore_permissions=True)
-	leave.submit()
