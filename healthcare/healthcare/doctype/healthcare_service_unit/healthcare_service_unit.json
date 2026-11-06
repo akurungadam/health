@@ -16,6 +16,7 @@
   "overlap_appointments",
   "service_unit_capacity",
   "inpatient_occupancy",
+  "is_ot",
   "occupancy_status",
   "column_break_9",
   "company",
@@ -111,6 +112,17 @@
    "hide_seconds": 1,
    "in_list_view": 1,
    "label": "Inpatient Occupancy",
+   "no_copy": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.is_group != 1",
+   "fetch_from": "service_unit_type.is_ot",
+   "fieldname": "is_ot",
+   "fieldtype": "Check",
+   "label": "Is OT",
    "no_copy": 1,
    "read_only": 1,
    "search_index": 1
@@ -258,7 +270,7 @@
    "table_fieldname": "practitioner_schedules"
   }
  ],
- "modified": "2025-12-25 09:36:44.187301",
+ "modified": "2026-11-06 11:20:36.188756",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Service Unit",
