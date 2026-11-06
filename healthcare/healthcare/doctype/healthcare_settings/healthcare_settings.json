@@ -52,6 +52,11 @@
   "lab_test_approval_required",
   "employee_name_and_designation_in_print",
   "custom_signature_in_print",
+  "ot_tab",
+  "ot_cleaning_minutes",
+  "column_break_ot",
+  "ot_day_start_time",
+  "ot_day_end_time",
   "billing_accounts",
   "healthcare_service_items",
   "inpatient_visit_charge_item",
@@ -380,6 +385,35 @@
    "label": "Laboratory"
   },
   {
+   "fieldname": "ot_tab",
+   "fieldtype": "Tab Break",
+   "label": "Operation Theatre"
+  },
+  {
+   "default": "30",
+   "description": "Time after every case before the next one can start in the same theatre",
+   "fieldname": "ot_cleaning_minutes",
+   "fieldtype": "Int",
+   "label": "Cleaning Minutes",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_ot",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "08:00:00",
+   "fieldname": "ot_day_start_time",
+   "fieldtype": "Time",
+   "label": "Day Start Time"
+  },
+  {
+   "default": "20:00:00",
+   "fieldname": "ot_day_end_time",
+   "fieldtype": "Time",
+   "label": "Day End Time"
+  },
+  {
    "fieldname": "billing_accounts",
    "fieldtype": "Tab Break",
    "label": "Billing & Accounts"
@@ -624,7 +658,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-09-17 15:11:28.071790",
+ "modified": "2026-11-06 22:24:09.710351",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",

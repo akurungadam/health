@@ -50,6 +50,7 @@
   "sb_refs",
   "column_break_34",
   "service_request",
+  "ot_booking",
   "invoiced",
   "prescription",
   "amended_from"
@@ -326,6 +327,14 @@
    "search_index": 1
   },
   {
+   "fieldname": "ot_booking",
+   "fieldtype": "Link",
+   "label": "OT Booking",
+   "options": "OT Booking",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
    "fieldname": "section_break_igrj",
    "fieldtype": "Section Break"
   },
@@ -374,7 +383,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2026-02-16 18:35:08.776702",
+ "modified": "2026-11-06 11:54:33.875893",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",

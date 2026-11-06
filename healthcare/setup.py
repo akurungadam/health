@@ -9,6 +9,7 @@ from healthcare.healthcare.doctype.allergy.allergy_seed import create_allergies
 from healthcare.healthcare.doctype.medication_class.medication_class_seed import (
 	create_medication_classes,
 )
+from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import store_ot_defaults
 
 
 data = {
@@ -35,6 +36,8 @@ data = {
 		"Nursing User",
 		"Physician",
 		"Patient",
+		"OT Coordinator",
+		"OT Manager",
 	],
 	"custom_fields": {
 		"Sales Invoice": [
@@ -278,6 +281,7 @@ def setup_healthcare():
 
 	create_custom_records()
 	create_default_root_service_units()
+	store_ot_defaults()
 
 	setup_domain()
 
