@@ -14,10 +14,11 @@ HOUR = 3600
 
 class TestOTBooking(HealthcareTestSuite):
 	def setUp(self):
-		self.patients = frappe.get_all("Patient", pluck="name", limit=2)
+		self.patients = frappe.get_all("Patient", pluck="name", limit=3)
 		self.practitioners = frappe.get_all("Healthcare Practitioner", pluck="name", limit=3)
 		self.theatre = create_theatre("_Test OT 1", "_Test General OT")
 		self.other_theatre = create_theatre("_Test OT 2", "_Test General OT")
+		self.third_theatre = create_theatre("_Test OT 3", "_Test General OT")
 		self.template = create_ot_template("_Test Procedure - Hernia Repair", duration=HOUR)
 		# every test books its own day, so the tests in this class never overlap each other
 		test_names = sorted(name for name in dir(self) if name.startswith("test_"))
@@ -81,6 +82,25 @@ class TestOTBooking(HealthcareTestSuite):
 		make_booking(self, self.at(9))
 
 		make_booking(self, self.at(10), theatre=self.other_theatre, patient=1)
+
+	def test_a_practitioner_allowed_to_overlap_covers_two_theatres(self):
+		self.allow_overlap(self.practitioners[0])
+		make_booking(self, self.at(9))
+
+		make_booking(self, self.at(9), theatre=self.other_theatre, patient=1)
+
+	def test_a_practitioner_allowed_to_overlap_never_covers_three(self):
+		self.allow_overlap(self.practitioners[0])
+		make_booking(self, self.at(9))
+		make_booking(self, self.at(9), theatre=self.other_theatre, patient=1)
+
+		self.assert_refused("is in theatre", self.at(9), theatre=self.third_theatre, patient=2)
+
+	def allow_overlap(self, practitioner):
+		frappe.db.set_value("Healthcare Practitioner", practitioner, "allow_overlapping_theatres", 1)
+		self.addCleanup(
+			frappe.db.set_value, "Healthcare Practitioner", practitioner, "allow_overlapping_theatres", 0
+		)
 
 	def test_patient_cannot_have_two_overlapping_bookings(self):
 		make_booking(self, self.at(9))

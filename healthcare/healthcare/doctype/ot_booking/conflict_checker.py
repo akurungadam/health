@@ -2,8 +2,10 @@
 # For license information, please see license.txt
 
 """Finds other active bookings that overlap a booking in its theatre, its team or its patient.
-The theatre also needs its cleaning time after every case."""
+The theatre also needs its cleaning time after every case. A practitioner allowed to overlap
+theatres may be in two at once, never three."""
 
+from collections import Counter
 from datetime import timedelta
 
 import frappe
@@ -11,6 +13,7 @@ from frappe import _
 from frappe.utils import add_days, cint, format_datetime, get_datetime, getdate
 
 INACTIVE_STATUSES = ("Cancelled", "Postponed")
+MAX_OVERLAPPING_THEATRES = 2
 
 
 def validate_no_conflicts(booking):
@@ -57,12 +60,26 @@ def team_conflicts(booking):
 		.where(team.parenttype == "OT Booking")
 		.where(team.practitioner.isin(practitioners))
 	)
+	others = bookings.run(as_dict=True)
+	busy = Counter(other.practitioner for other in others)
+	may_overlap = practitioners_allowed_to_overlap(practitioners)
 	return [
 		_("{0} is in theatre {1} from {2} to {3} ({4})").format(
 			frappe.bold(other.practitioner), other.theatre, *slot_text(other), other.name
 		)
-		for other in bookings.run(as_dict=True)
+		for other in others
+		if other.practitioner not in may_overlap or busy[other.practitioner] >= MAX_OVERLAPPING_THEATRES
 	]
+
+
+def practitioners_allowed_to_overlap(practitioners):
+	return set(
+		frappe.get_all(
+			"Healthcare Practitioner",
+			filters={"name": ["in", practitioners], "allow_overlapping_theatres": 1},
+			pluck="name",
+		)
+	)
 
 
 def patient_conflicts(booking):
