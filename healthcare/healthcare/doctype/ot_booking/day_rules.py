@@ -2,9 +2,10 @@
 # For license information, please see license.txt
 
 """Rules for a committed list. On the day of surgery only an emergency can be added, or moved
-in from another day, unless an OT Manager gives a reason. A Scheduled case, or any case on
-its own day, needs a reason to move, cancel or postpone. The reason is for that one change:
-once saved it goes to the timeline and the field is emptied for the next one."""
+in from another day, unless an OT Manager gives a reason. Moving a Scheduled case needs a
+reason, and so does cancelling or postponing any case; a Tentative or Postponed case moves
+freely. The reason is for that one change: once saved it goes to the timeline and the field
+is emptied for the next one."""
 
 import frappe
 from frappe import _
@@ -17,15 +18,13 @@ def validate_day_rules(booking):
 	before = booking.get_doc_before_save()
 	if not before or (is_surgery_day(booking) and not is_surgery_day(before)):
 		validate_same_day_addition(booking)
-	elif needs_change_reason(before) and is_moved_or_stopped(booking, before):
+	elif is_stopped(booking, before) or (needs_change_reason(before) and is_moved(booking, before)):
 		validate_reason_given(booking)
 
 
 def needs_change_reason(booking):
-	"""A postponed case is waiting for a new day, so putting it on one needs no reason"""
-	if booking.status == "Postponed":
-		return False
-	return booking.status == "Scheduled" or is_surgery_day(booking)
+	"""Whether moving the case needs a reason: only once its day's list is published"""
+	return booking.status == "Scheduled"
 
 
 def validate_same_day_addition(booking):
@@ -38,12 +37,14 @@ def validate_same_day_addition(booking):
 	validate_reason_given(booking)
 
 
-def is_moved_or_stopped(booking, before):
-	moved = booking.theatre != before.theatre or get_datetime(booking.scheduled_start) != get_datetime(
+def is_moved(booking, before):
+	return booking.theatre != before.theatre or get_datetime(booking.scheduled_start) != get_datetime(
 		before.scheduled_start
 	)
-	stopped = booking.status in INACTIVE_STATUSES and before.status not in INACTIVE_STATUSES
-	return moved or stopped
+
+
+def is_stopped(booking, before):
+	return booking.status in INACTIVE_STATUSES and before.status not in INACTIVE_STATUSES
 
 
 def validate_reason_given(booking):

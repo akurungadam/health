@@ -41,7 +41,7 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		booking.reload()
 		return request.name, booking
 
-	def stop(self, booking, status, reason=None):
+	def stop(self, booking, status, reason="_Test reason"):
 		return set_status(booking.name, status, str(booking.modified), reason)
 
 	def test_a_postponed_case_keeps_its_request_and_loses_its_draft_procedures(self):

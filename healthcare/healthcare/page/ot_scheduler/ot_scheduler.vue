@@ -144,10 +144,14 @@ function drop(theatre, event) {
 		start,
 		modified: drag.booking.modified,
 	};
-	// moving onto today adds a case on the day of surgery, which needs a reason unless it is an emergency
+	// a case moved onto today from another day is added on the day of surgery,
+	// which needs a reason unless it is an emergency
+	const ontoToday =
+		day.value === today() &&
+		String(drag.booking.scheduled_start).slice(0, 10) !== today();
 	if (
 		drag.booking.needs_reason ||
-		(day.value === today() && drag.booking.priority !== "Emergency")
+		(ontoToday && drag.booking.priority !== "Emergency")
 	)
 		return askReason("move_booking", move, "Move");
 	change("move_booking", move);

@@ -79,6 +79,18 @@ class TestDayRules(HealthcareTestSuite):
 		self.assertTrue(has_reason_comment(booking.name, "Laminar flow unit needed"))
 		self.assertFalse(frappe.db.get_value("OT Booking", booking.name, "change_reason"))
 
+	def test_a_tentative_case_on_its_own_day_moves_without_a_reason(self):
+		booking = make_booking(self, self.today_at(19), priority="Emergency")
+		booking.scheduled_start = self.today_at(20)
+
+		booking.save()
+
+	def test_a_tentative_case_needs_a_reason_to_be_cancelled(self):
+		booking = make_booking(self, self.later_at(9))
+		booking.status = "Cancelled"
+
+		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
+
 	def test_a_tentative_case_on_a_later_day_moves_without_a_reason(self):
 		booking = make_booking(self, self.later_at(9))
 		booking.scheduled_start = self.later_at(13)
