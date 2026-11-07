@@ -7,9 +7,15 @@ booking, so every booking check still runs."""
 
 import frappe
 from frappe import _
+from frappe.utils import nowdate
 
+from healthcare.healthcare.doctype.ot_booking.board import add_patient_details
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
-from healthcare.healthcare.doctype.ot_booking.ot_booking import ACTIVE_REQUEST_STATUS, make_ot_booking
+from healthcare.healthcare.doctype.ot_booking.ot_booking import (
+	ACTIVE_REQUEST_STATUS,
+	NEXT_STATUSES,
+	make_ot_booking,
+)
 
 MOVABLE_STATUSES = ("Tentative", "Scheduled")
 
@@ -47,6 +53,8 @@ def get_open_requests(company: str | None = None) -> list:
 	open_requests = [request for request in requests if request.name not in booked]
 	for request in open_requests:
 		request.duration = durations[request.procedure]
+	if open_requests:
+		add_patient_details(open_requests, nowdate())
 	return open_requests
 
 
@@ -68,7 +76,26 @@ def move_booking(name: str, theatre: str, start: str, modified: str, reason: str
 	return booking.save().name
 
 
-def validate_movable(booking, modified, reason):
+@frappe.whitelist()
+def create_procedures(name: str) -> list:
+	"""The booking's Clinical Procedures not yet created, one per procedure row"""
+	return frappe.get_doc("OT Booking", name).create_clinical_procedures()
+
+
+@frappe.whitelist()
+def set_status(name: str, status: str, modified: str) -> str:
+	booking = frappe.get_doc("OT Booking", name)
+	booking.check_permission("write")
+	validate_unchanged(booking, modified)
+	if status not in NEXT_STATUSES.get(booking.status, ()):
+		frappe.throw(
+			_("A {0} case cannot become {1}").format(_(booking.status), _(status)), title=_("Not Allowed")
+		)
+	booking.status = status
+	return booking.save().name
+
+
+def validate_unchanged(booking, modified):
 	if str(booking.modified) != modified:
 		frappe.throw(
 			_("{0} was changed by someone else. Reload the board and try again").format(
@@ -76,6 +103,10 @@ def validate_movable(booking, modified, reason):
 			),
 			title=_("Changed Elsewhere"),
 		)
+
+
+def validate_movable(booking, modified, reason):
+	validate_unchanged(booking, modified)
 	if booking.status not in MOVABLE_STATUSES:
 		frappe.throw(_("A {0} case cannot be moved").format(_(booking.status)), title=_("Not Movable"))
 	if booking.status == "Scheduled" and not reason:

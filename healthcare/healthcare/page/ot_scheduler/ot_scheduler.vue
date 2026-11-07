@@ -10,14 +10,21 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
 	Badge,
 	Button,
+	ContextMenu,
+	HoverCard,
 	DatePicker,
 	Dialog,
-	ErrorMessage,
 	FormControl,
 	frappeRequest,
+	toast,
+	ToastProvider,
 } from "frappe-ui";
 import { useHost } from "@framework/ui/island";
 
+import FastingIcon from "~icons/lucide/utensils-crossed";
+
+import BookingPreview from "./booking_preview.vue";
+import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
 import { playDropSound } from "./sounds.js";
 
@@ -40,12 +47,13 @@ const STATUS_CLASSES = {
 
 const day = ref(props.query.date || today());
 const board = ref(null);
-const notice = ref("");
 const requests = ref([]);
 const dragged = ref(null);
 const dropTheatre = ref(null);
 const reasonFor = ref(null);
 const reason = ref("");
+const menuFor = ref(null);
+const previewFor = ref(null);
 
 const dayStart = computed(() => board.value && minutesOf(board.value.day_start));
 const dayEnd = computed(() => board.value && minutesOf(board.value.day_end));
@@ -73,8 +81,16 @@ async function load() {
 			get("scheduling.get_open_requests"),
 		]);
 	} catch (error) {
-		notice.value = error;
+		showError(error);
 	}
+}
+
+// The first server message is the toast; any others go beneath it
+function showError(error) {
+	const [first, ...rest] = error?.messages?.length
+		? error.messages
+		: [error?.message || String(error)];
+	toast.error(first, { description: rest.join(" ") || undefined });
 }
 
 function get(method, params = {}) {
@@ -145,16 +161,58 @@ function moveWithReason({ close }) {
 	close();
 }
 
+// The preview stays shut while a case's menu is open, so the two never show together
+function menuOpened(booking, open) {
+	menuFor.value = open ? booking.name : null;
+	if (open) previewFor.value = null;
+}
+
+function previewOpened(booking, open) {
+	previewFor.value = open && !menuFor.value ? booking.name : null;
+}
+
+// A case's menu, on a left or right click: open it, or move it to a next status
+function caseMenu(booking) {
+	const statuses = booking.next_statuses.map(status => ({
+		label: status,
+		onClick: () =>
+			change("set_status", {
+				name: booking.name,
+				status,
+				modified: booking.modified,
+			}),
+	}));
+	if (!statuses.length)
+		statuses.push({ label: `No change from ${booking.status}`, disabled: true });
+	const actions = [{ label: "View", onClick: () => openBooking(booking.name) }];
+	if (booking.procedures_pending)
+		actions.push({
+			label: "Create Procedures",
+			onClick: () => createProcedures(booking),
+		});
+	return [
+		{ group: "Booking", hideLabel: true, options: actions },
+		{ group: "Change status", options: statuses },
+	];
+}
+
+async function createProcedures(booking) {
+	const created = await change("create_procedures", { name: booking.name });
+	if (created?.length)
+		toast.success(`Created ${created.length} Clinical Procedure(s)`);
+}
+
 async function change(method, params) {
+	let result;
 	try {
-		await post(`scheduling.${method}`, params);
-		notice.value = "";
+		result = await post(`scheduling.${method}`, params);
 		playDropSound("placed");
 	} catch (error) {
-		notice.value = error;
+		showError(error);
 		playDropSound("refused");
 	}
 	load();
+	return result;
 }
 
 function moveDay(days) {
@@ -256,7 +314,7 @@ function useBoardFeed(reload) {
 			</Badge>
 		</div>
 
-		<ErrorMessage :message="notice" class="shrink-0" />
+		<ToastProvider />
 
 		<div
 			v-if="board?.away.length"
@@ -326,7 +384,7 @@ function useBoardFeed(reload) {
 							</p>
 						</div>
 						<div
-							class="relative grid h-16 min-w-[720px] flex-1 py-1"
+							class="relative grid h-24 min-w-[720px] flex-1 py-1"
 							:class="dropTheatre === theatre.name && 'bg-surface-gray-1'"
 							@dragover.prevent="dropTheatre = theatre.name"
 							@dragleave="dropTheatre = null"
@@ -360,47 +418,112 @@ function useBoardFeed(reload) {
 									:style="cleaningPlace(booking)"
 									title="Cleaning"
 								/>
-								<button
-									class="overflow-hidden border px-2 py-1 text-left"
-									:class="[
-										STATUS_CLASSES[booking.status],
-										board.cleaning_minutes
-											? 'rounded-s-4'
-											: 'rounded-4',
-										booking.priority === 'Emergency' &&
-											'ring-2 ring-outline-red-3',
-									]"
-									:style="
-										placed(
-											minutesOf(booking.scheduled_start),
-											minutesOf(booking.scheduled_end),
-										)
-									"
-									:title="`${
-										booking.patient_name
-									} · ${booking.procedures.join(', ')} · ${
-										booking.status
-									}`"
-									:draggable="
-										['Tentative', 'Scheduled'].includes(
-											booking.status,
-										)
-									"
-									@dragstart="pickBooking(booking, $event)"
-									@click="openBooking(booking.name)"
+								<ContextMenu
+									:options="caseMenu(booking)"
+									@update:open="open => menuOpened(booking, open)"
 								>
-									<p
-										class="truncate text-sm font-medium text-ink-gray-9"
-									>
-										{{ booking.patient_name }}
-									</p>
-									<p class="truncate text-xs text-ink-gray-6">
-										{{ clock(booking.scheduled_start) }}&ndash;{{
-											clock(booking.scheduled_end)
-										}}
-										&middot; {{ booking.surgeon }}
-									</p>
-								</button>
+									<template #default="{ setOpen }">
+										<button
+											class="overflow-hidden border px-2 py-1 text-left"
+											:class="[
+												STATUS_CLASSES[booking.status],
+												board.cleaning_minutes
+													? 'rounded-s-4'
+													: 'rounded-4',
+												booking.priority === 'Emergency' &&
+													'ring-2 ring-outline-red-3',
+											]"
+											:style="
+												placed(
+													minutesOf(booking.scheduled_start),
+													minutesOf(booking.scheduled_end),
+												)
+											"
+											:draggable="
+												['Tentative', 'Scheduled'].includes(
+													booking.status,
+												)
+											"
+											@dragstart="pickBooking(booking, $event)"
+											@click="setOpen(true)"
+										>
+											<HoverCard
+												:hover-delay="500"
+												:open="previewFor === booking.name"
+												@update:open="
+													open => previewOpened(booking, open)
+												"
+											>
+												<template #trigger>
+													<div class="flex h-full flex-col">
+														<div
+															class="flex items-start gap-1"
+														>
+															<p
+																class="flex min-w-0 flex-1 flex-wrap gap-x-1 text-sm"
+															>
+																<span
+																	class="max-w-full truncate font-medium text-ink-gray-9"
+																>
+																	{{
+																		booking.patient_name
+																	}}
+																</span>
+																<span
+																	class="shrink-0 text-ink-gray-5"
+																>
+																	{{
+																		patientFacts(
+																			booking,
+																		)
+																	}}
+																</span>
+															</p>
+															<FastingIcon
+																class="size-3.5 shrink-0"
+																:class="
+																	booking.fasting_confirmed
+																		? 'text-ink-green-3'
+																		: 'text-ink-gray-4'
+																"
+																:title="
+																	booking.fasting_confirmed
+																		? 'Fasting confirmed'
+																		: 'Fasting not confirmed'
+																"
+															/>
+														</div>
+														<p
+															class="truncate text-xs text-ink-gray-6"
+														>
+															{{
+																clock(
+																	booking.scheduled_start,
+																)
+															}}&ndash;{{
+																clock(
+																	booking.scheduled_end,
+																)
+															}}
+														</p>
+														<p
+															class="truncate text-xs text-ink-gray-6"
+														>
+															{{ booking.surgeon }}
+														</p>
+													</div>
+												</template>
+												<BookingPreview
+													:booking="booking"
+													:theatre="theatre.label"
+													:time="`${clock(
+														booking.scheduled_start,
+													)}–${clock(booking.scheduled_end)}`"
+												/>
+											</HoverCard>
+										</button>
+									</template>
+								</ContextMenu>
 							</template>
 						</div>
 					</div>

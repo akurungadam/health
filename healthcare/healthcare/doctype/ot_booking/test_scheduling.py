@@ -6,8 +6,10 @@ from frappe.utils import add_days, get_datetime, nowdate
 
 from healthcare.healthcare.doctype.ot_booking.scheduling import (
 	book_request,
+	create_procedures,
 	get_open_requests,
 	move_booking,
+	set_status,
 )
 from healthcare.healthcare.doctype.ot_booking.test_booking_procedures import create_service_request
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
@@ -46,6 +48,7 @@ class TestScheduling(HealthcareTestSuite):
 		listed = {row.name: row for row in get_open_requests()}
 
 		self.assertEqual(listed[request.name].duration, HOUR)
+		self.assertEqual(listed[request.name].sex, frappe.db.get_value("Patient", self.patients[0], "sex"))
 
 	def test_a_booked_request_is_not_listed(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
@@ -106,6 +109,43 @@ class TestScheduling(HealthcareTestSuite):
 		booking.db_set("status", "Completed", update_modified=False)
 
 		self.assertRaisesRegex(frappe.ValidationError, "cannot be moved", self.move, booking, 13)
+
+	def test_a_tentative_case_is_scheduled(self):
+		booking = make_booking(self, self.at(9))
+
+		set_status(booking.name, "Scheduled", str(booking.modified))
+
+		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Scheduled")
+
+	def test_a_status_may_not_skip_ahead(self):
+		booking = make_booking(self, self.at(9))
+
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"cannot become",
+			set_status,
+			booking.name,
+			"Completed",
+			str(booking.modified),
+		)
+
+	def test_a_case_changed_elsewhere_keeps_its_status(self):
+		booking = make_booking(self, self.at(9))
+		stale = str(booking.modified)
+		booking.anaesthesia_type = "General"
+		booking.save()
+
+		self.assertRaisesRegex(
+			frappe.ValidationError, "changed by someone else", set_status, booking.name, "Scheduled", stale
+		)
+
+	def test_procedures_are_created_from_the_board(self):
+		booking = make_booking(self, self.at(9))
+
+		created = create_procedures(booking.name)
+
+		self.assertEqual(len(created), 1)
+		self.assertEqual(create_procedures(booking.name), [])
 
 	def test_moving_needs_permission(self):
 		booking = make_booking(self, self.at(9))

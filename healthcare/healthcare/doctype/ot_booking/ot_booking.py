@@ -17,6 +17,12 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 )
 
 ACTIVE_REQUEST_STATUS = "active-Request Status"
+# the statuses a case may move to next from the OT Scheduler
+NEXT_STATUSES = {
+	"Tentative": ("Scheduled",),
+	"Scheduled": ("Tentative", "In Progress"),
+	"In Progress": ("Completed",),
+}
 
 
 class OTBooking(Document):

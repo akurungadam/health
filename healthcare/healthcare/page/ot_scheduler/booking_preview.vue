@@ -1,0 +1,67 @@
+<script setup>
+// A case's details on hover, like desk's link preview, so it can be read without leaving the board.
+import { Badge } from "frappe-ui";
+
+import { patientFacts } from "./patient.js";
+
+defineProps({
+	booking: { type: Object, required: true },
+	theatre: { type: String, default: "" },
+	time: { type: String, default: "" },
+});
+
+const STATUS_THEMES = {
+	Tentative: "gray",
+	Scheduled: "blue",
+	"In Progress": "orange",
+	Completed: "green",
+};
+</script>
+
+<template>
+	<div class="flex w-72 flex-col gap-2 p-3 text-sm">
+		<div class="flex items-start justify-between gap-2">
+			<div class="min-w-0">
+				<p class="truncate font-medium text-ink-gray-9">
+					{{ booking.patient_name }}
+				</p>
+				<p class="text-xs text-ink-gray-5">
+					{{
+						[patientFacts(booking), booking.patient]
+							.filter(Boolean)
+							.join(" · ")
+					}}
+				</p>
+			</div>
+			<Badge :theme="STATUS_THEMES[booking.status]">{{ booking.status }}</Badge>
+		</div>
+		<ul class="text-ink-gray-8">
+			<li v-for="procedure in booking.procedures" :key="procedure">
+				{{ procedure }}
+			</li>
+		</ul>
+		<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+			<dt class="text-ink-gray-5">Theatre</dt>
+			<dd class="text-ink-gray-8">{{ theatre }}</dd>
+			<dt class="text-ink-gray-5">Time</dt>
+			<dd class="text-ink-gray-8">{{ time }}</dd>
+			<dt class="text-ink-gray-5">Surgeon</dt>
+			<dd class="text-ink-gray-8">{{ booking.surgeon }}</dd>
+			<dt class="text-ink-gray-5">Priority</dt>
+			<dd
+				:class="
+					booking.priority === 'Emergency'
+						? 'text-ink-red-7'
+						: 'text-ink-gray-8'
+				"
+			>
+				{{ booking.priority }}
+			</dd>
+			<dt class="text-ink-gray-5">Fasting</dt>
+			<dd class="text-ink-gray-8">
+				{{ booking.fasting_confirmed ? "Confirmed" : "Not confirmed" }}
+			</dd>
+		</dl>
+		<p class="text-xs text-ink-gray-5">{{ booking.name }}</p>
+	</div>
+</template>

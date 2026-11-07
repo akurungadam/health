@@ -9,7 +9,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_lea
 	link_new_employee,
 	skip_without_hrms,
 )
-from healthcare.healthcare.doctype.ot_booking.board import day_window, get_away, get_board
+from healthcare.healthcare.doctype.ot_booking.board import age_text, day_window, get_away, get_board
 from healthcare.healthcare.doctype.ot_booking.test_availability import (
 	create_holiday_list,
 	create_unavailable_block,
@@ -55,6 +55,28 @@ class TestBoard(HealthcareTestSuite):
 		self.assertEqual([row.name for row in shown], [booking.name])
 		self.assertEqual(shown[0].surgeon, booking.team[0].practitioner_name)
 		self.assertEqual(shown[0].procedures, [self.template.name])
+		self.assertEqual(shown[0].next_statuses, ("Scheduled",))
+		self.assertTrue(shown[0].procedures_pending)
+
+	def test_a_case_with_its_procedures_created_has_none_pending(self):
+		booking = make_booking(self, self.at(9))
+		booking.create_clinical_procedures()
+
+		self.assertFalse(self.board()["bookings"][0].procedures_pending)
+
+	def test_a_case_carries_its_patients_age_and_sex_and_fasting(self):
+		booking = make_booking(self, self.at(9))
+		booking.db_set("fasting_confirmed", 1)
+		sex, dob = frappe.db.get_value("Patient", booking.patient, ["sex", "dob"])
+
+		shown = self.board()["bookings"][0]
+
+		self.assertEqual((shown.sex, shown.age, shown.fasting_confirmed), (sex, age_text(dob, self.day), 1))
+
+	def test_age_is_in_years_or_in_months_under_a_year(self):
+		self.assertEqual(age_text("1980-05-20", "2026-05-19"), "45y")
+		self.assertEqual(age_text("2026-01-10", "2026-09-15"), "8m")
+		self.assertIsNone(age_text(None, "2026-09-15"))
 
 	def test_cancelled_bookings_and_other_days_are_left_out(self):
 		make_booking(self, self.at(9)).db_set("status", "Cancelled")

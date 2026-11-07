@@ -28,6 +28,7 @@
   "team",
   "consent_section",
   "consent_signed",
+  "fasting_confirmed",
   "column_break_consent",
   "consent_form",
   "change_section",
@@ -172,13 +173,20 @@
   {
    "fieldname": "consent_section",
    "fieldtype": "Section Break",
-   "label": "Consent"
+   "label": "Readiness"
   },
   {
    "default": "0",
    "fieldname": "consent_signed",
    "fieldtype": "Check",
    "label": "Consent Signed"
+  },
+  {
+   "default": "0",
+   "description": "Ticked by the ward once the patient has been nil by mouth for the required time",
+   "fieldname": "fasting_confirmed",
+   "fieldtype": "Check",
+   "label": "Fasting Confirmed"
   },
   {
    "fieldname": "column_break_consent",
@@ -204,7 +212,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-06 12:00:00.000000",
+ "modified": "2026-11-07 09:11:03.664721",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "OT Booking",

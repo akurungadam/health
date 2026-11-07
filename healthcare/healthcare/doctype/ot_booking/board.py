@@ -6,12 +6,15 @@ the theatre holiday, the time theatres are blocked and the practitioners who are
 
 from datetime import datetime
 
+from dateutil.relativedelta import relativedelta
+
 import frappe
 from frappe.utils import cint, get_time, getdate
 
 from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave import find_leaves
 from healthcare.healthcare.doctype.ot_booking.availability import theatre_holiday_list
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
+from healthcare.healthcare.doctype.ot_booking.ot_booking import NEXT_STATUSES
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
 )
@@ -96,6 +99,7 @@ def get_bookings(date, theatres):
 			"priority",
 			"scheduled_start",
 			"scheduled_end",
+			"fasting_confirmed",
 			"modified",
 		],
 		filters={
@@ -108,6 +112,7 @@ def get_bookings(date, theatres):
 	)
 	if bookings:
 		add_surgeons_and_procedures(bookings)
+		add_patient_details(bookings, date)
 	return bookings
 
 
@@ -123,13 +128,41 @@ def add_surgeons_and_procedures(bookings):
 	)
 	procedures = frappe.get_all(
 		"OT Booking Procedure",
-		fields=["parent", "procedure_template"],
+		fields=["parent", "procedure_template", "clinical_procedure"],
 		filters={"parent": ["in", names], "parenttype": "OT Booking"},
 		order_by="idx",
 	)
 	for booking in bookings:
+		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
 		booking.surgeon = surgeons.get(booking.name)
-		booking.procedures = [row.procedure_template for row in procedures if row.parent == booking.name]
+		rows = [row for row in procedures if row.parent == booking.name]
+		booking.procedures = [row.procedure_template for row in rows]
+		booking.procedures_pending = booking.status != "Completed" and any(
+			not row.clinical_procedure for row in rows
+		)
+
+
+def add_patient_details(rows, on_date):
+	"""Each row's patient `sex`, and `age` on `on_date` such as 45y, or 8m under a year"""
+	patients = {
+		patient.name: patient
+		for patient in frappe.get_all(
+			"Patient",
+			fields=["name", "sex", "dob"],
+			filters={"name": ["in", list({row.patient for row in rows})]},
+		)
+	}
+	for row in rows:
+		patient = patients.get(row.patient, frappe._dict())
+		row.sex = patient.sex
+		row.age = age_text(patient.dob, on_date)
+
+
+def age_text(dob, on_date):
+	if not dob:
+		return None
+	age = relativedelta(getdate(on_date), getdate(dob))
+	return f"{age.years}y" if age.years else f"{age.months}m"
 
 
 def get_away(date, start, end, company):

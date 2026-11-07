@@ -3,6 +3,8 @@
 import { computed, ref } from "vue";
 import { FormControl } from "frappe-ui";
 
+import { patientFacts } from "./patient.js";
+
 const props = defineProps({
 	requests: { type: Array, default: () => [] },
 });
@@ -56,6 +58,9 @@ function minutes(seconds) {
 			>
 				<p class="break-words text-sm font-medium text-ink-gray-9">
 					{{ request.patient_name }}
+					<span class="font-normal text-ink-gray-5">
+						{{ patientFacts(request) }}
+					</span>
 				</p>
 				<p class="break-words text-xs text-ink-gray-6">
 					{{ request.procedure }}
