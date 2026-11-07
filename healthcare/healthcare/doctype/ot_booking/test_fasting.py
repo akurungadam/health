@@ -166,6 +166,14 @@ class TestFasting(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 1)
 		self.assertEqual([row.name for row in self.tasks(booking)], [task.name])
 
+	def test_a_postponed_case_loses_its_task_after_fasting_is_switched_off(self):
+		booking = self.scheduled()
+		self.use_fasting(None, 6)
+
+		set_status(booking.name, "Postponed", str(booking.modified), "Patient unwell")
+
+		self.assertEqual([task.status for task in self.tasks(booking)], ["Cancelled"])
+
 	def test_no_task_without_a_fasting_activity(self):
 		self.use_fasting(None, 6)
 

@@ -21,6 +21,9 @@ import { useHost } from "@framework/ui/island";
 import FastingIcon from "~icons/lucide/utensils-crossed";
 
 import BookingPreview from "./booking_preview.vue";
+import DropGhost from "./drop_ghost.vue";
+import { confirmPublish } from "./publish.js";
+import { useDrop } from "./use_drop.js";
 import { caseBorder, caseFill } from "./case_style.js";
 import DateBar from "./date_bar.vue";
 import { patientFacts } from "./patient.js";
@@ -28,7 +31,7 @@ import RequestPanel from "./request_panel.vue";
 import { get, post, showError } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
-import { clock, minutesOf, today, twoDigits } from "./time.js";
+import { clock, minutesOf, today } from "./time.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -37,7 +40,6 @@ const props = defineProps({
 const emit = defineEmits(["title", "actions"]);
 const host = useHost();
 
-const SNAP_MINUTES = 15;
 // statuses that take a case off the board, and the word for doing it
 const STOPPING = ["Postponed", "Cancelled"];
 const STOPPING_ACTIONS = { Postponed: "Postpone", Cancelled: "Cancel" };
@@ -47,15 +49,33 @@ const department = ref(props.query.department || "");
 const board = ref(null);
 const requests = ref([]);
 const postponed = ref([]);
-const dragged = ref(null);
-const dropTheatre = ref(null);
 const reasonFor = ref(null);
 const reason = ref("");
 const menuFor = ref(null);
 const previewFor = ref(null);
 
-const dayStart = computed(() => board.value && minutesOf(board.value.day_start));
-const dayEnd = computed(() => board.value && minutesOf(board.value.day_end));
+// The theatre day, stretched to whole hours to hold any case (with its cleaning) outside it
+const dayStart = computed(() => {
+	if (!board.value) return null;
+	const starts = board.value.bookings.map(booking =>
+		minutesOf(booking.scheduled_start),
+	);
+	return Math.floor(Math.min(minutesOf(board.value.day_start), ...starts) / 60) * 60;
+});
+const dayEnd = computed(() => {
+	if (!board.value) return null;
+	const ends = board.value.bookings
+		.map(booking => [
+			minutesOf(booking.scheduled_start),
+			minutesOf(booking.scheduled_end),
+		])
+		.filter(([start, end]) => end > start) // a case running past midnight is cut at its day's end
+		.map(([, end]) => end + board.value.cleaning_minutes);
+	return Math.min(
+		24 * 60,
+		Math.ceil(Math.max(minutesOf(board.value.day_end), ...ends) / 60) * 60,
+	);
+});
 // a viewer who cannot change bookings sees the board read-only
 const canEdit = computed(() => Boolean(board.value?.can_edit));
 const tentativeCount = computed(
@@ -86,6 +106,29 @@ watch(company, (_value, previous) => {
 });
 watch(department, load);
 
+const {
+	dragged,
+	dropTheatre,
+	plan,
+	pickRequest,
+	pickPostponed,
+	pickBooking,
+	dragOver,
+	drop,
+	unschedule,
+} = useDrop({
+	board,
+	day,
+	dayStart,
+	dayEnd,
+	canEdit,
+	bookingsIn,
+	blocksIn,
+	change,
+	askReason,
+	stopParams,
+});
+
 // The board's company and department, the same for loading and publishing. Only the ones
 // that are set: an empty one would arrive as the text "undefined".
 function boardFilters() {
@@ -107,76 +150,8 @@ async function load() {
 	}
 }
 
-function pickRequest(request, event) {
-	dragged.value = { request, grab: 0 };
-	event.dataTransfer.setData("text/plain", request.name);
-}
-
-function pickPostponed(booking, event) {
-	dragged.value = { booking, grab: 0 };
-	event.dataTransfer.setData("text/plain", booking.name);
-}
-
-// A booked case dropped back on the pane is postponed, keeping its booking for another day
-function unschedule() {
-	const booking = dragged.value?.booking;
-	dragged.value = null;
-	if (!booking || booking.status === "Postponed") return;
-	askReason("set_status", stopParams(booking, "Postponed"), "Postpone");
-}
-
 function stopParams(booking, status) {
 	return { name: booking.name, status, modified: booking.modified };
-}
-
-// Where in the case it was grabbed, so the case keeps that point under the cursor
-function pickBooking(booking, event) {
-	const block = event.currentTarget.getBoundingClientRect();
-	const row = event.currentTarget.parentElement.getBoundingClientRect();
-	const grab =
-		((event.clientX - block.left) / row.width) * (dayEnd.value - dayStart.value);
-	dragged.value = { booking, grab };
-	event.dataTransfer.setData("text/plain", booking.name);
-}
-
-function drop(theatre, event) {
-	dropTheatre.value = null;
-	const drag = dragged.value;
-	dragged.value = null;
-	if (!drag) return;
-	const start = dropStart(event, drag.grab);
-	if (drag.request) {
-		const booking = { service_request: drag.request.name, theatre, start };
-		// on the day of surgery only an OT Manager may add a non-emergency case, and must say why
-		if (day.value === today() && !drag.request.is_emergency)
-			return askReason("book_request", booking, "Add");
-		return change("book_request", booking);
-	}
-	const move = {
-		name: drag.booking.name,
-		theatre,
-		start,
-		modified: drag.booking.modified,
-	};
-	// a case moved onto today from another day is added on the day of surgery,
-	// which needs a reason unless it is an emergency
-	const ontoToday =
-		day.value === today() &&
-		String(drag.booking.scheduled_start).slice(0, 10) !== today();
-	if (drag.booking.needs_reason || (ontoToday && !drag.booking.is_emergency))
-		return askReason("move_booking", move, "Move");
-	change("move_booking", move);
-}
-
-function dropStart(event, grab) {
-	const row = event.currentTarget.getBoundingClientRect();
-	const at =
-		dayStart.value +
-		((event.clientX - row.left) / row.width) * (dayEnd.value - dayStart.value);
-	const minutes = Math.round((at - grab) / SNAP_MINUTES) * SNAP_MINUTES;
-	return `${day.value} ${twoDigits(Math.floor(minutes / 60))}:${twoDigits(
-		minutes % 60,
-	)}:00`;
 }
 
 // A change the server will refuse without a reason waits here for one
@@ -243,26 +218,21 @@ function sendActions([count, editable]) {
 	const actions = [
 		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
 	];
-	if (count) actions.push({ label: `Publish ${count} case(s)`, onClick: publish });
-	emit("actions", actions);
-}
-
-// Every Tentative case on the day becomes Scheduled; a case that fails stays and is reported
-async function publish() {
-	try {
-		const result = await post("publishing.publish_day", {
-			date: day.value,
-			...boardFilters(),
+	if (count)
+		actions.push({
+			label: `Publish ${count} case(s)`,
+			onClick: () =>
+				confirmPublish({
+					count,
+					day: day.value,
+					company: board.value.company,
+					department: department.value,
+					filters: boardFilters(),
+					host,
+					reload: load,
+				}),
 		});
-		if (result.published.length)
-			toast.success(`Published ${result.published.length} case(s)`);
-		for (const row of result.failed) toast.error(`${row.name}: ${row.message}`);
-		playDropSound(result.failed.length ? "refused" : "placed");
-	} catch (error) {
-		showError(error);
-		playDropSound("refused");
-	}
-	load();
+	emit("actions", actions);
 }
 
 async function createProcedures(booking) {
@@ -292,10 +262,12 @@ function blocksIn(theatre) {
 	return board.value.blocks.filter(block => block.scope === theatre);
 }
 
+// A position on the row, kept inside it, so nothing can make the board wider than the window
 function span(start, end) {
 	const width = dayEnd.value - dayStart.value;
-	const from = Math.max(start, dayStart.value);
-	const to = Math.min(end, dayEnd.value);
+	const inside = minutes => Math.min(Math.max(minutes, dayStart.value), dayEnd.value);
+	const from = inside(start);
+	const to = Math.max(inside(end), from);
 	return {
 		left: `${((from - dayStart.value) / width) * 100}%`,
 		width: `${((to - from) / width) * 100}%`,
@@ -372,191 +344,216 @@ function openBooking(name) {
 				v-else-if="board"
 				class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
 			>
-				<div
-					class="sticky top-0 z-10 flex border-b border-outline-gray-2 bg-surface-base"
-				>
-					<div class="w-44 shrink-0 p-2 text-sm text-ink-gray-5">Theatre</div>
-					<div class="relative h-8 min-w-[720px] flex-1">
-						<span
-							v-for="hour in hours"
-							:key="hour"
-							class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
-							:style="span(hour * 60, hour * 60)"
-						>
-							{{ String(hour).padStart(2, "0") }}:00
-						</span>
-					</div>
-				</div>
-
-				<section v-for="group in board.complexes" :key="group.name">
-					<h2
-						class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
-					>
-						{{ group.name || "Theatres" }}
-					</h2>
+				<!-- one block as wide as a row, so the header, headings and rows scroll together -->
+				<div class="min-w-[896px]">
 					<div
-						v-for="theatre in group.theatres"
-						:key="theatre.name"
-						class="flex border-b border-outline-gray-1 last:border-b-0"
+						class="sticky top-0 z-10 flex border-b border-outline-gray-2 bg-surface-base"
 					>
-						<div class="w-44 shrink-0 p-2">
-							<p class="truncate text-base text-ink-gray-8">
-								{{ theatre.label }}
-							</p>
-							<p class="truncate text-xs text-ink-gray-5">
-								{{ theatre.service_unit_type }}
-							</p>
+						<div class="w-44 shrink-0 p-2 text-sm text-ink-gray-5">
+							Theatre
 						</div>
-						<div
-							class="relative grid h-24 min-w-[720px] flex-1 py-1"
-							:class="dropTheatre === theatre.name && 'bg-surface-gray-1'"
-							@dragover.prevent="
-								dropTheatre = canEdit ? theatre.name : null
-							"
-							@dragleave="dropTheatre = null"
-							@drop.prevent="drop(theatre.name, $event)"
-						>
+						<div class="relative h-8 min-w-[720px] flex-1 overflow-hidden">
 							<span
-								v-for="hour in hours"
+								v-for="hour in hours.slice(0, -1)"
 								:key="hour"
-								class="absolute inset-y-0 border-l border-outline-gray-1"
+								class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
 								:style="span(hour * 60, hour * 60)"
-							/>
-							<div
-								v-for="block in blocksIn(theatre.name)"
-								:key="block.name"
-								class="ot-hatch rounded-4 bg-surface-red-1"
-								:style="
-									placed(
-										minutesOf(block.start_time),
-										minutesOf(block.end_time),
-									)
-								"
-								:title="`Unavailable (${block.name})`"
-							/>
-							<template
-								v-for="booking in bookingsIn(theatre.name)"
-								:key="booking.name"
 							>
-								<div
-									v-if="board.cleaning_minutes"
-									class="ot-hatch rounded-e-4 bg-surface-gray-1"
-									:class="[caseBorder(booking), 'border-l-0']"
-									:style="cleaningPlace(booking)"
-									title="Cleaning"
-								/>
-								<ContextMenu
-									:options="caseMenu(booking)"
-									:open="menuFor === booking.name"
-									@update:open="open => menuOpened(booking, open)"
-								>
-									<template #default="{ setOpen }">
-										<button
-											class="overflow-hidden px-2 py-1 text-left"
-											:class="[
-												caseBorder(booking),
-												caseFill(booking),
-												board.cleaning_minutes
-													? 'rounded-s-4 border-r-0'
-													: 'rounded-4',
-											]"
-											:style="
-												placed(
-													minutesOf(booking.scheduled_start),
-													minutesOf(booking.scheduled_end),
-												)
-											"
-											:draggable="
-												canEdit &&
-												['Tentative', 'Scheduled'].includes(
-													booking.status,
-												)
-											"
-											@dragstart="pickBooking(booking, $event)"
-											@dragend="dragged = null"
-											@click="setOpen(true)"
-										>
-											<HoverCard
-												:hover-delay="500"
-												:open="previewFor === booking.name"
-												@update:open="
-													open => previewOpened(booking, open)
-												"
-											>
-												<template #trigger>
-													<div class="flex h-full flex-col">
-														<div
-															class="flex items-start gap-1"
-														>
-															<p
-																class="flex min-w-0 flex-1 flex-wrap gap-x-1 text-sm"
-															>
-																<span
-																	class="max-w-full truncate font-medium text-ink-gray-9"
-																>
-																	{{
-																		booking.patient_name
-																	}}
-																</span>
-																<span
-																	class="shrink-0 text-ink-gray-5"
-																>
-																	{{
-																		patientFacts(
-																			booking,
-																		)
-																	}}
-																</span>
-															</p>
-															<FastingIcon
-																class="size-3.5 shrink-0"
-																:class="
-																	booking.fasting_confirmed
-																		? 'text-ink-green-3'
-																		: 'text-ink-gray-4'
-																"
-																:title="
-																	booking.fasting_confirmed
-																		? 'Fasting confirmed'
-																		: 'Fasting not confirmed'
-																"
-															/>
-														</div>
-														<p
-															class="truncate text-xs text-ink-gray-6"
-														>
-															{{
-																clock(
-																	booking.scheduled_start,
-																)
-															}}&ndash;{{
-																clock(
-																	booking.scheduled_end,
-																)
-															}}
-														</p>
-														<p
-															class="truncate text-xs text-ink-gray-6"
-														>
-															{{ booking.surgeon }}
-														</p>
-													</div>
-												</template>
-												<BookingPreview
-													:booking="booking"
-													:theatre="theatre.label"
-													:time="`${clock(
-														booking.scheduled_start,
-													)}–${clock(booking.scheduled_end)}`"
-												/>
-											</HoverCard>
-										</button>
-									</template>
-								</ContextMenu>
-							</template>
+								{{ String(hour).padStart(2, "0") }}:00
+							</span>
 						</div>
 					</div>
-				</section>
+
+					<section v-for="group in board.complexes" :key="group.name">
+						<h2
+							class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
+						>
+							{{ group.name || "Theatres" }}
+						</h2>
+						<div
+							v-for="theatre in group.theatres"
+							:key="theatre.name"
+							class="flex border-b border-outline-gray-1 last:border-b-0"
+						>
+							<div
+								class="w-44 shrink-0 p-2"
+								@dragover.prevent="dragOver(theatre.name, null)"
+								@drop.prevent="drop(theatre.name)"
+							>
+								<p class="truncate text-base text-ink-gray-8">
+									{{ theatre.label }}
+								</p>
+								<p class="truncate text-xs text-ink-gray-5">
+									{{ theatre.service_unit_type }}
+								</p>
+							</div>
+							<div
+								class="relative grid h-24 min-w-[720px] flex-1 overflow-hidden py-1"
+								:class="
+									dropTheatre === theatre.name && 'bg-surface-gray-1'
+								"
+								@dragover.prevent="dragOver(theatre.name, $event)"
+								@dragleave="dropTheatre = null"
+								@drop.prevent="drop(theatre.name)"
+							>
+								<span
+									v-for="hour in hours"
+									:key="hour"
+									class="absolute inset-y-0 border-l border-outline-gray-1"
+									:style="span(hour * 60, hour * 60)"
+								/>
+								<div
+									v-for="block in blocksIn(theatre.name)"
+									:key="block.name"
+									class="ot-hatch rounded-4 bg-surface-red-1"
+									:style="
+										placed(
+											minutesOf(block.start_time),
+											minutesOf(block.end_time),
+										)
+									"
+									:title="`Unavailable (${block.name})`"
+								/>
+								<template
+									v-for="booking in bookingsIn(theatre.name)"
+									:key="booking.name"
+								>
+									<div
+										v-if="board.cleaning_minutes"
+										class="ot-hatch rounded-e-4 bg-surface-gray-1"
+										:class="[caseBorder(booking), 'border-l-0']"
+										:style="cleaningPlace(booking)"
+										title="Cleaning"
+									/>
+									<ContextMenu
+										:options="caseMenu(booking)"
+										:open="menuFor === booking.name"
+										@update:open="open => menuOpened(booking, open)"
+									>
+										<template #default="{ setOpen }">
+											<button
+												class="overflow-hidden px-2 py-1 text-left"
+												:class="[
+													caseBorder(booking),
+													caseFill(booking),
+													board.cleaning_minutes
+														? 'rounded-s-4 border-r-0'
+														: 'rounded-4',
+												]"
+												:style="
+													placed(
+														minutesOf(
+															booking.scheduled_start,
+														),
+														minutesOf(
+															booking.scheduled_end,
+														),
+													)
+												"
+												:draggable="
+													canEdit &&
+													['Tentative', 'Scheduled'].includes(
+														booking.status,
+													)
+												"
+												@dragstart="
+													pickBooking(booking, $event)
+												"
+												@dragend="dragged = null"
+												@click="setOpen(true)"
+											>
+												<HoverCard
+													:hover-delay="500"
+													:open="previewFor === booking.name"
+													@update:open="
+														open =>
+															previewOpened(booking, open)
+													"
+												>
+													<template #trigger>
+														<div
+															class="flex h-full flex-col"
+														>
+															<div
+																class="flex items-start gap-1"
+															>
+																<p
+																	class="flex min-w-0 flex-1 flex-wrap gap-x-1 text-sm"
+																>
+																	<span
+																		class="max-w-full truncate font-medium text-ink-gray-9"
+																	>
+																		{{
+																			booking.patient_name
+																		}}
+																	</span>
+																	<span
+																		class="shrink-0 text-ink-gray-5"
+																	>
+																		{{
+																			patientFacts(
+																				booking,
+																			)
+																		}}
+																	</span>
+																</p>
+																<FastingIcon
+																	class="size-3.5 shrink-0"
+																	:class="
+																		booking.fasting_confirmed
+																			? 'text-ink-green-3'
+																			: 'text-ink-gray-4'
+																	"
+																	:title="
+																		booking.fasting_confirmed
+																			? 'Fasting confirmed'
+																			: 'Fasting not confirmed'
+																	"
+																/>
+															</div>
+															<p
+																class="truncate text-xs text-ink-gray-6"
+															>
+																{{
+																	clock(
+																		booking.scheduled_start,
+																	)
+																}}&ndash;{{
+																	clock(
+																		booking.scheduled_end,
+																	)
+																}}
+															</p>
+															<p
+																class="truncate text-xs text-ink-gray-6"
+															>
+																{{ booking.surgeon }}
+															</p>
+														</div>
+													</template>
+													<BookingPreview
+														:booking="booking"
+														:theatre="theatre.label"
+														:time="`${clock(
+															booking.scheduled_start,
+														)}–${clock(
+															booking.scheduled_end,
+														)}`"
+													/>
+												</HoverCard>
+											</button>
+										</template>
+									</ContextMenu>
+								</template>
+								<DropGhost
+									v-if="plan && dropTheatre === theatre.name"
+									:plan="plan"
+									:placed="placed"
+								/>
+							</div>
+						</div>
+					</section>
+				</div>
 			</div>
 		</div>
 

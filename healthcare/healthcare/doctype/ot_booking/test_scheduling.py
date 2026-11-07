@@ -2,15 +2,17 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.utils import add_days, get_datetime, nowdate
+from frappe.utils import add_days, add_to_date, get_datetime, nowdate
 
 from healthcare.healthcare.doctype.ot_booking.scheduling import (
 	book_request,
+	check_drop,
 	create_procedures,
 	get_open_requests,
 	move_booking,
 	set_status,
 )
+from healthcare.healthcare.doctype.ot_booking.test_availability import create_holiday_list
 from healthcare.healthcare.doctype.ot_booking.test_booking_procedures import create_service_request
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
@@ -90,6 +92,29 @@ class TestScheduling(HealthcareTestSuite):
 
 		self.assertEqual(order, [sooner.name, later.name, undated.name])
 
+	def test_checking_a_drop_keeps_nothing(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		params = {"service_request": request.name, "theatre": self.theatre, "start": str(self.at(9))}
+
+		self.assertIsNone(check_drop("book_request", params))
+		self.assertIn(request.name, self.open_request_names())
+
+	def test_checking_a_drop_says_why_it_would_be_refused(self):
+		template = create_ot_template("_Test Procedure - Knee Replacement", HOUR, "_Test Laminar Flow OT")
+		request = create_service_request(self.patients[0], self.practitioners[0], template.name)
+		params = {"service_request": request.name, "theatre": self.theatre, "start": str(self.at(9))}
+
+		self.assertIn("Laminar Flow OT", check_drop("book_request", params))
+
+	def test_checking_a_drop_on_a_holiday_says_so(self):
+		saved = frappe.db.get_single_value("Healthcare Settings", "ot_holiday_list")
+		frappe.db.set_single_value("Healthcare Settings", "ot_holiday_list", create_holiday_list(self.day))
+		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_holiday_list", saved)
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		params = {"service_request": request.name, "theatre": self.theatre, "start": str(self.at(9))}
+
+		self.assertIn("theatre holiday", check_drop("book_request", params))
+
 	def test_a_booked_request_is_not_listed(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		book_request(request.name, self.theatre, str(self.at(9)))
@@ -109,12 +134,16 @@ class TestScheduling(HealthcareTestSuite):
 
 		self.assertEqual((booking.theatre, get_datetime(booking.scheduled_start)), (self.theatre, self.at(9)))
 
-	def test_a_request_dropped_onto_a_busy_theatre_is_refused(self):
-		make_booking(self, self.at(9), patient=1, surgeon=1)
+	def test_a_request_dropped_onto_a_busy_slot_pushes_the_case_there(self):
+		there = make_booking(self, self.at(9), patient=1, surgeon=1)
 		request = create_service_request(self.patients[0], self.practitioners[0])
 
-		self.assertRaisesRegex(
-			frappe.ValidationError, "is booked", book_request, request.name, self.theatre, str(self.at(9))
+		book_request(request.name, self.theatre, str(self.at(9)))
+
+		cleaning = frappe.db.get_single_value("Healthcare Settings", "ot_cleaning_minutes")
+		self.assertEqual(
+			get_datetime(frappe.db.get_value("OT Booking", there.name, "scheduled_start")),
+			add_to_date(self.at(10), minutes=cleaning),
 		)
 
 	def test_a_tentative_case_moves_to_another_theatre_and_time(self):

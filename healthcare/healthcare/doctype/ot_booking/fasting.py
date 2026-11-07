@@ -16,15 +16,17 @@ OPEN_TASK_STATUSES = ("Requested", "Received", "Accepted", "Ready", "In Progress
 
 
 def sync_fasting_task(booking):
-	activity = frappe.db.get_single_value("Healthcare Settings", "ot_fasting_activity")
-	if not activity:
-		return
+	"""A task the case no longer needs is cancelled even when new ones are switched off, so
+	clearing the Fasting Activity never leaves an old task on the ward's worklist"""
 	task = current_task(booking.name)
 	hours = fasting_hours(booking)
 	if booking.status != "Scheduled" or not hours:
-		cancel_if_open(task)
-	elif not task or out_of_date(task, booking, hours):
-		cancel_if_open(task)
+		return cancel_if_open(task)
+	if task and not out_of_date(task, booking, hours):
+		return
+	cancel_if_open(task)
+	activity = frappe.db.get_single_value("Healthcare Settings", "ot_fasting_activity")
+	if activity:
 		create_task(booking, activity, hours)
 
 

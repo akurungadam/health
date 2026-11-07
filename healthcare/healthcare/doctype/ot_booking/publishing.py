@@ -9,6 +9,7 @@ import frappe
 from frappe.utils import getdate
 
 from healthcare.healthcare.doctype.ot_booking.board import get_theatres
+from healthcare.healthcare.doctype.ot_booking.refusal import refusal_text
 
 
 @frappe.whitelist()
@@ -49,7 +50,6 @@ def publish_case(name):
 	except frappe.ValidationError as error:
 		frappe.db.rollback(save_point=savepoint)
 		# the failure is reported in the result, not again as a message on the response
-		frappe.local.message_log = frappe.local.message_log[:messages]
-		return str(error)
+		return refusal_text(error, messages)
 	frappe.db.release_savepoint(savepoint)
 	return None

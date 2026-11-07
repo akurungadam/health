@@ -19,6 +19,8 @@ from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	make_ot_booking,
 )
 from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
+from healthcare.healthcare.doctype.ot_booking.push import push_following
+from healthcare.healthcare.doctype.ot_booking.refusal import refusal_text
 
 MOVABLE_STATUSES = ("Tentative", "Scheduled", "Postponed")
 
@@ -118,6 +120,7 @@ def get_postponed(company: str | None = None, department: str | None = None) -> 
 def book_request(service_request: str, theatre: str, start: str, reason: str | None = None) -> str:
 	booking = make_ot_booking(service_request)
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
+	make_room(booking, reason)
 	return booking.insert().name
 
 
@@ -129,6 +132,7 @@ def move_booking(name: str, theatre: str, start: str, modified: str, reason: str
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
 	if booking.status == "Postponed":
 		booking.status = "Tentative"
+	make_room(booking, reason)
 	return booking.save().name
 
 
@@ -145,6 +149,42 @@ def set_status(name: str, status: str, modified: str, reason: str | None = None)
 	validate_unchanged(booking, modified)
 	booking.update({"status": status, "change_reason": reason})
 	return booking.save().name
+
+
+@frappe.whitelist(methods=["POST"])
+def check_drop(method: str, params: str | dict) -> str | None:
+	"""Tries a drop without keeping it, so the board asks for a reason only when the drop would
+	go through. Returns why it would be refused, or nothing."""
+	drops = {"book_request": book_request, "move_booking": move_booking, "set_status": set_status}
+	params = frappe.parse_json(params)
+	params["reason"] = params.get("reason") or _("Checking the drop")
+	messages = len(frappe.local.message_log)
+	frappe.db.savepoint("check_drop")
+	try:
+		drops[method](**params)
+	except frappe.ValidationError as error:
+		frappe.db.rollback(save_point="check_drop")
+		return refusal_text(error, messages)
+	frappe.db.rollback(save_point="check_drop")
+	frappe.local.message_log = frappe.local.message_log[:messages]
+	return None
+
+
+def make_room(booking, reason):
+	"""The case's new slot, then the cases after it pushed back to fit it. While they are pushed,
+	a moved case holds its new slot, so each is checked against where the case is going and
+	never against the slot it is leaving. It gets its old slot back before its own save, which
+	must see the move to check it; any refusal undoes all of it."""
+	booking.set_schedule()
+	if booking.is_new():
+		return push_following(booking, reason)
+	fields = ("theatre", "scheduled_start", "scheduled_end", "scheduled_date")
+	leaving = frappe.db.get_value("OT Booking", booking.name, fields, as_dict=True)
+	frappe.db.set_value(
+		"OT Booking", booking.name, {field: booking.get(field) for field in fields}, update_modified=False
+	)
+	push_following(booking, reason)
+	frappe.db.set_value("OT Booking", booking.name, leaving, update_modified=False)
 
 
 def validate_unchanged(booking, modified):
