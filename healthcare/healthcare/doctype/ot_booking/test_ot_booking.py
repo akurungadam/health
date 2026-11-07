@@ -122,7 +122,15 @@ class TestOTBooking(HealthcareTestSuite):
 
 
 def make_booking(
-	test, start, theatre=None, templates=None, patient=0, surgeon=0, primaries=1, priority="Elective"
+	test,
+	start,
+	theatre=None,
+	templates=None,
+	patient=0,
+	surgeon=0,
+	primaries=1,
+	priority="Elective",
+	change_reason=None,
 ):
 	team = [{"practitioner": test.practitioners[surgeon], "role": "Surgeon", "is_primary": primaries >= 1}]
 	if primaries >= 2:
@@ -135,6 +143,7 @@ def make_booking(
 			"theatre": theatre or test.theatre,
 			"scheduled_start": start,
 			"priority": priority,
+			"change_reason": change_reason,
 			"procedures": [{"procedure_template": name} for name in templates or [test.template.name]],
 			"team": team,
 		}

@@ -99,10 +99,15 @@ class TestScheduling(HealthcareTestSuite):
 		booking = make_booking(self, self.at(9))
 		booking.db_set("status", "Scheduled", update_modified=False)
 
-		self.assertRaisesRegex(frappe.ValidationError, "Give a reason", self.move, booking, 13)
+		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", self.move, booking, 13)
 		self.move(booking, 13, reason="Surgeon delayed")
 
-		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "change_reason"), "Surgeon delayed")
+		self.assertTrue(
+			frappe.db.exists(
+				"Comment",
+				{"reference_name": booking.name, "content": ["like", "%Surgeon delayed%"]},
+			)
+		)
 
 	def test_a_completed_case_cannot_move(self):
 		booking = make_booking(self, self.at(9))

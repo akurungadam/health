@@ -123,19 +123,19 @@ function drop(theatre, event) {
 	dragged.value = null;
 	if (!drag) return;
 	const start = dropStart(event, drag.grab);
-	if (drag.request)
-		return change("book_request", {
-			service_request: drag.request.name,
-			theatre,
-			start,
-		});
+	if (drag.request) {
+		const booking = { service_request: drag.request.name, theatre, start };
+		// on the day of surgery only an OT Manager may add a case, and must say why
+		if (day.value === today()) return askReason("book_request", booking, "Add");
+		return change("book_request", booking);
+	}
 	const move = {
 		name: drag.booking.name,
 		theatre,
 		start,
 		modified: drag.booking.modified,
 	};
-	if (drag.booking.status === "Scheduled") return askReason(move);
+	if (drag.booking.needs_reason) return askReason("move_booking", move, "Move");
 	change("move_booking", move);
 }
 
@@ -150,14 +150,15 @@ function dropStart(event, grab) {
 	)}:00`;
 }
 
-function askReason(move) {
+// A change the server will refuse without a reason waits here for one
+function askReason(method, params, action) {
 	reason.value = "";
-	reasonFor.value = move;
+	reasonFor.value = { method, params, action };
 }
 
-function moveWithReason({ close }) {
+function changeWithReason({ close }) {
 	if (!reason.value.trim()) return;
-	change("move_booking", { ...reasonFor.value, reason: reason.value });
+	change(reasonFor.value.method, { ...reasonFor.value.params, reason: reason.value });
 	close();
 }
 
@@ -533,9 +534,15 @@ function useBoardFeed(reload) {
 
 		<Dialog
 			:open="Boolean(reasonFor)"
-			title="Move a scheduled case"
-			message="This day's list is already published. Say why the case is moving."
-			:actions="[{ label: 'Move', variant: 'solid', onClick: moveWithReason }]"
+			title="Reason for this change"
+			message="The list for this day is committed, so say why the case is changing."
+			:actions="[
+				{
+					label: reasonFor?.action || 'Save',
+					variant: 'solid',
+					onClick: changeWithReason,
+				},
+			]"
 			@update:open="open => !open && (reasonFor = null)"
 		>
 			<FormControl v-model="reason" type="textarea" placeholder="Reason" />

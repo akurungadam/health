@@ -59,9 +59,9 @@ def get_open_requests(company: str | None = None) -> list:
 
 
 @frappe.whitelist()
-def book_request(service_request: str, theatre: str, start: str) -> str:
+def book_request(service_request: str, theatre: str, start: str, reason: str | None = None) -> str:
 	booking = make_ot_booking(service_request)
-	booking.update({"theatre": theatre, "scheduled_start": start})
+	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
 	return booking.insert().name
 
 
@@ -69,10 +69,8 @@ def book_request(service_request: str, theatre: str, start: str) -> str:
 def move_booking(name: str, theatre: str, start: str, modified: str, reason: str | None = None) -> str:
 	booking = frappe.get_doc("OT Booking", name)
 	booking.check_permission("write")
-	validate_movable(booking, modified, reason)
-	booking.update({"theatre": theatre, "scheduled_start": start})
-	if reason:
-		booking.change_reason = reason
+	validate_movable(booking, modified)
+	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
 	return booking.save().name
 
 
@@ -105,12 +103,10 @@ def validate_unchanged(booking, modified):
 		)
 
 
-def validate_movable(booking, modified, reason):
+def validate_movable(booking, modified):
 	validate_unchanged(booking, modified)
 	if booking.status not in MOVABLE_STATUSES:
 		frappe.throw(_("A {0} case cannot be moved").format(_(booking.status)), title=_("Not Movable"))
-	if booking.status == "Scheduled" and not reason:
-		frappe.throw(_("Give a reason to move a Scheduled case"), title=_("Reason Required"))
 
 
 def surgical_template_durations():

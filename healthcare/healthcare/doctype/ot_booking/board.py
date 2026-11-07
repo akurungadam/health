@@ -14,6 +14,7 @@ from frappe.utils import cint, get_time, getdate
 from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave import find_leaves
 from healthcare.healthcare.doctype.ot_booking.availability import theatre_holiday_list
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
+from healthcare.healthcare.doctype.ot_booking.day_rules import needs_change_reason
 from healthcare.healthcare.doctype.ot_booking.ot_booking import NEXT_STATUSES
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
@@ -134,6 +135,7 @@ def add_surgeons_and_procedures(bookings):
 	)
 	for booking in bookings:
 		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
+		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
 		rows = [row for row in procedures if row.parent == booking.name]
 		booking.procedures = [row.procedure_template for row in rows]

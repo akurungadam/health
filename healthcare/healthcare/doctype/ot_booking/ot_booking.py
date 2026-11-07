@@ -15,6 +15,7 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 	INACTIVE_STATUSES,
 	validate_no_conflicts,
 )
+from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
 
 ACTIVE_REQUEST_STATUS = "active-Request Status"
 # the statuses a case may move to next from the OT Scheduler
@@ -35,11 +36,13 @@ class OTBooking(Document):
 		self.validate_procedures()
 		self.validate_service_requests()
 		self.validate_primary_surgeon()
+		validate_day_rules(self)
 		validate_no_conflicts(self)
 		validate_availability(self)
 
 	def on_update(self):
 		sync_procedures(self)
+		log_change_reason(self)
 
 	@frappe.whitelist()
 	def create_clinical_procedures(self):
