@@ -18,6 +18,7 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 	validate_no_conflicts,
 )
 from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
+from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
 
 ACTIVE_REQUEST_STATUS = "active-Request Status"
 # the statuses a case may move to next from the OT Scheduler
@@ -46,6 +47,7 @@ class OTBooking(Document):
 	def on_update(self):
 		release_procedures(self)
 		sync_procedures(self)
+		sync_fasting_task(self)
 		log_change_reason(self)
 
 	@frappe.whitelist()

@@ -134,6 +134,9 @@ doc_events = {
 		"on_trash": "healthcare.healthcare.utils.company_on_trash",
 	},
 	"Patient": {"after_insert": "healthcare.regional.india.abdm.utils.set_consent_attachment_details"},
+	"Nursing Task": {
+		"on_update_after_submit": "healthcare.healthcare.doctype.ot_booking.fasting.confirm_fasting",
+	},
 	"Payment Entry": {
 		"on_submit": "healthcare.healthcare.custom_doctype.payment_entry.manage_payment_entry_submit_cancel",
 		"on_cancel": "healthcare.healthcare.custom_doctype.payment_entry.manage_payment_entry_submit_cancel",

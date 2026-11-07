@@ -1,0 +1,123 @@
+# Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.utils import add_days, add_to_date, get_datetime, nowdate
+
+from healthcare.healthcare.doctype.ot_booking.scheduling import set_status
+from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
+	HOUR,
+	create_ot_template,
+	create_theatre,
+	make_booking,
+)
+from healthcare.tests.utils import HealthcareTestSuite
+
+FASTING_SETTINGS = ("ot_fasting_activity", "ot_fasting_hours")
+
+
+class TestFasting(HealthcareTestSuite):
+	def setUp(self):
+		self.patients = frappe.get_all("Patient", pluck="name", limit=1)
+		self.practitioners = frappe.get_all("Healthcare Practitioner", pluck="name", limit=1)
+		self.theatre = create_theatre("_Test OT 1", "_Test General OT")
+		self.template = create_ot_template("_Test Procedure - Hernia Repair", duration=HOUR)
+		frappe.db.set_value(
+			"Clinical Procedure Template", self.template.name, {"requires_fasting": 1, "fasting_hours": 0}
+		)
+		test_names = sorted(name for name in dir(self) if name.startswith("test_"))
+		self.day = add_days(nowdate(), 1500 + test_names.index(self._testMethodName))
+		self.use_fasting(create_activity("_Test Nil by Mouth"), 6)
+
+	def use_fasting(self, activity, hours):
+		saved = {
+			field: frappe.db.get_single_value("Healthcare Settings", field) for field in FASTING_SETTINGS
+		}
+		frappe.db.set_single_value(
+			"Healthcare Settings", {"ot_fasting_activity": activity, "ot_fasting_hours": hours}
+		)
+		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", saved)
+
+	def at(self, hour):
+		return get_datetime(f"{self.day} {hour:02d}:00:00")
+
+	def scheduled(self, hour=9):
+		booking = make_booking(self, self.at(hour))
+		set_status(booking.name, "Scheduled", str(booking.modified))
+		booking.reload()
+		return booking
+
+	def tasks(self, booking, status=None):
+		filters = {"reference_doctype": "OT Booking", "reference_name": booking.name}
+		if status:
+			filters["status"] = status
+		return frappe.get_all(
+			"Nursing Task", filters=filters, fields=["name", "status", "requested_start_time"]
+		)
+
+	def test_a_scheduled_case_sends_the_ward_a_fasting_task_before_it(self):
+		booking = self.scheduled(hour=9)
+
+		[task] = self.tasks(booking)
+
+		self.assertEqual(task.status, "Requested")
+		self.assertEqual(get_datetime(task.requested_start_time), add_to_date(self.at(9), hours=-6))
+
+	def test_a_tentative_case_sends_no_task(self):
+		booking = make_booking(self, self.at(9))
+
+		self.assertEqual(self.tasks(booking), [])
+
+	def test_moving_the_case_replaces_its_task(self):
+		booking = self.scheduled(hour=9)
+		booking.update({"scheduled_start": self.at(13), "change_reason": "Surgeon delayed"})
+		booking.save()
+
+		[open_task] = self.tasks(booking, "Requested")
+
+		self.assertEqual(get_datetime(open_task.requested_start_time), add_to_date(self.at(13), hours=-6))
+		self.assertEqual(len(self.tasks(booking, "Cancelled")), 1)
+
+	def test_postponing_the_case_cancels_its_task(self):
+		booking = self.scheduled()
+
+		set_status(booking.name, "Postponed", str(booking.modified), "Patient unwell")
+
+		self.assertEqual([task.status for task in self.tasks(booking)], ["Cancelled"])
+
+	def test_completing_the_task_confirms_fasting(self):
+		booking = self.scheduled()
+		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
+
+		task.status = "Completed"
+		task.save()
+
+		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 1)
+
+	def test_a_procedure_that_needs_no_fasting_sends_no_task(self):
+		frappe.db.set_value("Clinical Procedure Template", self.template.name, "requires_fasting", 0)
+
+		booking = self.scheduled()
+
+		self.assertEqual(self.tasks(booking), [])
+
+	def test_the_longest_fasting_of_the_cases_procedures_wins(self):
+		frappe.db.set_value("Clinical Procedure Template", self.template.name, "fasting_hours", 8)
+
+		booking = self.scheduled(hour=9)
+
+		[task] = self.tasks(booking)
+		self.assertEqual(get_datetime(task.requested_start_time), add_to_date(self.at(9), hours=-8))
+
+	def test_no_task_without_a_fasting_activity(self):
+		self.use_fasting(None, 6)
+
+		booking = self.scheduled()
+
+		self.assertEqual(self.tasks(booking), [])
+
+
+def create_activity(name):
+	if not frappe.db.exists("Healthcare Activity", name):
+		frappe.get_doc({"doctype": "Healthcare Activity", "activity": name}).insert()
+	return name
