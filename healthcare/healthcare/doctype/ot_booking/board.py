@@ -16,6 +16,7 @@ from healthcare.healthcare.doctype.ot_booking.availability import theatre_holida
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.day_rules import needs_change_reason
 from healthcare.healthcare.doctype.ot_booking.ot_booking import NEXT_STATUSES
+from healthcare.healthcare.doctype.ot_booking.priority import is_emergency, priority_code
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
 )
@@ -159,6 +160,8 @@ def add_surgeons_and_procedures(bookings):
 	)
 	for booking in bookings:
 		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
+		booking.is_emergency = is_emergency(booking.priority)
+		booking.priority_label = priority_code(booking.priority).title()
 		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
 		rows = [row for row in procedures if row.parent == booking.name]
@@ -169,15 +172,20 @@ def add_surgeons_and_procedures(bookings):
 
 
 def add_patient_details(rows, on_date):
-	"""Each row's patient `sex`, and `age` on `on_date` such as 45y, or 8m under a year"""
-	patients = {
-		patient.name: patient
-		for patient in frappe.get_all(
-			"Patient",
-			fields=["name", "sex", "dob"],
-			filters={"name": ["in", list({row.patient for row in rows})]},
-		)
-	}
+	"""Each row's patient `sex`, and `age` on `on_date` such as 45y, or 8m under a year. A
+	patient the caller cannot read gets neither."""
+	if not frappe.has_permission("Patient", "read"):
+		patients = {}
+	else:
+		patients = {
+			patient.name: patient
+			for patient in frappe.get_list(
+				"Patient",
+				fields=["name", "sex", "dob"],
+				filters={"name": ["in", list({row.patient for row in rows})]},
+				limit=0,
+			)
+		}
 	for row in rows:
 		patient = patients.get(row.patient, frappe._dict())
 		row.sex = patient.sex

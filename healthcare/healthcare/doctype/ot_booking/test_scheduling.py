@@ -64,6 +64,18 @@ class TestScheduling(HealthcareTestSuite):
 			request.name, [row.name for row in get_open_requests(department="_Test Other Department")]
 		)
 
+	def test_the_pane_shows_the_default_company_when_none_is_given(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		other_company = frappe.db.get_value("Company", {"name": ["!=", "_Test Company"]})
+		# a Company default is stored under its scrubbed key
+		saved = frappe.defaults.get_user_default("Company")
+		self.addCleanup(frappe.defaults.set_user_default, "company", saved)
+
+		frappe.defaults.set_user_default("company", "_Test Company")
+		self.assertIn(request.name, self.open_request_names())
+		frappe.defaults.set_user_default("company", other_company)
+		self.assertNotIn(request.name, self.open_request_names())
+
 	def test_a_booked_request_is_not_listed(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		book_request(request.name, self.theatre, str(self.at(9)))

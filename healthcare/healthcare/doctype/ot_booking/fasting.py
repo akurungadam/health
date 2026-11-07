@@ -11,7 +11,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, flt, format_time, get_datetime
 
-OPEN_TASK_STATUSES = ("Requested", "Received", "Accepted", "Ready", "In Progress", "On Hold")
+# a missed task is cancelled with the open ones, so an old one never stays on the worklist
+OPEN_TASK_STATUSES = ("Requested", "Received", "Accepted", "Ready", "In Progress", "On Hold", "Missed")
 
 
 def sync_fasting_task(booking):
@@ -22,7 +23,7 @@ def sync_fasting_task(booking):
 	hours = fasting_hours(booking)
 	if booking.status != "Scheduled" or not hours:
 		cancel_if_open(task)
-	elif not task or start_moved(booking):
+	elif not task or out_of_date(task, booking, hours):
 		cancel_if_open(task)
 		create_task(booking, activity, hours)
 
@@ -40,8 +41,12 @@ def fasting_hours(booking):
 
 
 def confirm_fasting(task, method=None):
-	if task.reference_doctype == "OT Booking" and task.status == "Completed":
-		frappe.db.set_value("OT Booking", task.reference_name, "fasting_confirmed", 1)
+	"""Only the task for the case's current fasting window confirms it, never an old one"""
+	if task.reference_doctype != "OT Booking" or task.status != "Completed":
+		return
+	booking = frappe.get_doc("OT Booking", task.reference_name)
+	if not out_of_date(task, booking, fasting_hours(booking)):
+		booking.db_set("fasting_confirmed", 1, update_modified=False)
 
 
 def current_task(booking):
@@ -49,15 +54,17 @@ def current_task(booking):
 	return frappe.db.get_value(
 		"Nursing Task",
 		{"reference_doctype": "OT Booking", "reference_name": booking, "status": ["!=", "Cancelled"]},
-		["name", "status"],
+		["name", "status", "requested_start_time", "duration"],
 		as_dict=True,
 		order_by="creation desc",
 	)
 
 
-def start_moved(booking):
-	before = booking.get_doc_before_save()
-	return bool(before) and get_datetime(before.scheduled_start) != get_datetime(booking.scheduled_start)
+def out_of_date(task, booking, hours):
+	"""Whether the task no longer asks for the fasting the case now needs: its start moved, or
+	its procedures now need a different number of hours"""
+	start = add_to_date(get_datetime(booking.scheduled_start), hours=-hours)
+	return get_datetime(task.requested_start_time) != start or flt(task.duration) != hours * 3600
 
 
 def cancel_if_open(task):

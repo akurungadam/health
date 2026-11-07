@@ -21,6 +21,7 @@ import { useHost } from "@framework/ui/island";
 import FastingIcon from "~icons/lucide/utensils-crossed";
 
 import BookingPreview from "./booking_preview.vue";
+import { caseBorder, caseFill } from "./case_style.js";
 import DateBar from "./date_bar.vue";
 import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
@@ -40,13 +41,6 @@ const SNAP_MINUTES = 15;
 // statuses that take a case off the board, and the word for doing it
 const STOPPING = ["Postponed", "Cancelled"];
 const STOPPING_ACTIONS = { Postponed: "Postpone", Cancelled: "Cancel" };
-const STATUS_CLASSES = {
-	Tentative: "border-dashed border-outline-gray-3 bg-surface-gray-2",
-	Scheduled: "border-outline-blue-1 bg-surface-blue-2",
-	"In Progress": "border-outline-amber-1 bg-surface-amber-2",
-	Completed: "border-outline-green-1 bg-surface-green-2",
-};
-
 const day = ref(props.query.date || today());
 const company = ref(props.query.company || "");
 const department = ref(props.query.department || "");
@@ -92,15 +86,16 @@ watch(company, (_value, previous) => {
 });
 watch(department, load);
 
+// The board's company and department, the same for loading and publishing. Only the ones
+// that are set: an empty one would arrive as the text "undefined".
+function boardFilters() {
+	const filters = { company: company.value, department: department.value };
+	return Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+}
+
 async function load() {
 	try {
-		// only the filters that are set: an empty one would arrive as the text "undefined"
-		const filters = Object.fromEntries(
-			Object.entries({
-				company: company.value,
-				department: department.value,
-			}).filter(([, value]) => value),
-		);
+		const filters = boardFilters();
 		[board.value, requests.value, postponed.value] = await Promise.all([
 			get("board.get_board", { date: day.value, ...filters }),
 			get("scheduling.get_open_requests", filters),
@@ -152,8 +147,9 @@ function drop(theatre, event) {
 	const start = dropStart(event, drag.grab);
 	if (drag.request) {
 		const booking = { service_request: drag.request.name, theatre, start };
-		// on the day of surgery only an OT Manager may add a case, and must say why
-		if (day.value === today()) return askReason("book_request", booking, "Add");
+		// on the day of surgery only an OT Manager may add a non-emergency case, and must say why
+		if (day.value === today() && !drag.request.is_emergency)
+			return askReason("book_request", booking, "Add");
 		return change("book_request", booking);
 	}
 	const move = {
@@ -167,10 +163,7 @@ function drop(theatre, event) {
 	const ontoToday =
 		day.value === today() &&
 		String(drag.booking.scheduled_start).slice(0, 10) !== today();
-	if (
-		drag.booking.needs_reason ||
-		(ontoToday && drag.booking.priority !== "Emergency")
-	)
+	if (drag.booking.needs_reason || (ontoToday && !drag.booking.is_emergency))
 		return askReason("move_booking", move, "Move");
 	change("move_booking", move);
 }
@@ -257,7 +250,10 @@ function sendActions([count, editable]) {
 // Every Tentative case on the day becomes Scheduled; a case that fails stays and is reported
 async function publish() {
 	try {
-		const result = await post("publishing.publish_day", { date: day.value });
+		const result = await post("publishing.publish_day", {
+			date: day.value,
+			...boardFilters(),
+		});
 		if (result.published.length)
 			toast.success(`Published ${result.published.length} case(s)`);
 		for (const row of result.failed) toast.error(`${row.name}: ${row.message}`);
@@ -445,6 +441,7 @@ function openBooking(name) {
 								<div
 									v-if="board.cleaning_minutes"
 									class="ot-hatch rounded-e-4 bg-surface-gray-1"
+									:class="[caseBorder(booking), 'border-l-0']"
 									:style="cleaningPlace(booking)"
 									title="Cleaning"
 								/>
@@ -455,14 +452,13 @@ function openBooking(name) {
 								>
 									<template #default="{ setOpen }">
 										<button
-											class="overflow-hidden border px-2 py-1 text-left"
+											class="overflow-hidden px-2 py-1 text-left"
 											:class="[
-												STATUS_CLASSES[booking.status],
+												caseBorder(booking),
+												caseFill(booking),
 												board.cleaning_minutes
-													? 'rounded-s-4'
+													? 'rounded-s-4 border-r-0'
 													: 'rounded-4',
-												booking.priority === 'Emergency' &&
-													'ring-2 ring-outline-red-3',
 											]"
 											:style="
 												placed(

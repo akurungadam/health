@@ -5,6 +5,7 @@ import frappe
 from frappe.utils import add_days, add_to_date, get_datetime, nowdate, nowtime
 
 from healthcare.healthcare.doctype.ot_booking.ot_booking import make_ot_booking
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -45,6 +46,17 @@ class TestBookingProcedures(HealthcareTestSuite):
 		self.assertEqual(
 			(booking.team[0].practitioner, booking.team[0].is_primary), (self.practitioners[0], 1)
 		)
+
+	def test_the_requests_priority_reaches_the_booking_and_its_procedure(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		request.db_set("priority", priority_named("STAT"))
+		booking = make_ot_booking(request.name)
+		booking.update({"theatre": self.theatre, "scheduled_start": self.at(9)})
+		booking.insert()
+
+		procedure = frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0])
+
+		self.assertEqual((booking.priority, procedure.priority), (priority_named("STAT"),) * 2)
 
 	def test_a_request_that_needs_no_theatre_cannot_be_booked(self):
 		template = create_ot_template("_Test Procedure - Dressing Change", HOUR, requires_ot=0)

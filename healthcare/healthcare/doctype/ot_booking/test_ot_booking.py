@@ -7,6 +7,7 @@ from frappe.utils import add_days, add_to_date, cint, get_datetime, nowdate
 from healthcare.healthcare.doctype.healthcare_service_unit_type.test_healthcare_service_unit_type import (
 	create_theatre_type,
 )
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.tests.utils import HealthcareTestSuite
 
 HOUR = 3600
@@ -37,6 +38,23 @@ class TestOTBooking(HealthcareTestSuite):
 		self.assertEqual(str(booking.scheduled_date), self.day)
 		self.assertEqual(get_datetime(booking.scheduled_end), add_to_date(self.at(9), seconds=HOUR * 1.5))
 		self.assertEqual(booking.procedures[1].duration, HOUR // 2)
+
+	def test_a_new_booking_is_routine(self):
+		booking = make_booking(self, self.at(9))
+
+		self.assertEqual(booking.priority, priority_named("Routine"))
+
+	def test_a_procedure_must_take_some_time(self):
+		booking = frappe.get_doc("OT Booking", make_booking(self, self.at(9)).name)
+		booking.procedures[0].duration = -HOUR
+
+		self.assertRaisesRegex(frappe.ValidationError, "greater than zero", booking.save)
+
+	def test_the_theatre_must_belong_to_the_bookings_company(self):
+		other_company = frappe.db.get_value("Company", {"name": ["!=", "_Test Company"]})
+		frappe.db.set_value("Healthcare Service Unit", self.other_theatre, "company", other_company)
+
+		self.assert_refused("belongs to", self.at(9), theatre=self.other_theatre)
 
 	def test_theatre_must_be_an_ot(self):
 		ward = create_theatre("_Test Not An OT", "_Test General Ward", is_ot=0)
@@ -129,7 +147,7 @@ def make_booking(
 	patient=0,
 	surgeon=0,
 	primaries=1,
-	priority="Elective",
+	priority=None,
 	change_reason=None,
 ):
 	team = [{"practitioner": test.practitioners[surgeon], "role": "Surgeon", "is_primary": primaries >= 1}]

@@ -79,6 +79,7 @@ def new_procedure(booking, row, start):
 	procedure.update(schedule(booking, row, start))
 	procedure.practitioner = primary_surgeon(booking)
 	procedure.ot_booking = booking.name
+	procedure.priority = booking.priority
 	procedure.inpatient_record = booking.inpatient_record or procedure.inpatient_record
 	procedure.patient_name, procedure.patient_sex = frappe.db.get_value(
 		"Patient", booking.patient, ["patient_name", "sex"]

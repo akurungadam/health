@@ -12,6 +12,7 @@ from frappe import _
 from frappe.utils import get_datetime, getdate, today
 
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
+from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
 
 
 def validate_day_rules(booking):
@@ -28,7 +29,7 @@ def needs_change_reason(booking):
 
 
 def validate_same_day_addition(booking):
-	if not is_surgery_day(booking) or booking.priority == "Emergency":
+	if not is_surgery_day(booking) or is_emergency(booking.priority):
 		return
 	if "OT Manager" not in frappe.get_roles():
 		frappe.throw(

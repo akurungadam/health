@@ -19,6 +19,7 @@ from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	NEXT_STATUSES,
 	make_ot_booking,
 )
+from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
 
 MOVABLE_STATUSES = ("Tentative", "Scheduled", "Postponed")
 
@@ -26,7 +27,8 @@ MOVABLE_STATUSES = ("Tentative", "Scheduled", "Postponed")
 @frappe.whitelist()
 def get_open_requests(company: str | None = None, department: str | None = None) -> list:
 	"""Active surgical Service Requests with no active booking, oldest first. A request is in a
-	department by its own Medical Department, or else by its procedure's."""
+	department by its own Medical Department, or else by its procedure's. Like the board, it
+	shows the user's default company when none is given."""
 	frappe.has_permission("OT Booking", "read", throw=True)
 	templates = surgical_templates()
 	if not templates:
@@ -37,6 +39,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 		"template_dt": "Clinical Procedure Template",
 		"template_dn": ["in", list(templates)],
 	}
+	company = company or frappe.defaults.get_user_default("Company")
 	if company:
 		filters["company"] = company
 	requests = frappe.get_list(
@@ -48,6 +51,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 			"practitioner_name",
 			"template_dn as procedure",
 			"medical_department",
+			"priority",
 			"order_date",
 		],
 		filters=filters,
@@ -65,6 +69,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 	]
 	for request in open_requests:
 		request.duration = templates[request.procedure].default_duration
+		request.is_emergency = is_emergency(request.priority)
 	if open_requests:
 		add_patient_details(open_requests, nowdate())
 	return open_requests
@@ -75,6 +80,7 @@ def get_postponed(company: str | None = None, department: str | None = None) -> 
 	"""Postponed cases waiting for a new day, oldest first. A case is in a department when any
 	of its procedures is."""
 	filters = {"status": "Postponed"}
+	company = company or frappe.defaults.get_user_default("Company")
 	if company:
 		filters["company"] = company
 	bookings = frappe.get_list(

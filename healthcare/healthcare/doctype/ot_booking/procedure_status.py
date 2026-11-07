@@ -4,11 +4,13 @@
 """A booking moves with its Clinical Procedures: In Progress once one starts, Completed once
 every procedure row has one and all are Completed. It never moves backwards, and a Cancelled
 or Postponed booking stays as it is. The status is written directly, because a case that has
-started must not be stopped by a booking check, such as a block added since it was booked."""
+started must not be stopped by a booking check, such as a block added since it was booked.
+The ward's fasting task is still tidied up, since the case no longer needs it."""
 
 import frappe
 
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
+from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
 
 STATUS_ORDER = ("Tentative", "Scheduled", "In Progress", "Completed")
 
@@ -20,6 +22,7 @@ def follow_procedure(procedure):
 	status = status_from_procedures(booking)
 	if is_forward(booking.status, status):
 		booking.db_set("status", status)
+		sync_fasting_task(booking)
 		booking.notify_update()
 
 

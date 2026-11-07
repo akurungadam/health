@@ -20,6 +20,7 @@
   "inpatient_record",
   "column_break_7",
   "status",
+  "priority",
   "practitioner",
   "practitioner_name",
   "medical_department",
@@ -242,6 +243,15 @@
    "read_only": 1
   },
   {
+   "fetch_from": "service_request.priority",
+   "fetch_if_empty": 1,
+   "fieldname": "priority",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Priority",
+   "options": "Code Value"
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -383,7 +393,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2026-11-06 11:54:33.875893",
+ "modified": "2026-11-07 14:04:58.811339",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",

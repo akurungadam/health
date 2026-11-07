@@ -48,14 +48,8 @@ const STATUS_THEMES = {
 			<dt class="text-ink-gray-5">Surgeon</dt>
 			<dd class="text-ink-gray-8">{{ booking.surgeon }}</dd>
 			<dt class="text-ink-gray-5">Priority</dt>
-			<dd
-				:class="
-					booking.priority === 'Emergency'
-						? 'text-ink-red-7'
-						: 'text-ink-gray-8'
-				"
-			>
-				{{ booking.priority }}
+			<dd :class="booking.is_emergency ? 'text-ink-red-7' : 'text-ink-gray-8'">
+				{{ booking.priority_label }}
 			</dd>
 			<dt class="text-ink-gray-5">Fasting</dt>
 			<dd class="text-ink-gray-8">

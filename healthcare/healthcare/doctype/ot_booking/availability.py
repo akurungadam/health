@@ -16,6 +16,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave im
 	leave_message,
 )
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES, booking_slot
+from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
 )
@@ -28,7 +29,7 @@ def validate_availability(booking):
 	refusals = holiday_messages(booking) + blocked_messages(booking)
 	refusals += [leave_message(leave) for leave in leaves if not leave.is_half_day]
 	warnings = [leave_message(leave) for leave in leaves if leave.is_half_day]
-	if booking.priority == "Emergency":
+	if is_emergency(booking.priority):
 		warnings = refusals + warnings
 	elif refusals:
 		frappe.throw(refusals, title=_("Not Available"), as_list=True)

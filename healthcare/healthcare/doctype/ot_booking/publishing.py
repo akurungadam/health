@@ -8,12 +8,16 @@ rest of the day still publishes."""
 import frappe
 from frappe.utils import getdate
 
+from healthcare.healthcare.doctype.ot_booking.board import get_theatres
+
 
 @frappe.whitelist()
-def publish_day(date: str, company: str | None = None) -> dict:
+def publish_day(date: str, company: str | None = None, department: str | None = None) -> dict:
+	"""Publishes only the cases the board shows: the company's, in the department's theatres"""
 	frappe.has_permission("OT Booking", "write", throw=True)
+	company = company or frappe.defaults.get_user_default("Company")
 	published, failed = [], []
-	for name in tentative_cases(getdate(date), company):
+	for name in tentative_cases(getdate(date), company, department):
 		error = publish_case(name)
 		if error:
 			failed.append({"name": name, "message": error})
@@ -22,8 +26,11 @@ def publish_day(date: str, company: str | None = None) -> dict:
 	return {"published": published, "failed": failed}
 
 
-def tentative_cases(date, company):
-	filters = {"scheduled_date": date, "status": "Tentative"}
+def tentative_cases(date, company, department):
+	theatres = list(get_theatres(company, department))
+	if not theatres:
+		return []
+	filters = {"scheduled_date": date, "status": "Tentative", "theatre": ["in", theatres]}
 	if company:
 		filters["company"] = company
 	return frappe.get_list("OT Booking", filters=filters, order_by="scheduled_start", pluck="name", limit=0)

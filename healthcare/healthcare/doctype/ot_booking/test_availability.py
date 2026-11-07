@@ -9,6 +9,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_lea
 	link_new_employee,
 	skip_without_hrms,
 )
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -55,7 +56,7 @@ class TestAvailability(HealthcareTestSuite):
 		self.block(self.practitioners[0], "Healthcare Practitioner")
 		booking = make_booking(self, self.at(12))
 		booking.scheduled_start = self.at(9)
-		booking.priority = "Emergency"
+		booking.priority = priority_named("STAT")
 
 		booking.save()
 
@@ -67,7 +68,7 @@ class TestAvailability(HealthcareTestSuite):
 	def test_an_emergency_case_on_a_theatre_holiday_is_allowed(self):
 		self.use_theatre_holiday_list(create_holiday_list(self.day))
 
-		make_booking(self, self.at(9), priority="Emergency")
+		make_booking(self, self.at(9), priority=priority_named("STAT"))
 
 	def test_a_half_day_holiday_can_be_booked(self):
 		self.use_theatre_holiday_list(create_holiday_list(self.day, is_half_day=1))

@@ -88,13 +88,13 @@
    "reqd": 1
   },
   {
-   "default": "Elective",
+   "description": "STAT is an emergency: it can be added on the day of surgery",
    "fieldname": "priority",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Priority",
-   "options": "Elective\nUrgent\nEmergency",
-   "reqd": 1
+   "link_filters": "[[\"Code Value\",\"code_system\",\"=\",\"Priority\"]]",
+   "options": "Code Value"
   },
   {
    "fieldname": "anaesthesia_type",
@@ -212,7 +212,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-07 13:51:38.890514",
+ "modified": "2026-11-07 14:06:28.993954",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "OT Booking",

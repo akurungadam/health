@@ -19,6 +19,7 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 )
 from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
 from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
+from healthcare.healthcare.doctype.ot_booking.priority import set_priority
 
 ACTIVE_REQUEST_STATUS = "active-Request Status"
 # the statuses a case may move to next from the OT Scheduler
@@ -32,8 +33,10 @@ NEXT_STATUSES = {
 class OTBooking(Document):
 	def validate(self):
 		self.patient_name = frappe.db.get_value("Patient", self.patient, "patient_name")
+		set_priority(self)
 		self.set_templates_from_requests()
 		self.set_procedure_durations()
+		self.validate_durations()
 		self.set_schedule()
 		self.validate_theatre()
 		self.validate_procedures()
@@ -71,14 +74,31 @@ class OTBooking(Document):
 			if not row.duration:
 				row.duration = template_duration(row.procedure_template)
 
+	def validate_durations(self):
+		"""A row of no time, or less, would make the case end before it starts"""
+		for row in self.procedures:
+			if cint(row.duration) <= 0:
+				frappe.throw(
+					_("Row {0}: the duration of {1} must be greater than zero").format(
+						row.idx, frappe.bold(row.procedure_template)
+					)
+				)
+
 	def set_schedule(self):
 		self.scheduled_date = getdate(self.scheduled_start)
 		total_seconds = sum(cint(row.duration) for row in self.procedures)
 		self.scheduled_end = add_to_date(self.scheduled_start, seconds=total_seconds)
 
 	def validate_theatre(self):
-		if not frappe.db.get_value("Healthcare Service Unit", self.theatre, "is_ot"):
+		is_ot, company = frappe.db.get_value("Healthcare Service Unit", self.theatre, ["is_ot", "company"])
+		if not is_ot:
 			frappe.throw(_("{0} is not an operation theatre").format(frappe.bold(self.theatre)))
+		if company != self.company:
+			frappe.throw(
+				_("Theatre {0} belongs to {1}, not to {2}").format(
+					frappe.bold(self.theatre), frappe.bold(company), frappe.bold(self.company)
+				)
+			)
 
 	def validate_procedures(self):
 		theatre_type = frappe.db.get_value("Healthcare Service Unit", self.theatre, "service_unit_type")
@@ -137,7 +157,12 @@ def make_ot_booking(service_request: str) -> Document:
 
 	booking = frappe.new_doc("OT Booking")
 	booking.update(
-		{"patient": request.patient, "company": request.company, "inpatient_record": request.inpatient_record}
+		{
+			"patient": request.patient,
+			"company": request.company,
+			"inpatient_record": request.inpatient_record,
+			"priority": request.priority,
+		}
 	)
 	booking.append(
 		"procedures",

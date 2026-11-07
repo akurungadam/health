@@ -14,6 +14,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
+DEPARTMENT = "_Test Medical Department"
+
 
 class TestPublishing(HealthcareTestSuite):
 	def setUp(self):
@@ -61,6 +63,18 @@ class TestPublishing(HealthcareTestSuite):
 		publish_day(self.day)
 
 		self.assertEqual(self.status(booking), "Tentative")
+
+	def test_only_the_departments_theatres_are_published(self):
+		other = create_theatre("_Test OT 2", "_Test General OT")
+		frappe.db.set_value("Healthcare Service Unit", self.theatre, "medical_department", DEPARTMENT)
+		frappe.db.set_value("Healthcare Service Unit", other, "medical_department", None)
+		shown = make_booking(self, self.at(9))
+		hidden = make_booking(self, self.at(9), theatre=other, patient=1, surgeon=1)
+
+		result = publish_day(self.day, "_Test Company", DEPARTMENT)
+
+		self.assertEqual(result["published"], [shown.name])
+		self.assertEqual(self.status(hidden), "Tentative")
 
 	def test_publishing_needs_permission(self):
 		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role

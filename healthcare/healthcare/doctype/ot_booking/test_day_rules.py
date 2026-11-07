@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import add_days, get_datetime, nowdate
 
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -46,10 +47,22 @@ class TestDayRules(HealthcareTestSuite):
 			frappe.ValidationError, "Only an emergency", make_booking, self, self.today_at(19)
 		)
 
+	def test_an_asap_case_is_not_an_emergency(self):
+		self.as_coordinator()
+
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"Only an emergency",
+			make_booking,
+			self,
+			self.today_at(19),
+			priority=priority_named("ASAP"),
+		)
+
 	def test_an_emergency_can_be_added_on_its_own_day(self):
 		self.as_coordinator()
 
-		make_booking(self, self.today_at(19), priority="Emergency")
+		make_booking(self, self.today_at(19), priority=priority_named("STAT"))
 
 	def test_an_ot_manager_adds_an_elective_case_on_its_own_day_with_a_reason(self):
 		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", make_booking, self, self.today_at(19))
@@ -80,7 +93,7 @@ class TestDayRules(HealthcareTestSuite):
 		self.assertFalse(frappe.db.get_value("OT Booking", booking.name, "change_reason"))
 
 	def test_a_tentative_case_on_its_own_day_moves_without_a_reason(self):
-		booking = make_booking(self, self.today_at(19), priority="Emergency")
+		booking = make_booking(self, self.today_at(19), priority=priority_named("STAT"))
 		booking.scheduled_start = self.today_at(20)
 
 		booking.save()

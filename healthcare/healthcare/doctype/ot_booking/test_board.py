@@ -9,7 +9,13 @@ from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_lea
 	link_new_employee,
 	skip_without_hrms,
 )
-from healthcare.healthcare.doctype.ot_booking.board import age_text, day_window, get_away, get_board
+from healthcare.healthcare.doctype.ot_booking.board import (
+	add_patient_details,
+	age_text,
+	day_window,
+	get_away,
+	get_board,
+)
 from healthcare.healthcare.doctype.ot_booking.test_availability import (
 	create_holiday_list,
 	create_unavailable_block,
@@ -153,6 +159,24 @@ class TestBoard(HealthcareTestSuite):
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		self.assertFalse(self.board()["can_edit"])
+
+	def test_an_ot_coordinator_sees_age_and_sex(self):
+		make_booking(self, self.at(9))
+		frappe.set_user(create_user("_test_ot_coordinator@example.com", "OT Coordinator"))
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		shown = self.board()["bookings"][0]
+
+		self.assertTrue(shown.sex)
+
+	def test_a_caller_who_cannot_read_patients_gets_no_age_or_sex(self):
+		row = frappe._dict(patient=self.patients[0])
+		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		add_patient_details([row], self.day)
+
+		self.assertEqual((row.sex, row.age), (None, None))
 
 	def test_the_board_needs_permission(self):
 		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role

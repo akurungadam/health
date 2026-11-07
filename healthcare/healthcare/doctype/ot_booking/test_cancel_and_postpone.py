@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import add_days, get_datetime, nowdate
 
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.scheduling import (
 	book_request,
 	get_open_requests,
@@ -96,7 +97,7 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		)
 
 	def test_a_postponed_case_from_today_is_rescheduled_without_a_reason(self):
-		booking = make_booking(self, self.at(19, nowdate()), priority="Emergency")
+		booking = make_booking(self, self.at(19, nowdate()), priority=priority_named("STAT"))
 		self.stop(booking, "Postponed", "Theatre flooded")
 		booking.reload()
 
