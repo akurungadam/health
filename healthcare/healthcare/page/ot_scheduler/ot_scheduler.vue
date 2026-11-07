@@ -6,7 +6,7 @@
 // practitioners who are away that day are listed above the board. A request from
 // the panel dropped onto a row is booked there; a case dragged elsewhere moves.
 // The server checks every drop, so a refused one stays where it was.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
 	Badge,
 	Button,
@@ -15,7 +15,6 @@ import {
 	DatePicker,
 	Dialog,
 	FormControl,
-	frappeRequest,
 	toast,
 	ToastProvider,
 } from "frappe-ui";
@@ -26,6 +25,8 @@ import FastingIcon from "~icons/lucide/utensils-crossed";
 import BookingPreview from "./booking_preview.vue";
 import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
+import { get, post, showError } from "./api.js";
+import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
 import { clock, isoDate, minutesOf, today, twoDigits } from "./time.js";
 
@@ -36,12 +37,10 @@ const props = defineProps({
 const emit = defineEmits(["title", "actions"]);
 const host = useHost();
 
-const RELOAD_SECONDS = 60;
 const SNAP_MINUTES = 15;
 // statuses that take a case off the board, and the word for doing it
 const STOPPING = ["Postponed", "Cancelled"];
 const STOPPING_ACTIONS = { Postponed: "Postpone", Cancelled: "Cancel" };
-const API = "healthcare.healthcare.doctype.ot_booking";
 const STATUS_CLASSES = {
 	Tentative: "border-dashed border-outline-gray-3 bg-surface-gray-2",
 	Scheduled: "border-outline-blue-1 bg-surface-blue-2",
@@ -62,6 +61,11 @@ const previewFor = ref(null);
 
 const dayStart = computed(() => board.value && minutesOf(board.value.day_start));
 const dayEnd = computed(() => board.value && minutesOf(board.value.day_end));
+const tentativeCount = computed(
+	() =>
+		board.value?.bookings.filter(booking => booking.status === "Tentative")
+			.length || 0,
+);
 const hours = computed(() => {
 	if (!board.value) return [];
 	const first = Math.ceil(dayStart.value / 60);
@@ -71,11 +75,10 @@ const hours = computed(() => {
 
 onMounted(() => {
 	emit("title", "OT Scheduler");
-	emit("actions", [
-		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
-	]);
 	load();
 });
+// the page menu (the three dots) offers Publish while the day has Tentative cases
+watch(tentativeCount, sendActions, { immediate: true });
 useBoardFeed(load);
 watch(day, value => (value ? load() : goToday()));
 
@@ -89,23 +92,6 @@ async function load() {
 	} catch (error) {
 		showError(error);
 	}
-}
-
-// The first server message is the toast; any others go beneath it
-function showError(error) {
-	const [first, ...rest] = error?.messages?.length
-		? error.messages
-		: [error?.message || String(error)];
-	toast.error(first, { description: rest.join(" ") || undefined });
-}
-
-function get(method, params = {}) {
-	return frappeRequest({ url: `${API}.${method}`, params, method: "GET" });
-}
-
-function post(method, params) {
-	const headers = { "X-Frappe-CSRF-Token": window.frappe?.csrf_token };
-	return frappeRequest({ url: `${API}.${method}`, params, method: "POST", headers });
 }
 
 function pickRequest(request, event) {
@@ -235,6 +221,29 @@ function caseMenu(booking) {
 	];
 }
 
+function sendActions(count) {
+	const actions = [
+		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
+	];
+	if (count) actions.push({ label: `Publish ${count} case(s)`, onClick: publish });
+	emit("actions", actions);
+}
+
+// Every Tentative case on the day becomes Scheduled; a case that fails stays and is reported
+async function publish() {
+	try {
+		const result = await post("publishing.publish_day", { date: day.value });
+		if (result.published.length)
+			toast.success(`Published ${result.published.length} case(s)`);
+		for (const row of result.failed) toast.error(`${row.name}: ${row.message}`);
+		playDropSound(result.failed.length ? "refused" : "placed");
+	} catch (error) {
+		showError(error);
+		playDropSound("refused");
+	}
+	load();
+}
+
 async function createProcedures(booking) {
 	const created = await change("create_procedures", { name: booking.name });
 	if (created?.length)
@@ -295,21 +304,6 @@ function cleaningPlace(booking) {
 
 function openBooking(name) {
 	host.navigate?.(`ot-booking/${name}`);
-}
-
-function useBoardFeed(reload) {
-	const realtime = window.frappe?.realtime;
-	let timer = null;
-	const whenChanged = data => data?.doctype === "OT Booking" && reload();
-	onMounted(() => {
-		realtime?.doctype_subscribe?.("OT Booking");
-		realtime?.on("list_update", whenChanged);
-		timer = window.setInterval(reload, RELOAD_SECONDS * 1000);
-	});
-	onBeforeUnmount(() => {
-		realtime?.off("list_update", whenChanged);
-		window.clearInterval(timer);
-	});
 }
 </script>
 
