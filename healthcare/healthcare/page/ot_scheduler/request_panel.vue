@@ -3,8 +3,10 @@
 // Drag one onto a theatre row to book it. Drop a booked case here to postpone it.
 import { computed, ref } from "vue";
 import { FormControl } from "frappe-ui";
+import { useHost } from "@framework/ui/island";
 
 import { patientFacts } from "./patient.js";
+import { today } from "./time.js";
 
 const props = defineProps({
 	requests: { type: Array, default: () => [] },
@@ -14,6 +16,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["pick", "pickPostponed", "unschedule", "done"]);
 
+const host = useHost();
 const search = ref("");
 const over = ref(false);
 
@@ -43,6 +46,16 @@ function minutes(seconds) {
 function length(booking) {
 	const at = value => new Date(String(value).replace(" ", "T"));
 	return (at(booking.scheduled_end) - at(booking.scheduled_start)) / 1000;
+}
+
+// a date as desk prints a Date field, in the date format of System Settings
+function formatDate(value) {
+	return host.format?.(value, { fieldtype: "Date" }) ?? value;
+}
+
+// an Expected By date already gone is shown in red
+function isPast(date) {
+	return String(date) < today();
 }
 
 function drop() {
@@ -100,7 +113,18 @@ function drop() {
 				<p class="text-xs text-ink-gray-5">
 					{{ minutes(request.duration) }} &middot;
 					{{ request.practitioner_name }} &middot;
-					{{ request.order_date }}
+					{{ formatDate(request.order_date) }}
+				</p>
+				<p
+					v-if="request.expected_date"
+					class="text-xs"
+					:class="
+						isPast(request.expected_date)
+							? 'text-ink-red-7'
+							: 'text-ink-gray-6'
+					"
+				>
+					Expected by {{ formatDate(request.expected_date) }}
 				</p>
 			</div>
 

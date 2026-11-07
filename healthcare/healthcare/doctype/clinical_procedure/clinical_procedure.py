@@ -21,7 +21,7 @@ from erpnext.stock.stock_ledger import get_previous_sle
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import get_account
 from healthcare.healthcare.doctype.lab_test.lab_test import create_sample_doc
 from healthcare.healthcare.doctype.nursing_task.nursing_task import NursingTask
-from healthcare.healthcare.doctype.ot_booking.procedure_status import follow_procedure
+from healthcare.healthcare.doctype.ot_booking.procedure_status import follow_procedure, lock_booking
 from healthcare.healthcare.doctype.service_request.service_request import (
 	update_service_request_status,
 )
@@ -156,6 +156,7 @@ class ClinicalProcedure(Document):
 	@frappe.whitelist()
 	def complete_procedure(self):
 		self.check_permission("write")
+		lock_booking(self)
 		self.lock_with_status("In Progress", _("Only a procedure that is In Progress can be completed"))
 
 		stock_entry = make_stock_entry(self) if self.consume_stock and self.items else None
@@ -229,6 +230,7 @@ class ClinicalProcedure(Document):
 	@frappe.whitelist()
 	def start_procedure(self):
 		self.check_permission("write")
+		lock_booking(self)
 		self.lock_with_status("Pending", _("Only a Pending procedure can be started"))
 
 		if self.consume_stock and not self.has_required_qty():

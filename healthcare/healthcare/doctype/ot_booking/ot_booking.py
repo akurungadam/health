@@ -28,12 +28,17 @@ NEXT_STATUSES = {
 	"Scheduled": ("Tentative", "In Progress", "Postponed", "Cancelled"),
 	"In Progress": ("Completed",),
 }
+# every status change a save may make: the scheduler's, and a postponed case put back on a day
+# or cancelled. A booking follows its procedures without a save, so that is not one of them.
+ALLOWED_STATUS_CHANGES = {**NEXT_STATUSES, "Postponed": ("Tentative", "Cancelled")}
+NEW_STATUSES = ("Tentative", "Scheduled")
 
 
 class OTBooking(Document):
 	def validate(self):
 		self.patient_name = frappe.db.get_value("Patient", self.patient, "patient_name")
 		set_priority(self)
+		self.validate_status_change()
 		self.set_templates_from_requests()
 		self.set_procedure_durations()
 		self.validate_durations()
@@ -73,6 +78,19 @@ class OTBooking(Document):
 		for row in self.procedures:
 			if not row.duration:
 				row.duration = template_duration(row.procedure_template)
+
+	def validate_status_change(self):
+		before = self.get_doc_before_save()
+		if not before:
+			if self.status not in NEW_STATUSES:
+				frappe.throw(_("A new case cannot be {0}").format(_(self.status)), title=_("Not Allowed"))
+		elif self.status != before.status and self.status not in ALLOWED_STATUS_CHANGES.get(
+			before.status, ()
+		):
+			frappe.throw(
+				_("A {0} case cannot become {1}").format(_(before.status), _(self.status)),
+				title=_("Not Allowed"),
+			)
 
 	def validate_durations(self):
 		"""A row of no time, or less, would make the case end before it starts"""

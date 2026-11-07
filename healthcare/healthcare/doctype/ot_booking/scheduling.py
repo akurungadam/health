@@ -16,7 +16,6 @@ from healthcare.healthcare.doctype.ot_booking.board import (
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	ACTIVE_REQUEST_STATUS,
-	NEXT_STATUSES,
 	make_ot_booking,
 )
 from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
@@ -53,6 +52,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 			"medical_department",
 			"priority",
 			"order_date",
+			"expected_date",
 		],
 		filters=filters,
 		order_by="order_date asc, order_time asc",
@@ -67,6 +67,8 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 			request.medical_department or templates[request.procedure].medical_department, department
 		)
 	]
+	# the most pressing first: the earliest Expected By, then those with none, by order date
+	open_requests.sort(key=lambda request: (not request.expected_date, request.expected_date or ""))
 	for request in open_requests:
 		request.duration = templates[request.procedure].default_duration
 		request.is_emergency = is_emergency(request.priority)
@@ -141,10 +143,6 @@ def set_status(name: str, status: str, modified: str, reason: str | None = None)
 	booking = frappe.get_doc("OT Booking", name)
 	booking.check_permission("write")
 	validate_unchanged(booking, modified)
-	if status not in NEXT_STATUSES.get(booking.status, ()):
-		frappe.throw(
-			_("A {0} case cannot become {1}").format(_(booking.status), _(status)), title=_("Not Allowed")
-		)
 	booking.update({"status": status, "change_reason": reason})
 	return booking.save().name
 

@@ -56,6 +56,23 @@ class TestOTBooking(HealthcareTestSuite):
 
 		self.assert_refused("belongs to", self.at(9), theatre=self.other_theatre)
 
+	def test_a_form_save_follows_the_status_rules(self):
+		booking = make_booking(self, self.at(9))
+		booking.status = "Completed"
+		self.assertRaisesRegex(frappe.ValidationError, "cannot become", booking.save)
+
+		booking.reload()
+		booking.db_set("status", "Cancelled")
+		booking.reload()
+		booking.status = "Scheduled"
+		self.assertRaisesRegex(frappe.ValidationError, "cannot become", booking.save)
+
+	def test_a_new_case_cannot_start_completed(self):
+		booking = frappe.copy_doc(make_booking(self, self.at(9)))
+		booking.update({"status": "Completed", "scheduled_start": self.at(13)})
+
+		self.assertRaisesRegex(frappe.ValidationError, "A new case cannot be", booking.insert)
+
 	def test_theatre_must_be_an_ot(self):
 		ward = create_theatre("_Test Not An OT", "_Test General Ward", is_ot=0)
 

@@ -2,8 +2,9 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.utils import add_days, add_to_date, get_datetime, nowdate
+from frappe.utils import add_days, add_to_date, get_datetime, now_datetime, nowdate
 
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.scheduling import set_status
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
@@ -149,6 +150,21 @@ class TestFasting(HealthcareTestSuite):
 		procedure.start_procedure()
 
 		self.assertEqual([task.status for task in self.tasks(booking)], ["Cancelled"])
+
+	def test_a_task_made_after_its_fasting_began_still_confirms(self):
+		start = add_to_date(now_datetime().replace(second=0, microsecond=0), hours=2)
+		booking = make_booking(self, start, priority=priority_named("STAT"))
+		set_status(booking.name, "Scheduled", str(booking.modified))
+		booking.reload()
+		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
+
+		task.status = "Completed"
+		task.save()
+		booking.reload()
+		booking.save()
+
+		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 1)
+		self.assertEqual([row.name for row in self.tasks(booking)], [task.name])
 
 	def test_no_task_without_a_fasting_activity(self):
 		self.use_fasting(None, 6)

@@ -54,17 +54,18 @@ def current_task(booking):
 	return frappe.db.get_value(
 		"Nursing Task",
 		{"reference_doctype": "OT Booking", "reference_name": booking, "status": ["!=", "Cancelled"]},
-		["name", "status", "requested_start_time", "duration"],
+		["name", "status", "requested_end_time", "duration"],
 		as_dict=True,
 		order_by="creation desc",
 	)
 
 
 def out_of_date(task, booking, hours):
-	"""Whether the task no longer asks for the fasting the case now needs: its start moved, or
-	its procedures now need a different number of hours"""
-	start = add_to_date(get_datetime(booking.scheduled_start), hours=-hours)
-	return get_datetime(task.requested_start_time) != start or flt(task.duration) != hours * 3600
+	"""Whether the task no longer asks for the fasting the case now needs: the case moved, or its
+	procedures now need a different number of hours. It is matched on its end and duration, not
+	its start: a task made after its fasting should have begun has its start moved to now."""
+	case_start = get_datetime(booking.scheduled_start)
+	return get_datetime(task.requested_end_time) != case_start or flt(task.duration) != hours * 3600
 
 
 def cancel_if_open(task):
@@ -88,6 +89,7 @@ def create_task(booking, activity, hours):
 			"company": booking.company,
 			"service_unit": current_bed(booking),
 			"requested_start_time": add_to_date(start, hours=-hours),
+			"requested_end_time": start,
 			"duration": hours * 3600,
 			"description": _("Nil by mouth from {0}, for the case at {1} in {2}").format(
 				format_time(add_to_date(start, hours=-hours)), format_time(start), booking.theatre

@@ -15,6 +15,13 @@ from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
 STATUS_ORDER = ("Tentative", "Scheduled", "In Progress", "Completed")
 
 
+def lock_booking(procedure):
+	"""Taken before the procedure's own row, so two procedures of one case finishing together
+	take turns and always lock in the same order"""
+	if procedure.ot_booking:
+		frappe.db.get_value("OT Booking", procedure.ot_booking, "name", for_update=True)
+
+
 def follow_procedure(procedure):
 	if not procedure.ot_booking:
 		return
@@ -28,7 +35,10 @@ def follow_procedure(procedure):
 
 def status_from_procedures(booking):
 	names = [row.clinical_procedure for row in booking.procedures if row.clinical_procedure]
-	statuses = frappe.get_all("Clinical Procedure", filters={"name": ["in", names]}, pluck="status")
+	# a locking read sees the latest committed status, not this transaction's older snapshot
+	statuses = frappe.db.get_values(
+		"Clinical Procedure", {"name": ["in", names]}, "status", pluck=True, for_update=True
+	)
 	if len(names) == len(booking.procedures) and statuses and all(s == "Completed" for s in statuses):
 		return "Completed"
 	if any(status in ("In Progress", "Completed") for status in statuses):

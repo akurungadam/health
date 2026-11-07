@@ -76,6 +76,20 @@ class TestScheduling(HealthcareTestSuite):
 		frappe.defaults.set_user_default("company", other_company)
 		self.assertNotIn(request.name, self.open_request_names())
 
+	def test_the_most_pressing_request_comes_first(self):
+		later = create_service_request(self.patients[0], self.practitioners[0])
+		sooner = create_service_request(self.patients[1], self.practitioners[0])
+		undated = create_service_request(self.patients[0], self.practitioners[0])
+		later.db_set("expected_date", add_days(self.day, 5))
+		sooner.db_set("expected_date", add_days(self.day, 1))
+		undated.db_set("expected_date", None)
+
+		order = [
+			name for name in self.open_request_names() if name in (later.name, sooner.name, undated.name)
+		]
+
+		self.assertEqual(order, [sooner.name, later.name, undated.name])
+
 	def test_a_booked_request_is_not_listed(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		book_request(request.name, self.theatre, str(self.at(9)))
