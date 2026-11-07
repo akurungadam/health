@@ -1,0 +1,117 @@
+# Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.utils import add_days, get_datetime, getdate, nowdate
+
+from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_leave import (
+	create_approved_leave,
+	link_new_employee,
+	skip_without_hrms,
+)
+from healthcare.healthcare.doctype.ot_booking.board import day_window, get_away, get_board
+from healthcare.healthcare.doctype.ot_booking.test_availability import (
+	create_holiday_list,
+	create_unavailable_block,
+)
+from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
+	HOUR,
+	create_ot_template,
+	create_theatre,
+	make_booking,
+)
+from healthcare.tests.utils import HealthcareTestSuite
+
+
+class TestBoard(HealthcareTestSuite):
+	def setUp(self):
+		self.patients = frappe.get_all("Patient", pluck="name", limit=2)
+		self.practitioners = frappe.get_all("Healthcare Practitioner", pluck="name", limit=2)
+		self.theatre = create_theatre("_Test OT 1", "_Test General OT")
+		self.template = create_ot_template("_Test Procedure - Hernia Repair", duration=HOUR)
+		test_names = sorted(name for name in dir(self) if name.startswith("test_"))
+		self.day = add_days(nowdate(), 1000 + test_names.index(self._testMethodName))
+
+	def at(self, hour):
+		return get_datetime(f"{self.day} {hour:02d}:00:00")
+
+	def board(self):
+		return get_board(self.day, "_Test Company")
+
+	def test_theatres_are_grouped_by_their_complex(self):
+		complex_name = frappe.db.get_value(
+			"Healthcare Service Unit", self.theatre, "parent_healthcare_service_unit"
+		)
+
+		complexes = {group["name"]: group["theatres"] for group in self.board()["complexes"]}
+
+		self.assertIn(self.theatre, [theatre.name for theatre in complexes[complex_name]])
+
+	def test_the_days_bookings_carry_their_surgeon_and_procedures(self):
+		booking = make_booking(self, self.at(9))
+
+		shown = self.board()["bookings"]
+
+		self.assertEqual([row.name for row in shown], [booking.name])
+		self.assertEqual(shown[0].surgeon, booking.team[0].practitioner_name)
+		self.assertEqual(shown[0].procedures, [self.template.name])
+
+	def test_cancelled_bookings_and_other_days_are_left_out(self):
+		make_booking(self, self.at(9)).db_set("status", "Cancelled")
+		self.day = add_days(self.day, 1)
+		make_booking(self, self.at(9))
+		self.day = add_days(self.day, -1)
+
+		self.assertEqual(self.board()["bookings"], [])
+
+	def test_a_blocked_theatre_is_shown(self):
+		block = create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)
+
+		self.assertEqual([row.name for row in self.board()["blocks"]], [block.name])
+
+	def test_a_blocked_practitioner_is_away(self):
+		create_unavailable_block(self.practitioners[0], "Healthcare Practitioner", self.day)
+
+		away = [(row["practitioner"], row["reason"]) for row in self.board()["away"]]
+
+		self.assertIn((self.practitioners[0], "Unavailable"), away)
+
+	@skip_without_hrms
+	def test_a_practitioner_on_leave_is_away(self):
+		employee = link_new_employee(self, self.practitioners[1])
+		create_approved_leave(employee, self.day, self.day, half_day_date=self.day)
+
+		away = [(row["practitioner"], row["reason"]) for row in self.board()["away"]]
+
+		self.assertIn((self.practitioners[1], "Half-day Leave"), away)
+
+	def test_away_rows_name_no_records(self):
+		create_unavailable_block(self.practitioners[0], "Healthcare Practitioner", self.day)
+
+		rows = self.board()["away"]
+
+		self.assertTrue(rows)
+		self.assertEqual(
+			set(rows[0]), {"practitioner", "practitioner_name", "reason", "from_time", "to_time"}
+		)
+
+	def test_no_one_is_away_for_a_caller_who_cannot_read_practitioners(self):
+		create_unavailable_block(self.practitioners[0], "Healthcare Practitioner", self.day)
+		start, end = day_window(getdate(self.day))
+		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		self.assertEqual(get_away(getdate(self.day), start, end, "_Test Company"), [])
+
+	def test_the_theatre_holiday_is_shown(self):
+		saved = frappe.db.get_single_value("Healthcare Settings", "ot_holiday_list")
+		frappe.db.set_single_value("Healthcare Settings", "ot_holiday_list", create_holiday_list(self.day))
+		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_holiday_list", saved)
+
+		self.assertEqual(self.board()["holiday"].description, "_Test Holiday")
+
+	def test_the_board_needs_permission(self):
+		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		self.assertRaises(frappe.PermissionError, self.board)

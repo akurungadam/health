@@ -34,10 +34,7 @@ class TestAvailability(HealthcareTestSuite):
 		return get_datetime(f"{self.day} {hour:02d}:00:00")
 
 	def block(self, scope, scope_type, start="09:00:00", end="10:00:00"):
-		if scope_type == "Healthcare Practitioner":
-			# an Unavailable block for a practitioner must cut into time they are available
-			create_practitioner_availability("08:00:00", "18:00:00", scope, scope_type, self.day)
-		create_practitioner_availability(start, end, scope, scope_type, self.day, type="Unavailable")
+		create_unavailable_block(scope, scope_type, self.day, start, end)
 
 	def test_an_unavailable_surgeon_is_refused(self):
 		self.block(self.practitioners[0], "Healthcare Practitioner")
@@ -102,6 +99,13 @@ class TestAvailability(HealthcareTestSuite):
 		create_approved_leave(employee, self.day, self.day, half_day_date=self.day)
 
 		make_booking(self, self.at(9))
+
+
+def create_unavailable_block(scope, scope_type, day, start="09:00:00", end="10:00:00"):
+	if scope_type == "Healthcare Practitioner":
+		# an Unavailable block for a practitioner must cut into time they are available
+		create_practitioner_availability("08:00:00", "18:00:00", scope, scope_type, day)
+	return create_practitioner_availability(start, end, scope, scope_type, day, type="Unavailable")
 
 
 def create_holiday_list(day, is_half_day=0):
