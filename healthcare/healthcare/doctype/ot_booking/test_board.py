@@ -14,6 +14,7 @@ from healthcare.healthcare.doctype.ot_booking.test_availability import (
 	create_holiday_list,
 	create_unavailable_block,
 )
+from healthcare.healthcare.doctype.ot_booking.test_day_rules import create_user
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -21,6 +22,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	make_booking,
 )
 from healthcare.tests.utils import HealthcareTestSuite
+
+DEPARTMENT = "_Test Medical Department"
 
 
 class TestBoard(HealthcareTestSuite):
@@ -46,6 +49,18 @@ class TestBoard(HealthcareTestSuite):
 		complexes = {group["name"]: group["theatres"] for group in self.board()["complexes"]}
 
 		self.assertIn(self.theatre, [theatre.name for theatre in complexes[complex_name]])
+
+	def test_a_department_shows_only_its_own_theatres(self):
+		other = create_theatre("_Test OT 2", "_Test General OT")
+		frappe.db.set_value("Healthcare Service Unit", self.theatre, "medical_department", DEPARTMENT)
+		frappe.db.set_value("Healthcare Service Unit", other, "medical_department", None)
+
+		board = get_board(self.day, "_Test Company", DEPARTMENT)
+
+		shown = [theatre.name for group in board["complexes"] for theatre in group["theatres"]]
+		self.assertEqual(shown, [self.theatre])
+		self.assertIn(DEPARTMENT, board["departments"])
+		self.assertIn("_Test Company", board["companies"])
 
 	def test_the_days_bookings_carry_their_surgeon_and_procedures(self):
 		booking = make_booking(self, self.at(9))
@@ -131,6 +146,13 @@ class TestBoard(HealthcareTestSuite):
 		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_holiday_list", saved)
 
 		self.assertEqual(self.board()["holiday"].description, "_Test Holiday")
+
+	def test_the_board_is_read_only_for_a_physician(self):
+		self.assertTrue(self.board()["can_edit"])
+		frappe.set_user(create_user("_test_ot_physician@example.com", "Physician"))
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		self.assertFalse(self.board()["can_edit"])
 
 	def test_the_board_needs_permission(self):
 		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role

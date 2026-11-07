@@ -12,6 +12,7 @@
   "healthcare_service_unit_name",
   "is_group",
   "service_unit_type",
+  "medical_department",
   "allow_appointments",
   "overlap_appointments",
   "service_unit_capacity",
@@ -75,6 +76,14 @@
    "label": "Service Unit Type",
    "mandatory_depends_on": "eval: !(doc.is_group);",
    "options": "Healthcare Service Unit Type"
+  },
+  {
+   "depends_on": "is_ot",
+   "description": "The department this operation theatre belongs to, for the OT Scheduler's Department filter",
+   "fieldname": "medical_department",
+   "fieldtype": "Link",
+   "label": "Medical Department",
+   "options": "Medical Department"
   },
   {
    "default": "0",
@@ -270,7 +279,7 @@
    "table_fieldname": "practitioner_schedules"
   }
  ],
- "modified": "2026-11-06 11:20:36.188756",
+ "modified": "2026-11-07 13:07:30.712529",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Service Unit",

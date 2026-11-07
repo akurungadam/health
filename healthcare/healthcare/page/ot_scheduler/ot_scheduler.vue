@@ -9,10 +9,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import {
 	Badge,
-	Button,
 	ContextMenu,
 	HoverCard,
-	DatePicker,
 	Dialog,
 	FormControl,
 	toast,
@@ -23,12 +21,13 @@ import { useHost } from "@framework/ui/island";
 import FastingIcon from "~icons/lucide/utensils-crossed";
 
 import BookingPreview from "./booking_preview.vue";
+import DateBar from "./date_bar.vue";
 import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
 import { get, post, showError } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
-import { clock, isoDate, minutesOf, today, twoDigits } from "./time.js";
+import { clock, minutesOf, today, twoDigits } from "./time.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -49,6 +48,8 @@ const STATUS_CLASSES = {
 };
 
 const day = ref(props.query.date || today());
+const company = ref(props.query.company || "");
+const department = ref(props.query.department || "");
 const board = ref(null);
 const requests = ref([]);
 const postponed = ref([]);
@@ -61,6 +62,8 @@ const previewFor = ref(null);
 
 const dayStart = computed(() => board.value && minutesOf(board.value.day_start));
 const dayEnd = computed(() => board.value && minutesOf(board.value.day_end));
+// a viewer who cannot change bookings sees the board read-only
+const canEdit = computed(() => Boolean(board.value?.can_edit));
 const tentativeCount = computed(
 	() =>
 		board.value?.bookings.filter(booking => booking.status === "Tentative")
@@ -78,17 +81,32 @@ onMounted(() => {
 	load();
 });
 // the page menu (the three dots) offers Publish while the day has Tentative cases
-watch(tentativeCount, sendActions, { immediate: true });
+watch([tentativeCount, canEdit], sendActions, { immediate: true });
 useBoardFeed(load);
-watch(day, value => (value ? load() : goToday()));
+watch(day, value => (value ? load() : (day.value = today())));
+// the first load fills in the user's default company, which needs no second load
+watch(company, (_value, previous) => {
+	if (!previous) return;
+	department.value = "";
+	load();
+});
+watch(department, load);
 
 async function load() {
 	try {
+		// only the filters that are set: an empty one would arrive as the text "undefined"
+		const filters = Object.fromEntries(
+			Object.entries({
+				company: company.value,
+				department: department.value,
+			}).filter(([, value]) => value),
+		);
 		[board.value, requests.value, postponed.value] = await Promise.all([
-			get("board.get_board", { date: day.value }),
-			get("scheduling.get_open_requests"),
-			get("scheduling.get_postponed"),
+			get("board.get_board", { date: day.value, ...filters }),
+			get("scheduling.get_open_requests", filters),
+			get("scheduling.get_postponed", filters),
 		]);
+		company.value ||= board.value.company || "";
 	} catch (error) {
 		showError(error);
 	}
@@ -214,6 +232,8 @@ function caseMenu(booking) {
 	if (!statuses.length)
 		statuses.push({ label: `No change from ${booking.status}`, disabled: true });
 	const actions = [{ label: "View", onClick: () => openBooking(booking.name) }];
+	if (!canEdit.value)
+		return [{ group: "Booking", hideLabel: true, options: actions }];
 	if (booking.procedures_pending)
 		actions.push({
 			label: "Create Procedures",
@@ -225,7 +245,8 @@ function caseMenu(booking) {
 	];
 }
 
-function sendActions(count) {
+function sendActions([count, editable]) {
+	if (!editable) return emit("actions", []);
 	const actions = [
 		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
 	];
@@ -267,16 +288,6 @@ async function change(method, params) {
 	return result;
 }
 
-function moveDay(days) {
-	const date = new Date(`${day.value}T00:00:00`);
-	date.setDate(date.getDate() + days);
-	day.value = isoDate(date);
-}
-
-function goToday() {
-	day.value = today();
-}
-
 function bookingsIn(theatre) {
 	return board.value.bookings.filter(booking => booking.theatre === theatre);
 }
@@ -313,20 +324,12 @@ function openBooking(name) {
 
 <template>
 	<div class="flex h-full flex-col gap-3 overflow-hidden p-5">
-		<div class="flex shrink-0 flex-wrap items-center gap-2">
-			<Button @click="moveDay(-1)">Previous</Button>
-			<Button @click="goToday">Today</Button>
-			<Button @click="moveDay(1)">Next</Button>
-			<DatePicker v-model="day" format="ddd, D MMM YYYY" class="w-44" />
-			<Badge
-				v-if="board?.holiday"
-				:theme="board.holiday.is_half_day ? 'orange' : 'red'"
-				size="lg"
-			>
-				{{ board.holiday.is_half_day ? "Half-day holiday" : "Holiday" }}:
-				{{ board.holiday.description }}
-			</Badge>
-		</div>
+		<DateBar
+			v-model:day="day"
+			v-model:company="company"
+			v-model:department="department"
+			:board="board"
+		/>
 
 		<ToastProvider />
 
@@ -349,6 +352,7 @@ function openBooking(name) {
 
 		<div class="flex min-h-0 flex-1 gap-3">
 			<RequestPanel
+				v-if="canEdit"
 				:requests="requests"
 				:postponed="postponed"
 				:dropping="
@@ -410,7 +414,9 @@ function openBooking(name) {
 						<div
 							class="relative grid h-24 min-w-[720px] flex-1 py-1"
 							:class="dropTheatre === theatre.name && 'bg-surface-gray-1'"
-							@dragover.prevent="dropTheatre = theatre.name"
+							@dragover.prevent="
+								dropTheatre = canEdit ? theatre.name : null
+							"
 							@dragleave="dropTheatre = null"
 							@drop.prevent="drop(theatre.name, $event)"
 						>
@@ -465,6 +471,7 @@ function openBooking(name) {
 												)
 											"
 											:draggable="
+												canEdit &&
 												['Tentative', 'Scheduled'].includes(
 													booking.status,
 												)

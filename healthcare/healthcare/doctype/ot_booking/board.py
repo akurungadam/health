@@ -22,14 +22,19 @@ from healthcare.healthcare.doctype.practitioner_availability.practitioner_availa
 
 
 @frappe.whitelist()
-def get_board(date: str, company: str | None = None) -> dict:
+def get_board(date: str, company: str | None = None, department: str | None = None) -> dict:
 	frappe.has_permission("OT Booking", "read", throw=True)
 	date = getdate(date)
 	company = company or frappe.defaults.get_user_default("Company")
 	start, end = day_window(date)
-	theatres = get_theatres(company)
+	theatres = get_theatres(company, department)
 	return {
 		"date": date,
+		"company": company,
+		# the board is read-only for a viewer who cannot change bookings
+		"can_edit": bool(frappe.has_permission("OT Booking", "write")),
+		"companies": frappe.get_list("Company", pluck="name", order_by="name", limit=0),
+		"departments": theatre_departments(company),
 		"day_start": start,
 		"day_end": end,
 		"cleaning_minutes": cint(frappe.db.get_single_value("Healthcare Settings", "ot_cleaning_minutes")),
@@ -47,11 +52,11 @@ def day_window(date):
 	return datetime.combine(date, get_time(start)), datetime.combine(date, get_time(end))
 
 
-def get_theatres(company):
+def get_theatres(company, department=None):
 	"""Theatre name → theatre, in tree order"""
-	filters = {"is_ot": 1, "is_group": 0}
-	if company:
-		filters["company"] = company
+	filters = theatre_filters(company)
+	if department:
+		filters["medical_department"] = department
 	theatres = frappe.get_all(
 		"Healthcare Service Unit",
 		fields=[
@@ -64,6 +69,25 @@ def get_theatres(company):
 		order_by="lft",
 	)
 	return {theatre.name: theatre for theatre in theatres}
+
+
+def theatre_filters(company):
+	filters = {"is_ot": 1, "is_group": 0}
+	if company:
+		filters["company"] = company
+	return filters
+
+
+def theatre_departments(company):
+	"""The departments the company's theatres belong to, for the board's Department filter"""
+	filters = {**theatre_filters(company), "medical_department": ["is", "set"]}
+	return frappe.get_all(
+		"Healthcare Service Unit",
+		filters=filters,
+		pluck="medical_department",
+		distinct=True,
+		order_by="medical_department",
+	)
 
 
 def group_by_complex(theatres):

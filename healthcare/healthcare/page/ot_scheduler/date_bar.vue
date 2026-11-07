@@ -1,0 +1,50 @@
+<script setup>
+// The board's filters and day: the company and the theatres' department, then previous,
+// today and next, a date picker, and the day's theatre holiday.
+import { Badge, Button, DatePicker, FormControl } from "frappe-ui";
+
+import { isoDate, today } from "./time.js";
+
+defineProps({
+	board: { type: Object, default: null },
+});
+const day = defineModel("day", { type: String, required: true });
+const company = defineModel("company", { type: String, default: "" });
+const department = defineModel("department", { type: String, default: "" });
+
+function moveDay(days) {
+	const date = new Date(`${day.value}T00:00:00`);
+	date.setDate(date.getDate() + days);
+	day.value = isoDate(date);
+}
+</script>
+
+<template>
+	<div class="flex shrink-0 flex-wrap items-center gap-2">
+		<div v-if="board" class="w-48">
+			<FormControl v-model="company" type="select" :options="board.companies" />
+		</div>
+		<div v-if="board" class="w-48">
+			<FormControl
+				v-model="department"
+				type="select"
+				:options="[
+					{ label: 'All Departments', value: '' },
+					...board.departments,
+				]"
+			/>
+		</div>
+		<Button @click="moveDay(-1)">Previous</Button>
+		<Button @click="day = today()">Today</Button>
+		<Button @click="moveDay(1)">Next</Button>
+		<DatePicker v-model="day" format="ddd, D MMM YYYY" class="w-44" />
+		<Badge
+			v-if="board?.holiday"
+			:theme="board.holiday.is_half_day ? 'orange' : 'red'"
+			size="lg"
+		>
+			{{ board.holiday.is_half_day ? "Half-day holiday" : "Holiday" }}:
+			{{ board.holiday.description }}
+		</Badge>
+	</div>
+</template>

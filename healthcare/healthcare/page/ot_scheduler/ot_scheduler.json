@@ -5,7 +5,7 @@
  "doctype": "Page",
  "idx": 0,
  "island": null,
- "modified": "2026-11-06 23:45:00.000000",
+ "modified": "2026-11-07 13:51:38.890514",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "ot-scheduler",
@@ -20,6 +20,15 @@
   },
   {
    "role": "System Manager"
+  },
+  {
+   "role": "Healthcare Administrator"
+  },
+  {
+   "role": "Physician"
+  },
+  {
+   "role": "Nursing User"
   }
  ],
  "script": null,

@@ -212,7 +212,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-07 09:11:03.664721",
+ "modified": "2026-11-07 13:51:38.890514",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "OT Booking",
@@ -244,19 +244,15 @@
    "write": 1
   },
   {
-   "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "Healthcare Administrator",
-   "share": 1,
-   "write": 1
+   "share": 1
   },
   {
-   "create": 1,
    "email": 1,
    "print": 1,
    "read": 1,

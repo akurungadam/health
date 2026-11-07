@@ -24,17 +24,18 @@ MOVABLE_STATUSES = ("Tentative", "Scheduled", "Postponed")
 
 
 @frappe.whitelist()
-def get_open_requests(company: str | None = None) -> list:
-	"""Active surgical Service Requests with no active booking, oldest first"""
+def get_open_requests(company: str | None = None, department: str | None = None) -> list:
+	"""Active surgical Service Requests with no active booking, oldest first. A request is in a
+	department by its own Medical Department, or else by its procedure's."""
 	frappe.has_permission("OT Booking", "read", throw=True)
-	durations = surgical_template_durations()
-	if not durations:
+	templates = surgical_templates()
+	if not templates:
 		return []
 	filters = {
 		"docstatus": 1,
 		"status": ACTIVE_REQUEST_STATUS,
 		"template_dt": "Clinical Procedure Template",
-		"template_dn": ["in", list(durations)],
+		"template_dn": ["in", list(templates)],
 	}
 	if company:
 		filters["company"] = company
@@ -46,6 +47,7 @@ def get_open_requests(company: str | None = None) -> list:
 			"patient_name",
 			"practitioner_name",
 			"template_dn as procedure",
+			"medical_department",
 			"order_date",
 		],
 		filters=filters,
@@ -53,17 +55,25 @@ def get_open_requests(company: str | None = None) -> list:
 		limit=0,
 	)
 	booked = booked_requests([request.name for request in requests])
-	open_requests = [request for request in requests if request.name not in booked]
+	open_requests = [
+		request
+		for request in requests
+		if request.name not in booked
+		and in_department(
+			request.medical_department or templates[request.procedure].medical_department, department
+		)
+	]
 	for request in open_requests:
-		request.duration = durations[request.procedure]
+		request.duration = templates[request.procedure].default_duration
 	if open_requests:
 		add_patient_details(open_requests, nowdate())
 	return open_requests
 
 
 @frappe.whitelist()
-def get_postponed(company: str | None = None) -> list:
-	"""Postponed cases waiting for a new day, oldest first"""
+def get_postponed(company: str | None = None, department: str | None = None) -> list:
+	"""Postponed cases waiting for a new day, oldest first. A case is in a department when any
+	of its procedures is."""
 	filters = {"status": "Postponed"}
 	if company:
 		filters["company"] = company
@@ -86,6 +96,13 @@ def get_postponed(company: str | None = None) -> list:
 	if bookings:
 		add_surgeons_and_procedures(bookings)
 		add_patient_details(bookings, nowdate())
+	if department and bookings:
+		departments = template_departments({name for booking in bookings for name in booking.procedures})
+		bookings = [
+			booking
+			for booking in bookings
+			if department in {departments.get(name) for name in booking.procedures}
+		]
 	return bookings
 
 
@@ -142,15 +159,29 @@ def validate_movable(booking, modified):
 		frappe.throw(_("A {0} case cannot be moved").format(_(booking.status)), title=_("Not Movable"))
 
 
-def surgical_template_durations():
+def surgical_templates():
+	"""Template name → its default duration and medical department, for the templates needing an OT"""
+	templates = frappe.get_all(
+		"Clinical Procedure Template",
+		fields=["name", "default_duration", "medical_department"],
+		filters={"requires_ot": 1},
+	)
+	return {template.name: template for template in templates}
+
+
+def template_departments(names):
 	return dict(
 		frappe.get_all(
 			"Clinical Procedure Template",
-			fields=["name", "default_duration"],
-			filters={"requires_ot": 1},
+			fields=["name", "medical_department"],
+			filters={"name": ["in", list(names)]},
 			as_list=True,
 		)
 	)
+
+
+def in_department(own_department, department):
+	return not department or own_department == department
 
 
 def booked_requests(requests):

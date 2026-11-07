@@ -21,6 +21,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
+DEPARTMENT = "_Test Medical Department"
+
 
 class TestCancelAndPostpone(HealthcareTestSuite):
 	def setUp(self):
@@ -53,6 +55,18 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		self.assertFalse(frappe.db.exists("Clinical Procedure", procedure))
 		self.assertNotIn(request, [row.name for row in get_open_requests()])
 		self.assertIn(booking.name, [row.name for row in get_postponed()])
+
+	def test_a_postponed_case_is_in_its_procedures_department(self):
+		frappe.db.set_value(
+			"Clinical Procedure Template", self.template.name, "medical_department", DEPARTMENT
+		)
+		_request, booking = self.booked_request()
+		self.stop(booking, "Postponed")
+
+		self.assertIn(booking.name, [row.name for row in get_postponed(department=DEPARTMENT)])
+		self.assertNotIn(
+			booking.name, [row.name for row in get_postponed(department="_Test Other Department")]
+		)
 
 	def test_a_cancelled_case_frees_its_request(self):
 		request, booking = self.booked_request()

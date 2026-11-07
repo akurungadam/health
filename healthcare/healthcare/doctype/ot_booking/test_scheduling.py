@@ -20,6 +20,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 )
 from healthcare.tests.utils import HealthcareTestSuite
 
+DEPARTMENT = "_Test Medical Department"
+
 
 class TestScheduling(HealthcareTestSuite):
 	def setUp(self):
@@ -49,6 +51,18 @@ class TestScheduling(HealthcareTestSuite):
 
 		self.assertEqual(listed[request.name].duration, HOUR)
 		self.assertEqual(listed[request.name].sex, frappe.db.get_value("Patient", self.patients[0], "sex"))
+
+	def test_a_request_is_in_its_procedures_department(self):
+		frappe.db.set_value(
+			"Clinical Procedure Template", self.template.name, "medical_department", DEPARTMENT
+		)
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		frappe.db.set_value("Service Request", request.name, "medical_department", None)
+
+		self.assertIn(request.name, [row.name for row in get_open_requests(department=DEPARTMENT)])
+		self.assertNotIn(
+			request.name, [row.name for row in get_open_requests(department="_Test Other Department")]
+		)
 
 	def test_a_booked_request_is_not_listed(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
