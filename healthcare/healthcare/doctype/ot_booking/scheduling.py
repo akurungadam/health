@@ -9,7 +9,10 @@ import frappe
 from frappe import _
 from frappe.utils import nowdate
 
-from healthcare.healthcare.doctype.ot_booking.board import add_patient_details
+from healthcare.healthcare.doctype.ot_booking.board import (
+	add_patient_details,
+	add_surgeons_and_procedures,
+)
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	ACTIVE_REQUEST_STATUS,
@@ -17,7 +20,7 @@ from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	make_ot_booking,
 )
 
-MOVABLE_STATUSES = ("Tentative", "Scheduled")
+MOVABLE_STATUSES = ("Tentative", "Scheduled", "Postponed")
 
 
 @frappe.whitelist()
@@ -59,6 +62,34 @@ def get_open_requests(company: str | None = None) -> list:
 
 
 @frappe.whitelist()
+def get_postponed(company: str | None = None) -> list:
+	"""Postponed cases waiting for a new day, oldest first"""
+	filters = {"status": "Postponed"}
+	if company:
+		filters["company"] = company
+	bookings = frappe.get_list(
+		"OT Booking",
+		fields=[
+			"name",
+			"patient",
+			"patient_name",
+			"status",
+			"priority",
+			"scheduled_start",
+			"scheduled_end",
+			"modified",
+		],
+		filters=filters,
+		order_by="scheduled_start asc",
+		limit=0,
+	)
+	if bookings:
+		add_surgeons_and_procedures(bookings)
+		add_patient_details(bookings, nowdate())
+	return bookings
+
+
+@frappe.whitelist()
 def book_request(service_request: str, theatre: str, start: str, reason: str | None = None) -> str:
 	booking = make_ot_booking(service_request)
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
@@ -71,6 +102,8 @@ def move_booking(name: str, theatre: str, start: str, modified: str, reason: str
 	booking.check_permission("write")
 	validate_movable(booking, modified)
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
+	if booking.status == "Postponed":
+		booking.status = "Tentative"
 	return booking.save().name
 
 
@@ -81,7 +114,7 @@ def create_procedures(name: str) -> list:
 
 
 @frappe.whitelist()
-def set_status(name: str, status: str, modified: str) -> str:
+def set_status(name: str, status: str, modified: str, reason: str | None = None) -> str:
 	booking = frappe.get_doc("OT Booking", name)
 	booking.check_permission("write")
 	validate_unchanged(booking, modified)
@@ -89,7 +122,7 @@ def set_status(name: str, status: str, modified: str) -> str:
 		frappe.throw(
 			_("A {0} case cannot become {1}").format(_(booking.status), _(status)), title=_("Not Allowed")
 		)
-	booking.status = status
+	booking.update({"status": status, "change_reason": reason})
 	return booking.save().name
 
 
@@ -132,6 +165,6 @@ def booked_requests(requests):
 		.select(row.service_request)
 		.where(row.parenttype == "OT Booking")
 		.where(row.service_request.isin(requests))
-		.where(booking.status.notin(INACTIVE_STATUSES))
+		.where(booking.status != "Cancelled")
 	)
 	return {request for (request,) in query.run()}

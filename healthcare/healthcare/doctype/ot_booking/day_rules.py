@@ -1,10 +1,10 @@
 # Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""Rules for a committed list. On the day of surgery only an emergency can be added, unless
-an OT Manager gives a reason. A Scheduled case, or any case on its own day, needs a reason to
-move, cancel or postpone. The reason is for that one change: once saved it goes to the
-timeline and the field is emptied for the next one."""
+"""Rules for a committed list. On the day of surgery only an emergency can be added, or moved
+in from another day, unless an OT Manager gives a reason. A Scheduled case, or any case on
+its own day, needs a reason to move, cancel or postpone. The reason is for that one change:
+once saved it goes to the timeline and the field is emptied for the next one."""
 
 import frappe
 from frappe import _
@@ -15,13 +15,16 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_S
 
 def validate_day_rules(booking):
 	before = booking.get_doc_before_save()
-	if not before:
+	if not before or (is_surgery_day(booking) and not is_surgery_day(before)):
 		validate_same_day_addition(booking)
 	elif needs_change_reason(before) and is_moved_or_stopped(booking, before):
 		validate_reason_given(booking)
 
 
 def needs_change_reason(booking):
+	"""A postponed case is waiting for a new day, so putting it on one needs no reason"""
+	if booking.status == "Postponed":
+		return False
 	return booking.status == "Scheduled" or is_surgery_day(booking)
 
 

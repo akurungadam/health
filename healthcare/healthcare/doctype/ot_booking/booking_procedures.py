@@ -5,9 +5,11 @@
 booked slot, with the draft ones kept in step when the booking moves."""
 
 import frappe
+from frappe import _
 from frappe.utils import add_to_date, cint, get_datetime, get_time, getdate
 
 from healthcare.healthcare.doctype.clinical_procedure.clinical_procedure import set_stock_items
+from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.service_request.service_request import make_clinical_procedure
 
 
@@ -30,6 +32,36 @@ def sync_procedures(booking):
 	for row, start in rows_with_start(booking):
 		if row.clinical_procedure and is_draft(row.clinical_procedure):
 			frappe.db.set_value("Clinical Procedure", row.clinical_procedure, schedule(booking, row, start))
+
+
+def validate_release(booking):
+	"""A case being cancelled or postponed gives up its draft procedures; a submitted one stops it"""
+	if not is_stopping(booking):
+		return
+	for row in booking.procedures:
+		if row.clinical_procedure and not is_draft(row.clinical_procedure):
+			frappe.throw(
+				_("Row {0}: Clinical Procedure {1} is already submitted, so this case cannot be {2}").format(
+					row.idx, frappe.bold(row.clinical_procedure), _(booking.status)
+				),
+				title=_("Procedure Started"),
+			)
+
+
+def release_procedures(booking):
+	"""Deleted, not kept: a request allows only one draft procedure, and rebooking makes a new one"""
+	if not is_stopping(booking):
+		return
+	for row in booking.procedures:
+		if row.clinical_procedure:
+			procedure = row.clinical_procedure
+			row.db_set("clinical_procedure", None)
+			frappe.delete_doc("Clinical Procedure", procedure, ignore_permissions=True)
+
+
+def is_stopping(booking):
+	before = booking.get_doc_before_save()
+	return booking.status in INACTIVE_STATUSES and (not before or before.status not in INACTIVE_STATUSES)
 
 
 def rows_with_start(booking):

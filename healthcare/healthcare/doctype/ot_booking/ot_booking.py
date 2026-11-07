@@ -9,7 +9,9 @@ from frappe.utils import add_to_date, cint, getdate
 from healthcare.healthcare.doctype.ot_booking.availability import validate_availability
 from healthcare.healthcare.doctype.ot_booking.booking_procedures import (
 	create_procedures,
+	release_procedures,
 	sync_procedures,
+	validate_release,
 )
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 	INACTIVE_STATUSES,
@@ -20,8 +22,8 @@ from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason
 ACTIVE_REQUEST_STATUS = "active-Request Status"
 # the statuses a case may move to next from the OT Scheduler
 NEXT_STATUSES = {
-	"Tentative": ("Scheduled",),
-	"Scheduled": ("Tentative", "In Progress"),
+	"Tentative": ("Scheduled", "Postponed", "Cancelled"),
+	"Scheduled": ("Tentative", "In Progress", "Postponed", "Cancelled"),
 	"In Progress": ("Completed",),
 }
 
@@ -37,10 +39,12 @@ class OTBooking(Document):
 		self.validate_service_requests()
 		self.validate_primary_surgeon()
 		validate_day_rules(self)
+		validate_release(self)
 		validate_no_conflicts(self)
 		validate_availability(self)
 
 	def on_update(self):
+		release_procedures(self)
 		sync_procedures(self)
 		log_change_reason(self)
 
@@ -172,6 +176,7 @@ def validate_bookable(request):
 
 
 def find_active_booking(service_request, exclude=None):
+	"""The booking holding a request. A Postponed one still holds it; only a cancel frees it."""
 	booking = frappe.qb.DocType("OT Booking")
 	row = frappe.qb.DocType("OT Booking Procedure")
 	query = (
@@ -181,7 +186,7 @@ def find_active_booking(service_request, exclude=None):
 		.select(booking.name)
 		.where(row.parenttype == "OT Booking")
 		.where(row.service_request == service_request)
-		.where(booking.status.notin(INACTIVE_STATUSES))
+		.where(booking.status != "Cancelled")
 		.where(booking.name != (exclude or ""))
 		.limit(1)
 	)

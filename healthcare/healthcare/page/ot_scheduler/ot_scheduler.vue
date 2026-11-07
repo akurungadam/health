@@ -27,6 +27,7 @@ import BookingPreview from "./booking_preview.vue";
 import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
 import { playDropSound } from "./sounds.js";
+import { clock, isoDate, minutesOf, today, twoDigits } from "./time.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -37,6 +38,9 @@ const host = useHost();
 
 const RELOAD_SECONDS = 60;
 const SNAP_MINUTES = 15;
+// statuses that take a case off the board, and the word for doing it
+const STOPPING = ["Postponed", "Cancelled"];
+const STOPPING_ACTIONS = { Postponed: "Postpone", Cancelled: "Cancel" };
 const API = "healthcare.healthcare.doctype.ot_booking";
 const STATUS_CLASSES = {
 	Tentative: "border-dashed border-outline-gray-3 bg-surface-gray-2",
@@ -48,6 +52,7 @@ const STATUS_CLASSES = {
 const day = ref(props.query.date || today());
 const board = ref(null);
 const requests = ref([]);
+const postponed = ref([]);
 const dragged = ref(null);
 const dropTheatre = ref(null);
 const reasonFor = ref(null);
@@ -76,9 +81,10 @@ watch(day, value => (value ? load() : goToday()));
 
 async function load() {
 	try {
-		[board.value, requests.value] = await Promise.all([
+		[board.value, requests.value, postponed.value] = await Promise.all([
 			get("board.get_board", { date: day.value }),
 			get("scheduling.get_open_requests"),
+			get("scheduling.get_postponed"),
 		]);
 	} catch (error) {
 		showError(error);
@@ -105,6 +111,23 @@ function post(method, params) {
 function pickRequest(request, event) {
 	dragged.value = { request, grab: 0 };
 	event.dataTransfer.setData("text/plain", request.name);
+}
+
+function pickPostponed(booking, event) {
+	dragged.value = { booking, grab: 0 };
+	event.dataTransfer.setData("text/plain", booking.name);
+}
+
+// A booked case dropped back on the pane is postponed, keeping its booking for another day
+function unschedule() {
+	const booking = dragged.value?.booking;
+	dragged.value = null;
+	if (!booking || booking.status === "Postponed") return;
+	askReason("set_status", stopParams(booking, "Postponed"), "Postpone");
+}
+
+function stopParams(booking, status) {
+	return { name: booking.name, status, modified: booking.modified };
 }
 
 // Where in the case it was grabbed, so the case keeps that point under the cursor
@@ -135,7 +158,12 @@ function drop(theatre, event) {
 		start,
 		modified: drag.booking.modified,
 	};
-	if (drag.booking.needs_reason) return askReason("move_booking", move, "Move");
+	// moving onto today adds a case on the day of surgery, which needs a reason unless it is an emergency
+	if (
+		drag.booking.needs_reason ||
+		(day.value === today() && drag.booking.priority !== "Emergency")
+	)
+		return askReason("move_booking", move, "Move");
 	change("move_booking", move);
 }
 
@@ -154,6 +182,8 @@ function dropStart(event, grab) {
 function askReason(method, params, action) {
 	reason.value = "";
 	reasonFor.value = { method, params, action };
+	menuFor.value = null;
+	previewFor.value = null;
 }
 
 function changeWithReason({ close }) {
@@ -162,27 +192,35 @@ function changeWithReason({ close }) {
 	close();
 }
 
-// The preview stays shut while a case's menu is open, so the two never show together
+// A case's menu and its preview never show together, and neither opens over the reason dialog
 function menuOpened(booking, open) {
-	menuFor.value = open ? booking.name : null;
+	menuFor.value = open && !reasonFor.value ? booking.name : null;
 	if (open) previewFor.value = null;
 }
 
 function previewOpened(booking, open) {
-	previewFor.value = open && !menuFor.value ? booking.name : null;
+	previewFor.value = open && !menuFor.value && !reasonFor.value ? booking.name : null;
 }
 
 // A case's menu, on a left or right click: open it, or move it to a next status
 function caseMenu(booking) {
-	const statuses = booking.next_statuses.map(status => ({
-		label: status,
-		onClick: () =>
-			change("set_status", {
-				name: booking.name,
-				status,
-				modified: booking.modified,
-			}),
-	}));
+	const statuses = booking.next_statuses.map(status =>
+		STOPPING.includes(status)
+			? {
+					label: `${STOPPING_ACTIONS[status]}…`,
+					theme: "red",
+					onClick: () =>
+						askReason(
+							"set_status",
+							stopParams(booking, status),
+							STOPPING_ACTIONS[status],
+						),
+			  }
+			: {
+					label: status,
+					onClick: () => change("set_status", stopParams(booking, status)),
+			  },
+	);
 	if (!statuses.length)
 		statuses.push({ label: `No change from ${booking.status}`, disabled: true });
 	const actions = [{ label: "View", onClick: () => openBooking(booking.name) }];
@@ -259,29 +297,6 @@ function openBooking(name) {
 	host.navigate?.(`ot-booking/${name}`);
 }
 
-function minutesOf(value) {
-	const [hours, minutes] = String(value).split(" ").pop().split(":");
-	return Number(hours) * 60 + Number(minutes);
-}
-
-function clock(value) {
-	const minutes = minutesOf(value);
-	return `${twoDigits(Math.floor(minutes / 60))}:${twoDigits(minutes % 60)}`;
-}
-
-function twoDigits(number) {
-	return String(number).padStart(2, "0");
-}
-
-function today() {
-	return isoDate(new Date());
-}
-
-function isoDate(date) {
-	const offset = date.getTimezoneOffset() * 60000;
-	return new Date(date - offset).toISOString().slice(0, 10);
-}
-
 function useBoardFeed(reload) {
 	const realtime = window.frappe?.realtime;
 	let timer = null;
@@ -335,7 +350,17 @@ function useBoardFeed(reload) {
 		</div>
 
 		<div class="flex min-h-0 flex-1 gap-3">
-			<RequestPanel :requests="requests" @pick="pickRequest" />
+			<RequestPanel
+				:requests="requests"
+				:postponed="postponed"
+				:dropping="
+					Boolean(dragged?.booking && dragged.booking.status !== 'Postponed')
+				"
+				@pick="pickRequest"
+				@pick-postponed="pickPostponed"
+				@unschedule="unschedule"
+				@done="dragged = null"
+			/>
 
 			<p
 				v-if="board && !board.complexes.length"
@@ -421,6 +446,7 @@ function useBoardFeed(reload) {
 								/>
 								<ContextMenu
 									:options="caseMenu(booking)"
+									:open="menuFor === booking.name"
 									@update:open="open => menuOpened(booking, open)"
 								>
 									<template #default="{ setOpen }">
@@ -446,6 +472,7 @@ function useBoardFeed(reload) {
 												)
 											"
 											@dragstart="pickBooking(booking, $event)"
+											@dragend="dragged = null"
 											@click="setOpen(true)"
 										>
 											<HoverCard
