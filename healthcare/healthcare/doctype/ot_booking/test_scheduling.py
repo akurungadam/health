@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import add_days, add_to_date, get_datetime, nowdate
 
+from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.scheduling import (
 	book_request,
 	check_drop,
@@ -53,6 +54,14 @@ class TestScheduling(HealthcareTestSuite):
 
 		self.assertEqual(listed[request.name].duration, HOUR)
 		self.assertEqual(listed[request.name].sex, frappe.db.get_value("Patient", self.patients[0], "sex"))
+
+	def test_an_open_request_carries_its_priority(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		request.db_set("priority", priority_named("STAT"))
+
+		listed = {row.name: row for row in get_open_requests()}[request.name]
+
+		self.assertEqual((listed.priority_label, listed.is_emergency), ("STAT", True))
 
 	def test_a_request_is_in_its_procedures_department(self):
 		frappe.db.set_value(

@@ -21,6 +21,23 @@ export function caseBorder(booking) {
 		: STATUS_BORDERS[booking.status];
 }
 
+// A waiting case in the pane is bordered by its priority: STAT red, as on the board,
+// ASAP and Urgent amber, and Routine grey
+const PRIORITY_THEMES = { STAT: "red", ASAP: "amber", URGENT: "amber" };
+const PRIORITY_BORDERS = {
+	red: "border-2 border-outline-red-3",
+	amber: "border-2 border-outline-amber-3",
+	gray: "border border-outline-gray-3",
+};
+
+export function priorityTheme(row) {
+	return PRIORITY_THEMES[(row.priority_label || "").toUpperCase()] || "gray";
+}
+
+export function priorityBorder(row) {
+	return PRIORITY_BORDERS[priorityTheme(row)];
+}
+
 export function caseFill(booking) {
 	return STATUS_FILLS[booking.status];
 }

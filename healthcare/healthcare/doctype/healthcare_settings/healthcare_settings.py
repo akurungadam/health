@@ -200,20 +200,23 @@ def check_payments_app():
 		return True
 
 
-def store_ot_defaults():
-	"""A Single reads its field defaults only until one value is saved, so store the
-	Operation Theatre ones that were never set. A value someone saved, even 0, is kept."""
-	for field in frappe.get_meta("Healthcare Settings").fields:
-		if field.fieldname.startswith("ot_") and field.default and not is_stored(field.fieldname):
-			frappe.db.set_single_value("Healthcare Settings", field.fieldname, field.default)
+def ot_setting(fieldname):
+	"""An Operation Theatre setting: its saved value, or its field default when never saved or
+	cleared. A Single applies its field defaults only until one value is saved, so a site that had
+	Healthcare Settings before these fields would otherwise read nothing. A saved 0 is kept."""
+	if stored_value(fieldname) in (None, ""):
+		return frappe.get_meta("Healthcare Settings").get_field(fieldname).default
+	return frappe.db.get_single_value("Healthcare Settings", fieldname)
 
 
-def is_stored(fieldname):
+def stored_value(fieldname):
+	"""The raw saved text, or None when nothing is saved: get_single_value would turn an empty
+	Time into midnight and an empty Int into 0"""
 	singles = frappe.qb.DocType("Singles")
-	query = (
+	rows = (
 		frappe.qb.from_(singles)
-		.select(singles.field)
+		.select(singles.value)
 		.where(singles.doctype == "Healthcare Settings")
 		.where(singles.field == fieldname)
-	)
-	return bool(query.run())
+	).run()
+	return rows[0][0] if rows else None

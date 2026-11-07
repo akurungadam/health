@@ -15,6 +15,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave im
 	find_leaves,
 	leave_message,
 )
+from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import ot_setting
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES, booking_slot
 from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
@@ -45,7 +46,7 @@ def holiday_messages(booking):
 
 
 def theatre_holiday_list(company):
-	return frappe.db.get_single_value("Healthcare Settings", "ot_holiday_list") or frappe.get_cached_value(
+	return ot_setting("ot_holiday_list") or frappe.get_cached_value(
 		"Company", company, "default_holiday_list"
 	)
 

@@ -75,6 +75,18 @@ class TestDayRules(HealthcareTestSuite):
 
 		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
 
+	def test_a_scheduled_case_moved_onto_today_still_needs_a_reason(self):
+		booking = self.scheduled_booking()  # as Administrator, who may add to today
+		booking.scheduled_start = self.today_at(19)
+
+		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
+
+	def test_a_scheduled_case_needs_a_reason_to_go_back_to_tentative(self):
+		booking = self.scheduled_booking()
+		booking.status = "Tentative"
+
+		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
+
 	def test_a_scheduled_case_needs_a_reason_to_be_cancelled(self):
 		booking = self.scheduled_booking()
 		booking.status = "Cancelled"
@@ -89,6 +101,15 @@ class TestDayRules(HealthcareTestSuite):
 
 		self.assertTrue(has_reason_comment(booking.name, "Laminar flow unit needed"))
 		self.assertFalse(frappe.db.get_value("OT Booking", booking.name, "change_reason"))
+
+	def test_a_postponed_case_cannot_be_restored_onto_today_by_a_coordinator(self):
+		booking = make_booking(self, self.today_at(19), priority=priority_named("STAT"))
+		booking.db_set({"status": "Postponed", "priority": priority_named("Routine")})
+		booking.reload()
+		self.as_coordinator()
+		booking.status = "Tentative"
+
+		self.assertRaisesRegex(frappe.ValidationError, "Only an emergency", booking.save)
 
 	def test_a_tentative_case_on_its_own_day_moves_without_a_reason(self):
 		booking = make_booking(self, self.today_at(19), priority=priority_named("STAT"))

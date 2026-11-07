@@ -87,12 +87,13 @@ class TestBoard(HealthcareTestSuite):
 
 	def test_a_case_carries_its_patients_age_and_sex_and_fasting(self):
 		booking = make_booking(self, self.at(9))
-		booking.db_set("fasting_confirmed", 1)
 		sex, dob = frappe.db.get_value("Patient", booking.patient, ["sex", "dob"])
 
 		shown = self.board()["bookings"][0]
 
-		self.assertEqual((shown.sex, shown.age, shown.fasting_confirmed), (sex, age_text(dob, self.day), 1))
+		self.assertEqual(
+			(shown.sex, shown.age, shown.fasting_confirmed), (sex, age_text(dob, self.day), False)
+		)
 
 	def test_age_is_in_years_or_in_months_under_a_year(self):
 		self.assertEqual(age_text("1980-05-20", "2026-05-19"), "45y")
@@ -168,6 +169,18 @@ class TestBoard(HealthcareTestSuite):
 		shown = self.board()["bookings"][0]
 
 		self.assertTrue(shown.sex)
+
+	def test_another_companys_board_is_refused(self):
+		create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)
+		user = create_user("_test_ot_coordinator_elsewhere@example.com", "OT Coordinator")
+		other_company = frappe.get_all("Company", filters={"name": ["!=", "_Test Company"]}, pluck="name")[0]
+		frappe.get_doc(
+			{"doctype": "User Permission", "user": user, "allow": "Company", "for_value": other_company}
+		).insert(ignore_permissions=True)
+		frappe.set_user(user)
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		self.assertRaises(frappe.PermissionError, self.board)
 
 	def test_a_caller_who_cannot_read_patients_gets_no_age_or_sex(self):
 		row = frappe._dict(patient=self.patients[0])

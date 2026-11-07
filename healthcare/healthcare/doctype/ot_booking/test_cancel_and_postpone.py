@@ -57,6 +57,14 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		self.assertNotIn(request, [row.name for row in get_open_requests()])
 		self.assertIn(booking.name, [row.name for row in get_postponed()])
 
+	def test_a_postponed_case_carries_its_priority(self):
+		_request, booking = self.booked_request()
+
+		self.stop(booking, "Postponed")
+
+		listed = {row.name: row for row in get_postponed()}[booking.name]
+		self.assertEqual((listed.priority_label, listed.is_emergency), ("Routine", False))
+
 	def test_a_postponed_case_is_in_its_procedures_department(self):
 		frappe.db.set_value(
 			"Clinical Procedure Template", self.template.name, "medical_department", DEPARTMENT

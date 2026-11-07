@@ -9,14 +9,17 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 import frappe
+from frappe import _
 from frappe.utils import cint, get_time, getdate
 
 from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave import find_leaves
+from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import ot_setting
 from healthcare.healthcare.doctype.ot_booking.availability import theatre_holiday_list
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.day_rules import needs_change_reason
+from healthcare.healthcare.doctype.ot_booking.fasting import is_fasting_confirmed
 from healthcare.healthcare.doctype.ot_booking.ot_booking import NEXT_STATUSES
-from healthcare.healthcare.doctype.ot_booking.priority import is_emergency, priority_code
+from healthcare.healthcare.doctype.ot_booking.priority import add_priority
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
 )
@@ -38,7 +41,7 @@ def get_board(date: str, company: str | None = None, department: str | None = No
 		"departments": theatre_departments(company),
 		"day_start": start,
 		"day_end": end,
-		"cleaning_minutes": cint(frappe.db.get_single_value("Healthcare Settings", "ot_cleaning_minutes")),
+		"cleaning_minutes": cint(ot_setting("ot_cleaning_minutes")),
 		"holiday": get_holiday(company, date),
 		"complexes": group_by_complex(theatres),
 		"bookings": get_bookings(date, list(theatres)),
@@ -48,17 +51,17 @@ def get_board(date: str, company: str | None = None, department: str | None = No
 
 
 def day_window(date):
-	start = frappe.db.get_single_value("Healthcare Settings", "ot_day_start_time") or "08:00:00"
-	end = frappe.db.get_single_value("Healthcare Settings", "ot_day_end_time") or "20:00:00"
+	start, end = ot_setting("ot_day_start_time"), ot_setting("ot_day_end_time")
 	return datetime.combine(date, get_time(start)), datetime.combine(date, get_time(end))
 
 
 def get_theatres(company, department=None):
-	"""Theatre name → theatre, in tree order"""
+	"""Theatre name → theatre, in tree order: only those the user may read"""
+	check_company_access(company)
 	filters = theatre_filters(company)
 	if department:
 		filters["medical_department"] = department
-	theatres = frappe.get_all(
+	theatres = frappe.get_list(
 		"Healthcare Service Unit",
 		fields=[
 			"name",
@@ -68,8 +71,18 @@ def get_theatres(company, department=None):
 		],
 		filters=filters,
 		order_by="lft",
+		limit=0,
 	)
 	return {theatre.name: theatre for theatre in theatres}
+
+
+def check_company_access(company):
+	"""A theatre's company ignores user permissions, so the company itself is checked: it must be
+	one the user can see"""
+	if company and company not in frappe.get_list("Company", pluck="name", limit=0):
+		frappe.throw(
+			_("You cannot see the theatres of {0}").format(frappe.bold(company)), frappe.PermissionError
+		)
 
 
 def theatre_filters(company):
@@ -81,13 +94,15 @@ def theatre_filters(company):
 
 def theatre_departments(company):
 	"""The departments the company's theatres belong to, for the board's Department filter"""
+	check_company_access(company)
 	filters = {**theatre_filters(company), "medical_department": ["is", "set"]}
-	return frappe.get_all(
+	return frappe.get_list(
 		"Healthcare Service Unit",
 		filters=filters,
 		pluck="medical_department",
 		distinct=True,
 		order_by="medical_department",
+		limit=0,
 	)
 
 
@@ -125,7 +140,6 @@ def get_bookings(date, theatres):
 			"priority",
 			"scheduled_start",
 			"scheduled_end",
-			"fasting_confirmed",
 			"modified",
 		],
 		filters={
@@ -158,14 +172,14 @@ def add_surgeons_and_procedures(bookings):
 		filters={"parent": ["in", names], "parenttype": "OT Booking"},
 		order_by="idx",
 	)
+	add_priority(bookings)
 	for booking in bookings:
 		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
-		booking.is_emergency = is_emergency(booking.priority)
-		booking.priority_label = priority_code(booking.priority).title()
 		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
 		rows = [row for row in procedures if row.parent == booking.name]
 		booking.procedures = [row.procedure_template for row in rows]
+		booking.fasting_confirmed = is_fasting_confirmed(booking, booking.procedures)
 		booking.procedures_pending = booking.status != "Completed" and any(
 			not row.clinical_procedure for row in rows
 		)

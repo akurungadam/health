@@ -13,7 +13,7 @@ defineProps({
 const STATUS_THEMES = {
 	Tentative: "gray",
 	Scheduled: "blue",
-	"In Progress": "orange",
+	"In Progress": "amber",
 	Completed: "green",
 };
 </script>

@@ -40,11 +40,17 @@ function moveDay(days) {
 		<DatePicker v-model="day" format="ddd, D MMM YYYY" class="w-44" />
 		<Badge
 			v-if="board?.holiday"
-			:theme="board.holiday.is_half_day ? 'orange' : 'red'"
+			:theme="board.holiday.is_half_day ? 'amber' : 'red'"
 			size="lg"
 		>
 			{{ board.holiday.is_half_day ? "Half-day holiday" : "Holiday" }}:
 			{{ board.holiday.description }}
 		</Badge>
+		<span
+			class="ml-auto rounded-full bg-surface-yellow-2 px-2.5 py-1 text-sm font-medium text-ink-yellow-8"
+			title="In beta: tell us what works and what does not"
+		>
+			Experimental
+		</span>
 	</div>
 </template>

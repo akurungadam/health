@@ -133,6 +133,7 @@ export function useDrop({
 				name: booking.name,
 				patient_name: booking.patient_name,
 				status: booking.status,
+				is_emergency: booking.is_emergency,
 				start: minutesOf(booking.scheduled_start),
 				end: minutesOf(booking.scheduled_end),
 			}));

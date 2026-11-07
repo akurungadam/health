@@ -3,9 +3,9 @@
 
 """Rules for a committed list. Adding a case never needs a reason, but on the day of surgery
 only an emergency, or an OT Manager, can add one or move one in from another day. Once a case
-is published (Scheduled), moving it, rescheduling it or cancelling it needs a reason; a
-Tentative case changes freely. The reason is for that one change: once saved it goes to the
-timeline and the field is emptied for the next one."""
+is published (Scheduled), moving it, rescheduling it, cancelling it or returning it to
+Tentative needs a reason; a Tentative case changes freely. The reason is for that one change:
+once saved it goes to the timeline and the field is emptied for the next one."""
 
 import frappe
 from frappe import _
@@ -16,11 +16,25 @@ from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
 
 
 def validate_day_rules(booking):
+	"""A move onto the day of surgery is both an addition to that day and, for a published case,
+	a change that needs its reason"""
 	before = booking.get_doc_before_save()
-	if not before or (is_surgery_day(booking) and not is_surgery_day(before)):
+	if is_added_to_surgery_day(booking, before):
 		validate_same_day_addition(booking)
-	elif needs_change_reason(before) and (is_stopped(booking, before) or is_moved(booking, before)):
+	if before and needs_change_reason(before) and is_published_change(booking, before):
 		validate_reason_given(booking)
+
+
+def is_added_to_surgery_day(booking, before):
+	"""A new case, one moved in from another day, or one restored from Postponed or Cancelled"""
+	if not before or not is_surgery_day(before):
+		return True
+	return before.status in INACTIVE_STATUSES and booking.status not in INACTIVE_STATUSES
+
+
+def is_published_change(booking, before):
+	"""Moving, stopping or unpublishing (back to Tentative) a case changes the published list"""
+	return is_stopped(booking, before) or is_moved(booking, before) or booking.status == "Tentative"
 
 
 def needs_change_reason(booking):

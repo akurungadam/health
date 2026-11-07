@@ -24,7 +24,9 @@ import BookingPreview from "./booking_preview.vue";
 import DropGhost from "./drop_ghost.vue";
 import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
 import { confirmPublish } from "./publish.js";
+import SlotHighlight from "./slot_highlight.vue";
 import { useDrop } from "./use_drop.js";
+import { useSlots } from "./use_slots.js";
 import { caseBorder, caseFill } from "./case_style.js";
 import DateBar from "./date_bar.vue";
 import { patientFacts } from "./patient.js";
@@ -96,9 +98,11 @@ onMounted(() => {
 watch([tentativeCount, canEdit], sendActions, { immediate: true });
 useBoardFeed(load);
 watch(day, value => (value ? load() : (day.value = today())));
-// the first load fills in the user's default company, which needs no second load
-watch(company, (_value, previous) => {
-	if (!previous) return;
+// the first load fills in the user's default company, which needs no second load; any other
+// change of company, the first pick of a user with no default included, loads the board
+let companyFromServer = false;
+watch(company, () => {
+	if (companyFromServer) return (companyFromServer = false);
 	department.value = "";
 	load();
 });
@@ -141,8 +145,19 @@ function caseMenu(booking) {
 	});
 }
 
-// The board's company and department, the same for loading and publishing. Only the ones
-// that are set: an empty one would arrive as the text "undefined".
+const {
+	finder,
+	picked,
+	find: findSlots,
+	pick: pickSlot,
+	book: bookSlot,
+	close: closeSlots,
+	slotIn,
+} = useSlots({ day, filters: boardFilters, change });
+// slots found for other theatres no longer apply
+watch([company, department], closeSlots);
+
+// The board's set filters, for loading and publishing: an empty one arrives as "undefined"
 function boardFilters() {
 	const filters = { company: company.value, department: department.value };
 	return Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
@@ -156,7 +171,10 @@ async function load() {
 			get("scheduling.get_open_requests", filters),
 			get("scheduling.get_postponed", filters),
 		]);
-		company.value ||= board.value.company || "";
+		if (!company.value && board.value.company) {
+			companyFromServer = true;
+			company.value = board.value.company;
+		}
 	} catch (error) {
 		showError(error);
 	}
@@ -304,6 +322,10 @@ function openBooking(name) {
 				@unschedule="unschedule"
 				@over="clearGhost"
 				@done="endDrag"
+				:finder="finder"
+				:picked="picked"
+				@find="findSlots"
+				@pick-slot="pickSlot"
 			/>
 
 			<p
@@ -379,15 +401,25 @@ function openBooking(name) {
 								<div
 									v-for="block in blocksIn(theatre.name)"
 									:key="block.name"
-									class="ot-hatch rounded-4 bg-surface-red-1"
+									class="ot-hatch overflow-hidden rounded-4 bg-surface-red-1 px-2 py-1"
 									:style="
 										placed(
 											minutesOf(block.start_time),
 											minutesOf(block.end_time),
 										)
 									"
-									:title="`Unavailable (${block.name})`"
-								/>
+									:title="
+										[block.title, block.reason]
+											.filter(Boolean)
+											.join(' · ')
+									"
+								>
+									<p
+										class="truncate text-xs font-medium text-ink-red-7"
+									>
+										{{ block.title }}
+									</p>
+								</div>
 								<template
 									v-for="booking in bookingsIn(theatre.name)"
 									:key="booking.name"
@@ -523,6 +555,19 @@ function openBooking(name) {
 									v-if="plan && dropTheatre === theatre.name"
 									:plan="plan"
 									:placed="placed"
+								/>
+								<SlotHighlight
+									v-if="slotIn(theatre.name)"
+									:place="
+										placed(
+											minutesOf(picked.start),
+											minutesOf(picked.end) +
+												board.cleaning_minutes,
+										)
+									"
+									:gap="picked"
+									@book="bookSlot"
+									@clear="picked = null"
 								/>
 							</div>
 						</div>

@@ -1,6 +1,7 @@
 // A case's menu on the board, opened with a left or right click: view it, create its
-// procedures, reschedule it, or move it to its next status. Cancelling a published case needs a
-// reason; a Tentative one only a confirm, so a click cannot cancel it by mistake. A viewer who
+// procedures, reschedule it, or move it to its next status. Cancelling a published case, or
+// taking it back to Tentative, needs a reason; cancelling a Tentative one only a confirm, so a
+// click cannot cancel it by mistake. A viewer who
 // cannot change bookings gets View alone.
 
 export function caseMenu(
@@ -29,22 +30,27 @@ export function caseMenu(
 function statusOptions(booking, change, askReason) {
 	const options = booking.next_statuses
 		.filter(status => status !== "Postponed")
-		.map(status =>
-			status === "Cancelled"
-				? {
-						label: "Cancel…",
-						theme: "red",
-						onClick: () => cancel(booking, change, askReason),
-				  }
-				: {
-						label: status,
-						onClick: () =>
-							change("set_status", statusParams(booking, status)),
-				  },
-		);
+		.map(status => statusOption(booking, status, change, askReason));
 	if (!options.length)
 		options.push({ label: `No change from ${booking.status}`, disabled: true });
 	return options;
+}
+
+function statusOption(booking, status, change, askReason) {
+	const params = statusParams(booking, status);
+	if (status === "Cancelled")
+		return {
+			label: "Cancel…",
+			theme: "red",
+			onClick: () => cancel(booking, change, askReason),
+		};
+	// only a Scheduled case goes back to Tentative, which unpublishes it
+	if (status === "Tentative")
+		return {
+			label: "Tentative…",
+			onClick: () => askReason("set_status", params, "Unpublish"),
+		};
+	return { label: status, onClick: () => change("set_status", params) };
 }
 
 function cancel(booking, change, askReason) {

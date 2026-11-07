@@ -182,11 +182,12 @@
    "label": "Consent Signed"
   },
   {
-   "default": "0",
-   "description": "Ticked by the ward once the patient has been nil by mouth for the required time",
+   "description": "Shown once the ward completes the patient's fasting task for this case's time",
    "fieldname": "fasting_confirmed",
    "fieldtype": "Check",
-   "label": "Fasting Confirmed"
+   "is_virtual": 1,
+   "label": "Fasting Confirmed",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_consent",
@@ -212,7 +213,7 @@
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-07 14:06:28.993954",
+ "modified": "2026-11-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "OT Booking",

@@ -4,6 +4,7 @@
 import frappe
 from frappe.utils import add_days, add_to_date, get_datetime, now_datetime, nowdate
 
+from healthcare.healthcare.doctype.ot_booking.board import get_board
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.scheduling import set_status
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
@@ -48,6 +49,15 @@ class TestFasting(HealthcareTestSuite):
 		booking.reload()
 		return booking
 
+	def confirmed(self, booking):
+		return frappe.get_doc("OT Booking", booking.name).fasting_confirmed
+
+	def complete_task(self, booking):
+		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
+		task.status = "Completed"
+		task.save()
+		return task
+
 	def tasks(self, booking, status=None):
 		filters = {"reference_doctype": "OT Booking", "reference_name": booking.name}
 		if status:
@@ -88,12 +98,18 @@ class TestFasting(HealthcareTestSuite):
 
 	def test_completing_the_task_confirms_fasting(self):
 		booking = self.scheduled()
-		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
 
-		task.status = "Completed"
-		task.save()
+		self.complete_task(booking)
 
-		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 1)
+		self.assertTrue(self.confirmed(booking))
+
+	def test_the_board_shows_confirmed_fasting(self):
+		booking = self.scheduled()
+		self.complete_task(booking)
+
+		[shown] = get_board(self.day, "_Test Company")["bookings"]
+
+		self.assertTrue(shown.fasting_confirmed)
 
 	def test_a_procedure_that_needs_no_fasting_sends_no_task(self):
 		frappe.db.set_value("Clinical Procedure Template", self.template.name, "requires_fasting", 0)
@@ -112,7 +128,7 @@ class TestFasting(HealthcareTestSuite):
 
 	def test_a_longer_fasting_replaces_the_task_and_clears_its_confirmation(self):
 		booking = self.scheduled(hour=9)
-		booking.db_set("fasting_confirmed", 1)
+		self.complete_task(booking)
 		frappe.db.set_value("Clinical Procedure Template", self.template.name, "fasting_hours", 8)
 
 		booking.reload()
@@ -120,7 +136,7 @@ class TestFasting(HealthcareTestSuite):
 
 		[task] = self.tasks(booking, "Requested")
 		self.assertEqual(get_datetime(task.requested_start_time), add_to_date(self.at(9), hours=-8))
-		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 0)
+		self.assertFalse(self.confirmed(booking))
 
 	def test_a_missed_task_is_cancelled_when_the_case_moves(self):
 		booking = self.scheduled(hour=9)
@@ -134,13 +150,11 @@ class TestFasting(HealthcareTestSuite):
 
 	def test_an_out_of_date_task_does_not_confirm_fasting(self):
 		booking = self.scheduled(hour=9)
-		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
 		frappe.db.set_value("Clinical Procedure Template", self.template.name, "fasting_hours", 8)
 
-		task.status = "Completed"
-		task.save()
+		self.complete_task(booking)
 
-		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 0)
+		self.assertFalse(self.confirmed(booking))
 
 	def test_starting_the_procedure_cancels_the_fasting_task(self):
 		booking = self.scheduled(hour=9)
@@ -156,14 +170,11 @@ class TestFasting(HealthcareTestSuite):
 		booking = make_booking(self, start, priority=priority_named("STAT"))
 		set_status(booking.name, "Scheduled", str(booking.modified))
 		booking.reload()
-		task = frappe.get_doc("Nursing Task", self.tasks(booking)[0].name)
-
-		task.status = "Completed"
-		task.save()
+		task = self.complete_task(booking)
 		booking.reload()
 		booking.save()
 
-		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "fasting_confirmed"), 1)
+		self.assertTrue(self.confirmed(booking))
 		self.assertEqual([row.name for row in self.tasks(booking)], [task.name])
 
 	def test_a_postponed_case_loses_its_task_after_fasting_is_switched_off(self):

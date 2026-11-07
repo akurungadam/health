@@ -90,6 +90,12 @@ class TestBookingProcedures(HealthcareTestSuite):
 		self.assertEqual(booking.procedures[0].procedure_template, self.template.name)
 		self.assertEqual(booking.procedures[0].duration, HOUR)
 
+	def test_a_request_cannot_be_in_a_booking_twice(self):
+		booking = self.book_from_request(self.at(9))
+		booking.append("procedures", {"service_request": booking.procedures[0].service_request})
+
+		self.assertRaisesRegex(frappe.ValidationError, "already in this booking", booking.save)
+
 	def test_a_request_for_another_patient_is_refused(self):
 		request = create_service_request(self.patients[1], self.practitioners[0])
 		booking = make_ot_booking(request.name)

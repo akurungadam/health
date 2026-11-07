@@ -52,9 +52,11 @@ export function planDrop({
 	const problem =
 		holiday && !emergency
 			? `${holiday} is a theatre holiday`
-			: findProblem({ cases, blocks, start, end, pushes, cleaning });
+			: findProblem({ cases, blocks, start, end, pushes, cleaning, emergency });
 	const lastEnd = Math.max(end, ...pushes.map(push => push.end));
 	const late = lastEnd > dayEnd ? `Runs past ${hourMinute(dayEnd)}` : "";
+	const overBlock = emergency && blockedBy(blocks, [{ start, end }]);
+	const warning = overBlock ? `Emergency in blocked ${blockedText(overBlock)}` : "";
 	return {
 		start,
 		end,
@@ -62,7 +64,8 @@ export function planDrop({
 		problem,
 		needsReason: pushes.some(push => push.status === "Scheduled"),
 		label:
-			problem || [result(start, end, pushes), late].filter(Boolean).join(" · "),
+			problem ||
+			[result(start, end, pushes), late, warning].filter(Boolean).join(" · "),
 	};
 }
 
@@ -86,22 +89,31 @@ function pushesAfter(cases, start, end, cleaning) {
 	return pushes;
 }
 
-function findProblem({ cases, blocks, start, end, pushes, cleaning }) {
+// An emergency may go into blocked theatre time (the server only warns), so only the
+// non-emergency cases, the dropped one and those it pushes, are checked against blocks
+function findProblem({ cases, blocks, start, end, pushes, cleaning, emergency }) {
 	const overlapped = cases.find(
 		item => item.start < start && item.end + cleaning > start,
 	);
 	if (overlapped) return `Overlaps ${overlapped.patient_name}`;
 	const underWay = pushes.find(push => UNDER_WAY.includes(push.status));
 	if (underWay) return `${underWay.patient_name} is under way and cannot be pushed`;
-	const spans = [{ start, end }, ...pushes];
-	const blocked = blocks.find(block =>
+	const spans = [{ start, end, is_emergency: emergency }, ...pushes];
+	const blocked = blockedBy(
+		blocks,
+		spans.filter(span => !span.is_emergency),
+	);
+	return blocked ? `Theatre blocked ${blockedText(blocked)}` : "";
+}
+
+function blockedBy(blocks, spans) {
+	return blocks.find(block =>
 		spans.some(span => span.start < block.end && block.start < span.end),
 	);
-	if (blocked)
-		return `Theatre blocked ${hourMinute(blocked.start)}–${hourMinute(
-			blocked.end,
-		)}`;
-	return "";
+}
+
+function blockedText(block) {
+	return `${hourMinute(block.start)}–${hourMinute(block.end)}`;
 }
 
 function result(start, end, pushes) {

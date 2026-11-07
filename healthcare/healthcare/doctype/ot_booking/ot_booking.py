@@ -18,7 +18,7 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 	validate_no_conflicts,
 )
 from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
-from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
+from healthcare.healthcare.doctype.ot_booking.fasting import is_fasting_confirmed, sync_fasting_task
 from healthcare.healthcare.doctype.ot_booking.priority import set_priority
 
 ACTIVE_REQUEST_STATUS = "active-Request Status"
@@ -35,6 +35,11 @@ NEW_STATUSES = ("Tentative", "Scheduled")
 
 
 class OTBooking(Document):
+	@property
+	def fasting_confirmed(self):
+		"""A virtual field, read from the ward's fasting task (fasting.py)"""
+		return is_fasting_confirmed(self, [row.procedure_template for row in self.procedures])
+
 	def validate(self):
 		self.patient_name = frappe.db.get_value("Patient", self.patient, "patient_name")
 		set_priority(self)
@@ -140,9 +145,17 @@ class OTBooking(Document):
 				)
 
 	def validate_service_requests(self):
+		seen = set()
 		for row in self.procedures:
 			if not row.service_request:
 				continue
+			if row.service_request in seen:
+				frappe.throw(
+					_("Row {0}: Service Request {1} is already in this booking").format(
+						row.idx, frappe.bold(row.service_request)
+					)
+				)
+			seen.add(row.service_request)
 			if frappe.db.get_value("Service Request", row.service_request, "patient") != self.patient:
 				frappe.throw(
 					_("Row {0}: Service Request {1} is for another patient").format(

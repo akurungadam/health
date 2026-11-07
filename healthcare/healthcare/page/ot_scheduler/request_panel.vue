@@ -2,10 +2,13 @@
 // The cases still waiting for a theatre: open surgical requests, and postponed cases.
 // Drag one onto a theatre row to book it. Drop a booked case here to postpone it.
 import { computed, ref } from "vue";
-import { FormControl } from "frappe-ui";
+import { Badge, FormControl } from "frappe-ui";
 import { useHost } from "@framework/ui/island";
 
+import { priorityBorder, priorityTheme } from "./case_style.js";
+import FinderButton from "./finder_button.vue";
 import { patientFacts } from "./patient.js";
+import SlotList from "./slot_list.vue";
 import { today } from "./time.js";
 
 const props = defineProps({
@@ -13,8 +16,19 @@ const props = defineProps({
 	postponed: { type: Array, default: () => [] },
 	// a booked case is being dragged, so the pane offers to take it
 	dropping: { type: Boolean, default: false },
+	// the slot finder: which card it is open on and what it found (use_slots.js)
+	finder: { type: Object, required: true },
+	picked: { type: Object, default: null },
 });
-const emit = defineEmits(["pick", "pickPostponed", "unschedule", "over", "done"]);
+const emit = defineEmits([
+	"pick",
+	"pickPostponed",
+	"unschedule",
+	"over",
+	"done",
+	"find",
+	"pickSlot",
+]);
 
 const host = useHost();
 const search = ref("");
@@ -100,15 +114,31 @@ function drop() {
 				v-for="request in shownRequests"
 				:key="request.name"
 				draggable="true"
-				class="cursor-grab rounded-4 border border-outline-gray-2 bg-surface-base p-2"
+				class="cursor-grab rounded-4 bg-surface-base p-2"
+				:class="priorityBorder(request)"
 				@dragstart="emit('pick', request, $event)"
 				@dragend="emit('done')"
 			>
-				<p class="break-words text-sm font-medium text-ink-gray-9">
-					{{ request.patient_name }}
-					<span class="font-normal text-ink-gray-5">{{
-						patientFacts(request)
-					}}</span>
+				<p
+					class="flex items-start justify-between gap-2 break-words text-sm font-medium text-ink-gray-9"
+				>
+					<span>
+						{{ request.patient_name }}
+						<span class="font-normal text-ink-gray-5">{{
+							patientFacts(request)
+						}}</span>
+					</span>
+					<Badge
+						v-if="request.priority_label"
+						class="ml-auto shrink-0"
+						:theme="priorityTheme(request)"
+					>
+						{{ request.priority_label }}
+					</Badge>
+					<FinderButton
+						:open="finder.for === request.name"
+						@click="emit('find', { request })"
+					/>
 				</p>
 				<p class="break-words text-xs text-ink-gray-6">
 					{{ request.procedure }}
@@ -129,6 +159,13 @@ function drop() {
 				>
 					Expected by {{ formatDate(request.expected_date) }}
 				</p>
+				<SlotList
+					v-if="finder.for === request.name"
+					class="mt-2"
+					:finder="finder"
+					:picked="picked"
+					@pick="slot => emit('pickSlot', slot)"
+				/>
 			</div>
 
 			<p
@@ -141,15 +178,31 @@ function drop() {
 				v-for="booking in shownPostponed"
 				:key="booking.name"
 				draggable="true"
-				class="cursor-grab rounded-4 border border-dashed border-outline-gray-3 bg-surface-base p-2"
+				class="cursor-grab rounded-4 border-dashed bg-surface-base p-2"
+				:class="priorityBorder(booking)"
 				@dragstart="emit('pickPostponed', booking, $event)"
 				@dragend="emit('done')"
 			>
-				<p class="break-words text-sm font-medium text-ink-gray-9">
-					{{ booking.patient_name }}
-					<span class="font-normal text-ink-gray-5">{{
-						patientFacts(booking)
-					}}</span>
+				<p
+					class="flex items-start justify-between gap-2 break-words text-sm font-medium text-ink-gray-9"
+				>
+					<span>
+						{{ booking.patient_name }}
+						<span class="font-normal text-ink-gray-5">{{
+							patientFacts(booking)
+						}}</span>
+					</span>
+					<Badge
+						v-if="booking.priority_label"
+						class="ml-auto shrink-0"
+						:theme="priorityTheme(booking)"
+					>
+						{{ booking.priority_label }}
+					</Badge>
+					<FinderButton
+						:open="finder.for === booking.name"
+						@click="emit('find', { booking })"
+					/>
 				</p>
 				<p class="break-words text-xs text-ink-gray-6">
 					{{ booking.procedures.join(", ") }}
@@ -159,6 +212,13 @@ function drop() {
 					{{ booking.surgeon }} &middot;
 					{{ booking.name }}
 				</p>
+				<SlotList
+					v-if="finder.for === booking.name"
+					class="mt-2"
+					:finder="finder"
+					:picked="picked"
+					@pick="slot => emit('pickSlot', slot)"
+				/>
 			</div>
 		</div>
 	</aside>

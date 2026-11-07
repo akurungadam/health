@@ -24,6 +24,19 @@ def priority_code(priority):
 	return (frappe.db.get_value("Code Value", priority, "code_value", cache=True) or "").upper()
 
 
+def add_priority(rows):
+	"""Each row's priority code as written, such as STAT, and whether it is an emergency"""
+	for row in rows:
+		row.priority_label = priority_label(row.priority)
+		row.is_emergency = is_emergency(row.priority)
+
+
+def priority_label(priority):
+	if not priority:
+		return ""
+	return frappe.db.get_value("Code Value", priority, "code_value", cache=True) or ""
+
+
 def priority_named(code):
 	"""The Priority Code Value whose code is `code`, such as STAT or Routine"""
 	return frappe.db.get_value("Code Value", {"code_system": PRIORITY_CODE_SYSTEM, "code_value": code})

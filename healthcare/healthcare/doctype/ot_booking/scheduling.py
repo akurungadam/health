@@ -13,12 +13,11 @@ from healthcare.healthcare.doctype.ot_booking.board import (
 	add_patient_details,
 	add_surgeons_and_procedures,
 )
-from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.ot_booking import (
 	ACTIVE_REQUEST_STATUS,
 	make_ot_booking,
 )
-from healthcare.healthcare.doctype.ot_booking.priority import is_emergency
+from healthcare.healthcare.doctype.ot_booking.priority import add_priority
 from healthcare.healthcare.doctype.ot_booking.push import push_following
 from healthcare.healthcare.doctype.ot_booking.refusal import refusal_text
 
@@ -73,7 +72,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 	open_requests.sort(key=lambda request: (not request.expected_date, request.expected_date or ""))
 	for request in open_requests:
 		request.duration = templates[request.procedure].default_duration
-		request.is_emergency = is_emergency(request.priority)
+	add_priority(open_requests)
 	if open_requests:
 		add_patient_details(open_requests, nowdate())
 	return open_requests
@@ -104,6 +103,7 @@ def get_postponed(company: str | None = None, department: str | None = None) -> 
 		limit=0,
 	)
 	if bookings:
+		add_priority(bookings)
 		add_surgeons_and_procedures(bookings)
 		add_patient_details(bookings, nowdate())
 	if department and bookings:

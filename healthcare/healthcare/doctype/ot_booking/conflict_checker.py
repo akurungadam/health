@@ -12,6 +12,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, format_datetime, get_datetime, getdate
 
+from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import ot_setting
+
 INACTIVE_STATUSES = ("Cancelled", "Postponed")
 MAX_OVERLAPPING_THEATRES = 2
 
@@ -113,7 +115,7 @@ def booking_slot(booking):
 
 
 def cleaning_time():
-	return timedelta(minutes=cint(frappe.db.get_single_value("Healthcare Settings", "ot_cleaning_minutes")))
+	return timedelta(minutes=cint(ot_setting("ot_cleaning_minutes")))
 
 
 def slot_text(other):
