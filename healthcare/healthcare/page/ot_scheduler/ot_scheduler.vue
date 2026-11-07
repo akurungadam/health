@@ -22,6 +22,7 @@ import FastingIcon from "~icons/lucide/utensils-crossed";
 
 import BookingPreview from "./booking_preview.vue";
 import DropGhost from "./drop_ghost.vue";
+import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
 import { confirmPublish } from "./publish.js";
 import { useDrop } from "./use_drop.js";
 import { caseBorder, caseFill } from "./case_style.js";
@@ -40,9 +41,6 @@ const props = defineProps({
 const emit = defineEmits(["title", "actions"]);
 const host = useHost();
 
-// statuses that take a case off the board, and the word for doing it
-const STOPPING = ["Postponed", "Cancelled"];
-const STOPPING_ACTIONS = { Postponed: "Postpone", Cancelled: "Cancel" };
 const day = ref(props.query.date || today());
 const company = ref(props.query.company || "");
 const department = ref(props.query.department || "");
@@ -116,6 +114,9 @@ const {
 	dragOver,
 	drop,
 	unschedule,
+	reschedule,
+	clearGhost,
+	endDrag,
 } = useDrop({
 	board,
 	day,
@@ -126,8 +127,19 @@ const {
 	blocksIn,
 	change,
 	askReason,
-	stopParams,
+	stopParams: statusParams,
 });
+
+function caseMenu(booking) {
+	return buildCaseMenu(booking, {
+		canEdit: canEdit.value,
+		open: openBooking,
+		createProcedures,
+		reschedule,
+		change,
+		askReason,
+	});
+}
 
 // The board's company and department, the same for loading and publishing. Only the ones
 // that are set: an empty one would arrive as the text "undefined".
@@ -148,10 +160,6 @@ async function load() {
 	} catch (error) {
 		showError(error);
 	}
-}
-
-function stopParams(booking, status) {
-	return { name: booking.name, status, modified: booking.modified };
 }
 
 // A change the server will refuse without a reason waits here for one
@@ -176,41 +184,6 @@ function menuOpened(booking, open) {
 
 function previewOpened(booking, open) {
 	previewFor.value = open && !menuFor.value && !reasonFor.value ? booking.name : null;
-}
-
-// A case's menu, on a left or right click: open it, or move it to a next status
-function caseMenu(booking) {
-	const statuses = booking.next_statuses.map(status =>
-		STOPPING.includes(status)
-			? {
-					label: `${STOPPING_ACTIONS[status]}…`,
-					theme: "red",
-					onClick: () =>
-						askReason(
-							"set_status",
-							stopParams(booking, status),
-							STOPPING_ACTIONS[status],
-						),
-			  }
-			: {
-					label: status,
-					onClick: () => change("set_status", stopParams(booking, status)),
-			  },
-	);
-	if (!statuses.length)
-		statuses.push({ label: `No change from ${booking.status}`, disabled: true });
-	const actions = [{ label: "View", onClick: () => openBooking(booking.name) }];
-	if (!canEdit.value)
-		return [{ group: "Booking", hideLabel: true, options: actions }];
-	if (booking.procedures_pending)
-		actions.push({
-			label: "Create Procedures",
-			onClick: () => createProcedures(booking),
-		});
-	return [
-		{ group: "Booking", hideLabel: true, options: actions },
-		{ group: "Change status", options: statuses },
-	];
 }
 
 function sendActions([count, editable]) {
@@ -329,7 +302,8 @@ function openBooking(name) {
 				@pick="pickRequest"
 				@pick-postponed="pickPostponed"
 				@unschedule="unschedule"
-				@done="dragged = null"
+				@over="clearGhost"
+				@done="endDrag"
 			/>
 
 			<p
@@ -459,7 +433,7 @@ function openBooking(name) {
 												@dragstart="
 													pickBooking(booking, $event)
 												"
-												@dragend="dragged = null"
+												@dragend="endDrag"
 												@click="setOpen(true)"
 											>
 												<HoverCard

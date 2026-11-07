@@ -14,7 +14,7 @@ const props = defineProps({
 	// a booked case is being dragged, so the pane offers to take it
 	dropping: { type: Boolean, default: false },
 });
-const emit = defineEmits(["pick", "pickPostponed", "unschedule", "done"]);
+const emit = defineEmits(["pick", "pickPostponed", "unschedule", "over", "done"]);
 
 const host = useHost();
 const search = ref("");
@@ -68,7 +68,10 @@ function drop() {
 	<aside
 		class="flex w-72 shrink-0 flex-col gap-2 overflow-hidden rounded-4 border-2 border-dashed"
 		:class="dropping ? 'border-outline-gray-3 p-1' : 'border-transparent'"
-		@dragover.prevent="over = dropping"
+		@dragover.prevent="
+			over = dropping;
+			emit('over');
+		"
 		@dragleave="over = false"
 		@drop.prevent="drop"
 	>
@@ -80,7 +83,7 @@ function drop() {
 			class="rounded-4 p-3 text-center text-sm text-ink-gray-6"
 			:class="over ? 'bg-surface-gray-3' : 'bg-surface-gray-1'"
 		>
-			Drop here to postpone the case
+			Drop here to reschedule the case
 		</p>
 		<FormControl
 			v-model="search"
@@ -132,7 +135,7 @@ function drop() {
 				v-if="shownPostponed.length"
 				class="pt-2 text-sm font-semibold text-ink-gray-7"
 			>
-				Postponed ({{ shownPostponed.length }})
+				To reschedule ({{ shownPostponed.length }})
 			</p>
 			<div
 				v-for="booking in shownPostponed"

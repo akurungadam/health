@@ -64,12 +64,10 @@ class TestDayRules(HealthcareTestSuite):
 
 		make_booking(self, self.today_at(19), priority=priority_named("STAT"))
 
-	def test_an_ot_manager_adds_an_elective_case_on_its_own_day_with_a_reason(self):
-		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", make_booking, self, self.today_at(19))
+	def test_an_ot_manager_adds_an_elective_case_on_its_own_day_without_a_reason(self):
+		booking = make_booking(self, self.today_at(19))
 
-		booking = make_booking(self, self.today_at(19), change_reason="Theatre freed by a cancellation")
-
-		self.assertTrue(has_reason_comment(booking.name, "Theatre freed"))
+		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Tentative")
 
 	def test_a_scheduled_case_needs_a_reason_to_move(self):
 		booking = self.scheduled_booking()
@@ -98,11 +96,11 @@ class TestDayRules(HealthcareTestSuite):
 
 		booking.save()
 
-	def test_a_tentative_case_needs_a_reason_to_be_cancelled(self):
+	def test_a_tentative_case_is_cancelled_without_a_reason(self):
 		booking = make_booking(self, self.later_at(9))
 		booking.status = "Cancelled"
 
-		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
+		booking.save()
 
 	def test_a_tentative_case_on_a_later_day_moves_without_a_reason(self):
 		booking = make_booking(self, self.later_at(9))

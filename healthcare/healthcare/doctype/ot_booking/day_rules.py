@@ -1,11 +1,11 @@
 # Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""Rules for a committed list. On the day of surgery only an emergency can be added, or moved
-in from another day, unless an OT Manager gives a reason. Moving a Scheduled case needs a
-reason, and so does cancelling or postponing any case; a Tentative or Postponed case moves
-freely. The reason is for that one change: once saved it goes to the timeline and the field
-is emptied for the next one."""
+"""Rules for a committed list. Adding a case never needs a reason, but on the day of surgery
+only an emergency, or an OT Manager, can add one or move one in from another day. Once a case
+is published (Scheduled), moving it, rescheduling it or cancelling it needs a reason; a
+Tentative case changes freely. The reason is for that one change: once saved it goes to the
+timeline and the field is emptied for the next one."""
 
 import frappe
 from frappe import _
@@ -19,12 +19,12 @@ def validate_day_rules(booking):
 	before = booking.get_doc_before_save()
 	if not before or (is_surgery_day(booking) and not is_surgery_day(before)):
 		validate_same_day_addition(booking)
-	elif is_stopped(booking, before) or (needs_change_reason(before) and is_moved(booking, before)):
+	elif needs_change_reason(before) and (is_stopped(booking, before) or is_moved(booking, before)):
 		validate_reason_given(booking)
 
 
 def needs_change_reason(booking):
-	"""Whether moving the case needs a reason: only once its day's list is published"""
+	"""Whether moving or stopping the case needs a reason: only once its day's list is published"""
 	return booking.status == "Scheduled"
 
 
@@ -35,7 +35,6 @@ def validate_same_day_addition(booking):
 		frappe.throw(
 			_("Only an emergency case can be added on the day of surgery"), title=_("Day Already Planned")
 		)
-	validate_reason_given(booking)
 
 
 def is_moved(booking, before):

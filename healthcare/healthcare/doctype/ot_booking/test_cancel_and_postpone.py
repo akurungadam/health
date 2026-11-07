@@ -105,6 +105,27 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Tentative")
 
+	def test_a_tentative_case_is_rescheduled_without_a_reason(self):
+		booking = make_booking(self, self.at(9))
+
+		set_status(booking.name, "Postponed", str(booking.modified))
+
+		self.assertIn(booking.name, [row.name for row in get_postponed()])
+
+	def test_a_scheduled_case_needs_a_reason_to_be_rescheduled(self):
+		booking = make_booking(self, self.at(9))
+		booking.db_set("status", "Scheduled")
+		booking.reload()
+
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"Change Reason",
+			set_status,
+			booking.name,
+			"Postponed",
+			str(booking.modified),
+		)
+
 	def test_a_postponed_reason_goes_to_the_timeline(self):
 		booking = make_booking(self, self.at(9))
 
