@@ -1,12 +1,25 @@
 <script setup>
-// The OT Scheduler: one day of every theatre, read-only for now.
+// The OT Scheduler: one day of every theatre.
 //
 // Theatres are rows grouped by OT complex, and time runs across. Each case shows
 // its cleaning time after it, blocked theatre time is hatched, and the
-// practitioners who are away that day are listed above the board.
+// practitioners who are away that day are listed above the board. A request from
+// the panel dropped onto a row is booked there; a case dragged elsewhere moves.
+// The server checks every drop, so a refused one stays where it was.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { Badge, Button, DatePicker, frappeRequest } from "frappe-ui";
+import {
+	Badge,
+	Button,
+	DatePicker,
+	Dialog,
+	ErrorMessage,
+	FormControl,
+	frappeRequest,
+} from "frappe-ui";
 import { useHost } from "@framework/ui/island";
+
+import RequestPanel from "./request_panel.vue";
+import { playDropSound } from "./sounds.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -16,6 +29,8 @@ const emit = defineEmits(["title", "actions"]);
 const host = useHost();
 
 const RELOAD_SECONDS = 60;
+const SNAP_MINUTES = 15;
+const API = "healthcare.healthcare.doctype.ot_booking";
 const STATUS_CLASSES = {
 	Tentative: "border-dashed border-outline-gray-3 bg-surface-gray-2",
 	Scheduled: "border-outline-blue-1 bg-surface-blue-2",
@@ -26,6 +41,11 @@ const STATUS_CLASSES = {
 const day = ref(props.query.date || today());
 const board = ref(null);
 const notice = ref("");
+const requests = ref([]);
+const dragged = ref(null);
+const dropTheatre = ref(null);
+const reasonFor = ref(null);
+const reason = ref("");
 
 const dayStart = computed(() => board.value && minutesOf(board.value.day_start));
 const dayEnd = computed(() => board.value && minutesOf(board.value.day_end));
@@ -48,15 +68,93 @@ watch(day, value => (value ? load() : goToday()));
 
 async function load() {
 	try {
-		board.value = await frappeRequest({
-			url: "healthcare.healthcare.doctype.ot_booking.board.get_board",
-			params: { date: day.value },
-			method: "GET",
-		});
-		notice.value = "";
+		[board.value, requests.value] = await Promise.all([
+			get("board.get_board", { date: day.value }),
+			get("scheduling.get_open_requests"),
+		]);
 	} catch (error) {
-		notice.value = error?.messages?.join("\n") || error?.message || String(error);
+		notice.value = error;
 	}
+}
+
+function get(method, params = {}) {
+	return frappeRequest({ url: `${API}.${method}`, params, method: "GET" });
+}
+
+function post(method, params) {
+	const headers = { "X-Frappe-CSRF-Token": window.frappe?.csrf_token };
+	return frappeRequest({ url: `${API}.${method}`, params, method: "POST", headers });
+}
+
+function pickRequest(request, event) {
+	dragged.value = { request, grab: 0 };
+	event.dataTransfer.setData("text/plain", request.name);
+}
+
+// Where in the case it was grabbed, so the case keeps that point under the cursor
+function pickBooking(booking, event) {
+	const block = event.currentTarget.getBoundingClientRect();
+	const row = event.currentTarget.parentElement.getBoundingClientRect();
+	const grab =
+		((event.clientX - block.left) / row.width) * (dayEnd.value - dayStart.value);
+	dragged.value = { booking, grab };
+	event.dataTransfer.setData("text/plain", booking.name);
+}
+
+function drop(theatre, event) {
+	dropTheatre.value = null;
+	const drag = dragged.value;
+	dragged.value = null;
+	if (!drag) return;
+	const start = dropStart(event, drag.grab);
+	if (drag.request)
+		return change("book_request", {
+			service_request: drag.request.name,
+			theatre,
+			start,
+		});
+	const move = {
+		name: drag.booking.name,
+		theatre,
+		start,
+		modified: drag.booking.modified,
+	};
+	if (drag.booking.status === "Scheduled") return askReason(move);
+	change("move_booking", move);
+}
+
+function dropStart(event, grab) {
+	const row = event.currentTarget.getBoundingClientRect();
+	const at =
+		dayStart.value +
+		((event.clientX - row.left) / row.width) * (dayEnd.value - dayStart.value);
+	const minutes = Math.round((at - grab) / SNAP_MINUTES) * SNAP_MINUTES;
+	return `${day.value} ${twoDigits(Math.floor(minutes / 60))}:${twoDigits(
+		minutes % 60,
+	)}:00`;
+}
+
+function askReason(move) {
+	reason.value = "";
+	reasonFor.value = move;
+}
+
+function moveWithReason({ close }) {
+	if (!reason.value.trim()) return;
+	change("move_booking", { ...reasonFor.value, reason: reason.value });
+	close();
+}
+
+async function change(method, params) {
+	try {
+		await post(`scheduling.${method}`, params);
+		notice.value = "";
+		playDropSound("placed");
+	} catch (error) {
+		notice.value = error;
+		playDropSound("refused");
+	}
+	load();
 }
 
 function moveDay(days) {
@@ -87,7 +185,7 @@ function span(start, end) {
 	};
 }
 
-// Blocks share one grid cell, so the row grows to its tallest block
+// Blocks share one grid cell, placed across it by time
 function placed(start, end) {
 	const { left, width } = span(start, end);
 	return { gridArea: "1 / 1", marginLeft: left, width };
@@ -109,9 +207,11 @@ function minutesOf(value) {
 
 function clock(value) {
 	const minutes = minutesOf(value);
-	return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
-		minutes % 60,
-	).padStart(2, "0")}`;
+	return `${twoDigits(Math.floor(minutes / 60))}:${twoDigits(minutes % 60)}`;
+}
+
+function twoDigits(number) {
+	return String(number).padStart(2, "0");
 }
 
 function today() {
@@ -141,7 +241,7 @@ function useBoardFeed(reload) {
 
 <template>
 	<div class="flex h-full flex-col gap-3 overflow-hidden p-5">
-		<div class="flex flex-wrap items-center gap-2">
+		<div class="flex shrink-0 flex-wrap items-center gap-2">
 			<Button @click="moveDay(-1)">Previous</Button>
 			<Button @click="goToday">Today</Button>
 			<Button @click="moveDay(1)">Next</Button>
@@ -156,16 +256,18 @@ function useBoardFeed(reload) {
 			</Badge>
 		</div>
 
-		<p v-if="notice" class="rounded-3 bg-surface-red-2 p-3 text-sm text-ink-red-3">
-			{{ notice }}
-		</p>
+		<ErrorMessage :message="notice" class="shrink-0" />
 
 		<div
 			v-if="board?.away.length"
-			class="flex flex-wrap items-center gap-2 text-sm"
+			class="flex shrink-0 flex-wrap items-center gap-2 text-sm"
 		>
 			<span class="text-ink-gray-5">Away today</span>
-			<Badge v-for="row in board.away" :key="row.reference" theme="gray">
+			<Badge
+				v-for="row in board.away"
+				:key="`${row.practitioner} ${row.reason} ${row.from_time}`"
+				theme="gray"
+			>
 				{{ row.practitioner_name }} &middot; {{ row.reason }}
 				<template v-if="row.from_time"
 					>{{ clock(row.from_time) }}&ndash;{{ clock(row.to_time) }}</template
@@ -173,122 +275,148 @@ function useBoardFeed(reload) {
 			</Badge>
 		</div>
 
-		<p
-			v-if="board && !board.complexes.length"
-			class="p-8 text-center text-base text-ink-gray-5"
-		>
-			No operation theatres. Mark a Healthcare Service Unit Type as an OT to see
-			its units here.
-		</p>
+		<div class="flex min-h-0 flex-1 gap-3">
+			<RequestPanel :requests="requests" @pick="pickRequest" />
 
-		<div
-			v-else-if="board"
-			class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
-		>
-			<div
-				class="sticky top-0 z-10 flex border-b border-outline-gray-2 bg-surface-base"
+			<p
+				v-if="board && !board.complexes.length"
+				class="p-8 text-center text-base text-ink-gray-5"
 			>
-				<div class="w-44 shrink-0 p-2 text-sm text-ink-gray-5">Theatre</div>
-				<div class="relative h-8 min-w-[720px] flex-1">
-					<span
-						v-for="hour in hours"
-						:key="hour"
-						class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
-						:style="span(hour * 60, hour * 60)"
-					>
-						{{ String(hour).padStart(2, "0") }}:00
-					</span>
-				</div>
-			</div>
+				No operation theatres. Mark a Healthcare Service Unit Type as an OT to
+				see its units here.
+			</p>
 
-			<section v-for="group in board.complexes" :key="group.name">
-				<h2
-					class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
-				>
-					{{ group.name || "Theatres" }}
-				</h2>
+			<div
+				v-else-if="board"
+				class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
+			>
 				<div
-					v-for="theatre in group.theatres"
-					:key="theatre.name"
-					class="flex border-b border-outline-gray-1 last:border-b-0"
+					class="sticky top-0 z-10 flex border-b border-outline-gray-2 bg-surface-base"
 				>
-					<div class="w-44 shrink-0 p-2">
-						<p class="truncate text-base text-ink-gray-8">
-							{{ theatre.label }}
-						</p>
-						<p class="truncate text-xs text-ink-gray-5">
-							{{ theatre.service_unit_type }}
-						</p>
-					</div>
-					<div class="relative grid min-h-16 min-w-[720px] flex-1 py-1">
+					<div class="w-44 shrink-0 p-2 text-sm text-ink-gray-5">Theatre</div>
+					<div class="relative h-8 min-w-[720px] flex-1">
 						<span
 							v-for="hour in hours"
 							:key="hour"
-							class="absolute inset-y-0 border-l border-outline-gray-1"
+							class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
 							:style="span(hour * 60, hour * 60)"
-						/>
-						<div
-							v-for="block in blocksIn(theatre.name)"
-							:key="block.name"
-							class="ot-hatch rounded-4 bg-surface-red-1"
-							:style="
-								placed(
-									minutesOf(block.start_time),
-									minutesOf(block.end_time),
-								)
-							"
-							:title="`Unavailable (${block.name})`"
-						/>
-						<template
-							v-for="booking in bookingsIn(theatre.name)"
-							:key="booking.name"
 						>
-							<div
-								v-if="board.cleaning_minutes"
-								class="ot-hatch rounded-e-4 bg-surface-gray-1"
-								:style="cleaningPlace(booking)"
-								title="Cleaning"
-							/>
-							<button
-								class="overflow-hidden border px-2 py-1 text-left"
-								:class="[
-									STATUS_CLASSES[booking.status],
-									board.cleaning_minutes
-										? 'rounded-s-4'
-										: 'rounded-4',
-									booking.priority === 'Emergency' &&
-										'ring-2 ring-outline-red-3',
-								]"
-								:style="
-									placed(
-										minutesOf(booking.scheduled_start),
-										minutesOf(booking.scheduled_end),
-									)
-								"
-								:title="`${
-									booking.patient_name
-								} · ${booking.procedures.join(', ')} · ${
-									booking.status
-								}`"
-								@click="openBooking(booking.name)"
-							>
-								<p
-									class="break-words text-sm font-medium text-ink-gray-9"
-								>
-									{{ booking.patient_name }}
-								</p>
-								<p class="break-words text-xs text-ink-gray-6">
-									{{ clock(booking.scheduled_start) }}&ndash;{{
-										clock(booking.scheduled_end)
-									}}
-									&middot; {{ booking.surgeon }}
-								</p>
-							</button>
-						</template>
+							{{ String(hour).padStart(2, "0") }}:00
+						</span>
 					</div>
 				</div>
-			</section>
+
+				<section v-for="group in board.complexes" :key="group.name">
+					<h2
+						class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
+					>
+						{{ group.name || "Theatres" }}
+					</h2>
+					<div
+						v-for="theatre in group.theatres"
+						:key="theatre.name"
+						class="flex border-b border-outline-gray-1 last:border-b-0"
+					>
+						<div class="w-44 shrink-0 p-2">
+							<p class="truncate text-base text-ink-gray-8">
+								{{ theatre.label }}
+							</p>
+							<p class="truncate text-xs text-ink-gray-5">
+								{{ theatre.service_unit_type }}
+							</p>
+						</div>
+						<div
+							class="relative grid h-16 min-w-[720px] flex-1 py-1"
+							:class="dropTheatre === theatre.name && 'bg-surface-gray-1'"
+							@dragover.prevent="dropTheatre = theatre.name"
+							@dragleave="dropTheatre = null"
+							@drop.prevent="drop(theatre.name, $event)"
+						>
+							<span
+								v-for="hour in hours"
+								:key="hour"
+								class="absolute inset-y-0 border-l border-outline-gray-1"
+								:style="span(hour * 60, hour * 60)"
+							/>
+							<div
+								v-for="block in blocksIn(theatre.name)"
+								:key="block.name"
+								class="ot-hatch rounded-4 bg-surface-red-1"
+								:style="
+									placed(
+										minutesOf(block.start_time),
+										minutesOf(block.end_time),
+									)
+								"
+								:title="`Unavailable (${block.name})`"
+							/>
+							<template
+								v-for="booking in bookingsIn(theatre.name)"
+								:key="booking.name"
+							>
+								<div
+									v-if="board.cleaning_minutes"
+									class="ot-hatch rounded-e-4 bg-surface-gray-1"
+									:style="cleaningPlace(booking)"
+									title="Cleaning"
+								/>
+								<button
+									class="overflow-hidden border px-2 py-1 text-left"
+									:class="[
+										STATUS_CLASSES[booking.status],
+										board.cleaning_minutes
+											? 'rounded-s-4'
+											: 'rounded-4',
+										booking.priority === 'Emergency' &&
+											'ring-2 ring-outline-red-3',
+									]"
+									:style="
+										placed(
+											minutesOf(booking.scheduled_start),
+											minutesOf(booking.scheduled_end),
+										)
+									"
+									:title="`${
+										booking.patient_name
+									} · ${booking.procedures.join(', ')} · ${
+										booking.status
+									}`"
+									:draggable="
+										['Tentative', 'Scheduled'].includes(
+											booking.status,
+										)
+									"
+									@dragstart="pickBooking(booking, $event)"
+									@click="openBooking(booking.name)"
+								>
+									<p
+										class="truncate text-sm font-medium text-ink-gray-9"
+									>
+										{{ booking.patient_name }}
+									</p>
+									<p class="truncate text-xs text-ink-gray-6">
+										{{ clock(booking.scheduled_start) }}&ndash;{{
+											clock(booking.scheduled_end)
+										}}
+										&middot; {{ booking.surgeon }}
+									</p>
+								</button>
+							</template>
+						</div>
+					</div>
+				</section>
+			</div>
 		</div>
+
+		<Dialog
+			:open="Boolean(reasonFor)"
+			title="Move a scheduled case"
+			message="This day's list is already published. Say why the case is moving."
+			:actions="[{ label: 'Move', variant: 'solid', onClick: moveWithReason }]"
+			@update:open="open => !open && (reasonFor = null)"
+		>
+			<FormControl v-model="reason" type="textarea" placeholder="Reason" />
+		</Dialog>
 	</div>
 </template>
 
