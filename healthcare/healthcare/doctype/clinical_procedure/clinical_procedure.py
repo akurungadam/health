@@ -128,6 +128,8 @@ class ClinicalProcedure(Document):
 	def set_planned_endtime(self):
 		if not self.procedure_template or not self.start_time:
 			return
+		if self.ot_booking and self.planned_end_datetime:
+			return  # its OT Booking gave it the end of the slot booked for it
 
 		duration = self.get_template_value("default_duration")
 		if duration:

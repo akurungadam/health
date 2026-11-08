@@ -5,7 +5,6 @@
 The theatre also needs its cleaning time after every case. A practitioner allowed to overlap
 theatres may be in two at once, never three."""
 
-from collections import Counter
 from datetime import timedelta
 
 import frappe
@@ -63,15 +62,44 @@ def team_conflicts(booking):
 		.where(team.practitioner.isin(practitioners))
 	)
 	others = bookings.run(as_dict=True)
-	busy = Counter(other.practitioner for other in others)
 	may_overlap = practitioners_allowed_to_overlap(practitioners)
+	crowded = crowded_practitioners(others, may_overlap, *booking_slot(booking))
 	return [
 		_("{0} is in theatre {1} from {2} to {3} ({4})").format(
 			frappe.bold(other.practitioner), other.theatre, *slot_text(other), other.name
 		)
 		for other in others
-		if other.practitioner not in may_overlap or busy[other.practitioner] >= MAX_OVERLAPPING_THEATRES
+		if other.practitioner not in may_overlap or other.practitioner in crowded
 	]
+
+
+def crowded_practitioners(others, may_overlap, start, end):
+	"""Those allowed to overlap who, with this case, would be in more theatres at one moment than
+	allowed. Only the time this case takes counts: two cases of theirs that overlap each other
+	before it starts crowd nothing."""
+	return {
+		practitioner
+		for practitioner in may_overlap
+		if most_at_once(
+			(max(get_datetime(other.scheduled_start), start), min(get_datetime(other.scheduled_end), end))
+			for other in others
+			if other.practitioner == practitioner
+		)
+		+ 1
+		> MAX_OVERLAPPING_THEATRES
+	}
+
+
+def most_at_once(slots):
+	"""The most of `slots` running at one moment; one ending as another starts is not an overlap"""
+	moments = sorted(
+		(moment, step) for slot_start, slot_end in slots for moment, step in ((slot_start, 1), (slot_end, -1))
+	)
+	running = most = 0
+	for _moment, step in moments:
+		running += step
+		most = max(most, running)
+	return most
 
 
 def practitioners_allowed_to_overlap(practitioners):

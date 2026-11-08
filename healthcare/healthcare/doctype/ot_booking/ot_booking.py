@@ -8,9 +8,11 @@ from frappe.utils import add_to_date, cint, getdate
 
 from healthcare.healthcare.doctype.ot_booking.availability import validate_availability
 from healthcare.healthcare.doctype.ot_booking.booking_procedures import (
+	ACTIVE_REQUEST_STATUS,
 	create_procedures,
 	release_procedures,
 	sync_procedures,
+	validate_procedures_follow,
 	validate_release,
 )
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
@@ -21,7 +23,6 @@ from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason
 from healthcare.healthcare.doctype.ot_booking.fasting import is_fasting_confirmed, sync_fasting_task
 from healthcare.healthcare.doctype.ot_booking.priority import set_priority
 
-ACTIVE_REQUEST_STATUS = "active-Request Status"
 # the statuses a case may move to next from the OT Scheduler
 NEXT_STATUSES = {
 	"Tentative": ("Scheduled", "Postponed", "Cancelled"),
@@ -50,10 +51,13 @@ class OTBooking(Document):
 		self.set_schedule()
 		self.validate_theatre()
 		self.validate_procedures()
+		self.validate_procedure_links()
 		self.validate_service_requests()
+		self.validate_inpatient_record()
 		self.validate_primary_surgeon()
 		validate_day_rules(self)
 		validate_release(self)
+		validate_procedures_follow(self)
 		validate_no_conflicts(self)
 		validate_availability(self)
 
@@ -144,6 +148,30 @@ class OTBooking(Document):
 					)
 				)
 
+	def validate_procedure_links(self):
+		"""A row's Clinical Procedure is linked by the server when it makes it for this booking, so a
+		save keeps each row's link as stored: none on a new row, never another procedure"""
+		stored = (
+			{}
+			if self.is_new()
+			else dict(
+				frappe.get_all(
+					"OT Booking Procedure",
+					fields=["name", "clinical_procedure"],
+					filters={"parent": self.name, "parenttype": "OT Booking"},
+					as_list=True,
+				)
+			)
+		)
+		for row in self.procedures:
+			if (row.clinical_procedure or None) != (stored.get(row.name) or None):
+				frappe.throw(
+					_(
+						"Row {0}: the Clinical Procedure is linked by the system and cannot be set by hand"
+					).format(row.idx),
+					title=_("Not Allowed"),
+				)
+
 	def validate_service_requests(self):
 		seen = set()
 		for row in self.procedures:
@@ -169,6 +197,18 @@ class OTBooking(Document):
 						row.idx, frappe.bold(row.service_request), frappe.bold(other_booking)
 					)
 				)
+
+	def validate_inpatient_record(self):
+		"""The admission is the patient's own, so its bed and record are theirs"""
+		if not self.inpatient_record:
+			return
+		if frappe.db.get_value("Inpatient Record", self.inpatient_record, "patient") != self.patient:
+			frappe.throw(
+				_("Inpatient Record {0} is not this patient's admission").format(
+					frappe.bold(self.inpatient_record)
+				),
+				title=_("Another Patient's Admission"),
+			)
 
 	def validate_primary_surgeon(self):
 		primary = [member for member in self.team if member.is_primary]

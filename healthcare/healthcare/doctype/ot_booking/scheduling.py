@@ -13,10 +13,8 @@ from healthcare.healthcare.doctype.ot_booking.board import (
 	add_patient_details,
 	add_surgeons_and_procedures,
 )
-from healthcare.healthcare.doctype.ot_booking.ot_booking import (
-	ACTIVE_REQUEST_STATUS,
-	make_ot_booking,
-)
+from healthcare.healthcare.doctype.ot_booking.booking_procedures import ACTIVE_REQUEST_STATUS
+from healthcare.healthcare.doctype.ot_booking.ot_booking import make_ot_booking
 from healthcare.healthcare.doctype.ot_booking.priority import add_priority
 from healthcare.healthcare.doctype.ot_booking.push import push_following
 from healthcare.healthcare.doctype.ot_booking.refusal import refusal_text

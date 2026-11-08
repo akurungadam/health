@@ -7,6 +7,7 @@ from frappe.utils import add_days, add_to_date, cint, get_datetime, nowdate
 from healthcare.healthcare.doctype.healthcare_service_unit_type.test_healthcare_service_unit_type import (
 	create_theatre_type,
 )
+from healthcare.healthcare.doctype.inpatient_record.test_inpatient_record import create_inpatient
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.tests.utils import HealthcareTestSuite
 
@@ -130,6 +131,24 @@ class TestOTBooking(HealthcareTestSuite):
 		make_booking(self, self.at(9), theatre=self.other_theatre, patient=1)
 
 		self.assert_refused("is in theatre", self.at(9), theatre=self.third_theatre, patient=2)
+
+	def test_a_practitioner_allowed_to_overlap_may_span_two_cases_that_follow_each_other(self):
+		# 09-10 and 10-11 in two theatres, then 09-11 in a third: never more than two at once
+		self.allow_overlap(self.practitioners[0])
+		make_booking(self, self.at(9))
+		make_booking(self, self.at(10), theatre=self.other_theatre, patient=1)
+		two_hours = create_ot_template("_Test Procedure - Two Hours", duration=2 * HOUR)
+
+		make_booking(self, self.at(9), theatre=self.third_theatre, patient=2, templates=[two_hours.name])
+
+	def test_another_patients_admission_is_refused(self):
+		admission = create_inpatient(self.patients[1])
+		admission.flags.ignore_validate = True
+		admission.insert(ignore_permissions=True)
+		booking = make_booking(self, self.at(9))
+		booking.inpatient_record = admission.name
+
+		self.assertRaisesRegex(frappe.ValidationError, "not this patient's admission", booking.save)
 
 	def allow_overlap(self, practitioner):
 		frappe.db.set_value("Healthcare Practitioner", practitioner, "allow_overlapping_theatres", 1)

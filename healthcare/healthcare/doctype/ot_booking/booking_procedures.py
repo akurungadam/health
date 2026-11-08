@@ -10,6 +10,9 @@ from frappe.utils import add_to_date, cint, get_datetime, get_time, getdate
 
 from healthcare.healthcare.doctype.clinical_procedure.clinical_procedure import set_stock_items
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
+from healthcare.healthcare.doctype.ot_booking.day_rules import is_moved
+
+ACTIVE_REQUEST_STATUS = "active-Request Status"
 from healthcare.healthcare.doctype.service_request.service_request import make_clinical_procedure
 
 
@@ -20,8 +23,6 @@ def create_procedures(booking):
 			continue
 		procedure = new_procedure(booking, row, start)
 		procedure.insert()
-		# validate sets the planned end from the template; the booking row's duration wins
-		procedure.db_set("planned_end_datetime", schedule(booking, row, start)["planned_end_datetime"])
 		row.db_set("clinical_procedure", procedure.name)
 		created.append(procedure.name)
 	return created
@@ -45,6 +46,22 @@ def validate_release(booking):
 					row.idx, frappe.bold(row.clinical_procedure), _(booking.status)
 				),
 				title=_("Procedure Started"),
+			)
+
+
+def validate_procedures_follow(booking):
+	"""A submitted procedure keeps the theatre and time it was submitted with, so its case cannot
+	move until it is cancelled; a draft one follows the case (sync_procedures)"""
+	before = booking.get_doc_before_save()
+	if not before or booking.status in INACTIVE_STATUSES or not is_moved(booking, before):
+		return
+	for row in booking.procedures:
+		if row.clinical_procedure and not is_draft(row.clinical_procedure):
+			frappe.throw(
+				_("Row {0}: Clinical Procedure {1} is already submitted, so this case cannot move").format(
+					row.idx, frappe.bold(row.clinical_procedure)
+				),
+				title=_("Procedure Submitted"),
 			)
 
 
@@ -73,6 +90,7 @@ def rows_with_start(booking):
 
 def new_procedure(booking, row, start):
 	if row.service_request:
+		validate_request_active(row)
 		procedure = make_clinical_procedure(row.service_request)
 	else:
 		procedure = procedure_from_template(booking, row.procedure_template)
@@ -85,6 +103,17 @@ def new_procedure(booking, row, start):
 		"Patient", booking.patient, ["patient_name", "sex"]
 	)
 	return procedure
+
+
+def validate_request_active(row):
+	"""A request put on hold or revoked since it was booked makes no clinical work"""
+	if frappe.db.get_value("Service Request", row.service_request, "status") != ACTIVE_REQUEST_STATUS:
+		frappe.throw(
+			_("Row {0}: Service Request {1} is no longer active, so no procedure is made for it").format(
+				row.idx, frappe.bold(row.service_request)
+			),
+			title=_("Request Not Active"),
+		)
 
 
 def procedure_from_template(booking, template):

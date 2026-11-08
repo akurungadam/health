@@ -9,7 +9,7 @@ import { priorityBorder, priorityTheme } from "./case_style.js";
 import FinderButton from "./finder_button.vue";
 import { patientFacts } from "./patient.js";
 import SlotList from "./slot_list.vue";
-import { today } from "./time.js";
+import { caseMinutes, today } from "./time.js";
 
 const props = defineProps({
 	requests: { type: Array, default: () => [] },
@@ -58,8 +58,7 @@ function minutes(seconds) {
 }
 
 function length(booking) {
-	const at = value => new Date(String(value).replace(" ", "T"));
-	return (at(booking.scheduled_end) - at(booking.scheduled_start)) / 1000;
+	return caseMinutes(booking) * 60;
 }
 
 // a date as desk prints a Date field, in the date format of System Settings

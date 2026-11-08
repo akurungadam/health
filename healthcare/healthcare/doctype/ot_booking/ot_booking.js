@@ -22,6 +22,10 @@ frappe.ui.form.on("OT Booking", {
 		}));
 	},
 
+	patient: function (frm) {
+		frm.set_value("inpatient_record", null);
+	},
+
 	refresh: function (frm) {
 		if (!frm.is_new() && has_procedures_to_create(frm)) {
 			frm.add_custom_button(__("Create Procedures"), () =>

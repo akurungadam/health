@@ -218,7 +218,17 @@ def find_unavailable_blocks(scopes, start, end):
 	start, end = get_datetime(start), get_datetime(end)
 	blocks = frappe.get_all(
 		"Practitioner Availability",
-		fields=["name", "title", "reason", "scope", "start_date", "end_date", "start_time", "end_time"],
+		fields=[
+			"name",
+			"title",
+			"reason",
+			"note",
+			"scope",
+			"start_date",
+			"end_date",
+			"start_time",
+			"end_time",
+		],
 		filters={
 			"type": "Unavailable",
 			"docstatus": ("!=", 2),

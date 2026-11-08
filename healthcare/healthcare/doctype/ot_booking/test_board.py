@@ -113,6 +113,14 @@ class TestBoard(HealthcareTestSuite):
 
 		self.assertEqual([row.name for row in self.board()["blocks"]], [block.name])
 
+	def test_a_block_says_why(self):
+		block = create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)
+		block.db_set({"reason": "Training", "note": "Laminar flow service"})
+
+		[shown] = self.board()["blocks"]
+
+		self.assertEqual((shown.reason, shown.note), ("Training", "Laminar flow service"))
+
 	def test_a_blocked_practitioner_is_away(self):
 		create_unavailable_block(self.practitioners[0], "Healthcare Practitioner", self.day)
 

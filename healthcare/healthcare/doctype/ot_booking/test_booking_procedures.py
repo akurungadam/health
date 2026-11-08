@@ -96,6 +96,49 @@ class TestBookingProcedures(HealthcareTestSuite):
 
 		self.assertRaisesRegex(frappe.ValidationError, "already in this booking", booking.save)
 
+	def test_a_procedure_keeps_its_booked_duration_when_submitted(self):
+		booking = make_booking(self, self.at(9))
+		booking.procedures[0].duration = 2 * HOUR
+		booking.save()
+		procedure = frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0])
+
+		procedure.submit()
+
+		self.assertEqual(get_datetime(procedure.planned_end_datetime), self.at(11))
+
+	def test_a_case_with_a_submitted_procedure_cannot_move(self):
+		booking = make_booking(self, self.at(9))
+		frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0]).submit()
+		booking.reload()
+		booking.update({"scheduled_start": self.at(13), "change_reason": "Surgeon delayed"})
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot move", booking.save)
+
+	def test_another_patients_procedure_cannot_be_linked(self):
+		other = make_booking(self, self.at(13), patient=1, surgeon=1)
+		theirs = other.create_clinical_procedures()[0]
+		booking = make_booking(self, self.at(9))
+		booking.procedures[0].clinical_procedure = theirs
+
+		self.assertRaisesRegex(frappe.ValidationError, "linked by the system", booking.save)
+
+	def test_a_linked_procedure_cannot_be_swapped(self):
+		booking = make_booking(self, self.at(9))
+		booking.create_clinical_procedures()
+		other = make_booking(self, self.at(13), patient=1, surgeon=1)
+		booking.reload()
+		booking.procedures[0].clinical_procedure = other.create_clinical_procedures()[0]
+
+		self.assertRaisesRegex(frappe.ValidationError, "linked by the system", booking.save)
+
+	def test_a_withdrawn_request_makes_no_procedure(self):
+		booking = self.book_from_request(self.at(9))
+		frappe.db.set_value(
+			"Service Request", booking.procedures[0].service_request, "status", "revoked-Request Status"
+		)
+
+		self.assertRaisesRegex(frappe.ValidationError, "no longer active", booking.create_clinical_procedures)
+
 	def test_a_request_for_another_patient_is_refused(self):
 		request = create_service_request(self.patients[1], self.practitioners[0])
 		booking = make_ot_booking(request.name)

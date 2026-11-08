@@ -46,13 +46,16 @@ export function planDrop({
 	dayEnd,
 	holiday,
 	emergency,
+	pastUntil,
 }) {
 	const end = start + length;
 	const pushes = pushesAfter(cases, start, end, cleaning);
 	const problem =
-		holiday && !emergency
-			? `${holiday} is a theatre holiday`
-			: findProblem({ cases, blocks, start, end, pushes, cleaning, emergency });
+		start < pastUntil
+			? "That time has passed"
+			: holiday && !emergency
+			  ? `${holiday} is a theatre holiday`
+			  : findProblem({ cases, blocks, start, end, pushes, cleaning, emergency });
 	const lastEnd = Math.max(end, ...pushes.map(push => push.end));
 	const late = lastEnd > dayEnd ? `Runs past ${hourMinute(dayEnd)}` : "";
 	const overBlock = emergency && blockedBy(blocks, [{ start, end }]);

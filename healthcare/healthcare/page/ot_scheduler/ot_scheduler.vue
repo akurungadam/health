@@ -19,12 +19,15 @@ import {
 import { useHost } from "@framework/ui/island";
 
 import FastingIcon from "~icons/lucide/utensils-crossed";
+import LockIcon from "~icons/lucide/lock";
 
 import BookingPreview from "./booking_preview.vue";
 import DropGhost from "./drop_ghost.vue";
 import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
 import { confirmPublish } from "./publish.js";
 import SlotHighlight from "./slot_highlight.vue";
+import RowWash from "./row_wash.vue";
+import UnavailableBlock from "./unavailable_block.vue";
 import { useDrop } from "./use_drop.js";
 import { useSlots } from "./use_slots.js";
 import { caseBorder, caseFill } from "./case_style.js";
@@ -34,7 +37,7 @@ import RequestPanel from "./request_panel.vue";
 import { get, post, showError } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
-import { clock, minutesOf, today } from "./time.js";
+import { clock, minutesOf, pastUntil, placed, span, today } from "./time.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -54,28 +57,17 @@ const reason = ref("");
 const menuFor = ref(null);
 const previewFor = ref(null);
 
-// The theatre day, stretched to whole hours to hold any case (with its cleaning) outside it
-const dayStart = computed(() => {
-	if (!board.value) return null;
-	const starts = board.value.bookings.map(booking =>
-		minutesOf(booking.scheduled_start),
-	);
-	return Math.floor(Math.min(minutesOf(board.value.day_start), ...starts) / 60) * 60;
-});
-const dayEnd = computed(() => {
-	if (!board.value) return null;
-	const ends = board.value.bookings
-		.map(booking => [
-			minutesOf(booking.scheduled_start),
-			minutesOf(booking.scheduled_end),
-		])
-		.filter(([start, end]) => end > start) // a case running past midnight is cut at its day's end
-		.map(([, end]) => end + board.value.cleaning_minutes);
-	return Math.min(
-		24 * 60,
-		Math.ceil(Math.max(minutesOf(board.value.day_end), ...ends) / 60) * 60,
-	);
-});
+// The whole day, midnight to midnight, scrolled to the usual working hours; any hour is bookable
+const HOUR_WIDTH = 96; // pixels: the usual 12-hour day is about a window wide
+const THEATRE_WIDTH = 176; // the theatre column, w-44
+const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
+const timeline = ref(null);
+const workStart = computed(() => minutesOf(board.value?.day_start || "08:00"));
+const workEnd = computed(() => minutesOf(board.value?.day_end || "20:00"));
+let scrolledDay = null;
+// hover details close while the board scrolls, or they would float over the theatre column
+const scrolling = ref(false);
+let scrollEnd = null;
 // a viewer who cannot change bookings sees the board read-only
 const canEdit = computed(() => Boolean(board.value?.can_edit));
 const tentativeCount = computed(
@@ -83,12 +75,6 @@ const tentativeCount = computed(
 		board.value?.bookings.filter(booking => booking.status === "Tentative")
 			.length || 0,
 );
-const hours = computed(() => {
-	if (!board.value) return [];
-	const first = Math.ceil(dayStart.value / 60);
-	const last = Math.floor(dayEnd.value / 60);
-	return Array.from({ length: last - first + 1 }, (_, index) => first + index);
-});
 
 onMounted(() => {
 	emit("title", "OT Scheduler");
@@ -107,6 +93,22 @@ watch(company, () => {
 	load();
 });
 watch(department, load);
+// a new day opens at the start of working hours; a reload of the same day stays where it is
+watch(board, scrollToWorkingHours, { flush: "post" });
+
+function hideDetailsWhileScrolling() {
+	scrolling.value = true;
+	previewFor.value = null;
+	clearTimeout(scrollEnd);
+	scrollEnd = setTimeout(() => (scrolling.value = false), 300);
+}
+
+function scrollToWorkingHours() {
+	if (!timeline.value || scrolledDay === day.value) return;
+	// a quarter of an hour early, so a case at the start of the day clears the theatre column
+	timeline.value.scrollLeft = ((workStart.value - 15) / 60) * HOUR_WIDTH;
+	scrolledDay = day.value;
+}
 
 const {
 	dragged,
@@ -124,8 +126,6 @@ const {
 } = useDrop({
 	board,
 	day,
-	dayStart,
-	dayEnd,
 	canEdit,
 	bookingsIn,
 	blocksIn,
@@ -245,30 +245,17 @@ async function change(method, params) {
 	return result;
 }
 
+// a case whose time has passed stays put: it can only be rescheduled or cancelled
+function hasPassed(booking) {
+	return minutesOf(booking.scheduled_start) < pastUntil(day.value);
+}
+
 function bookingsIn(theatre) {
 	return board.value.bookings.filter(booking => booking.theatre === theatre);
 }
 
 function blocksIn(theatre) {
 	return board.value.blocks.filter(block => block.scope === theatre);
-}
-
-// A position on the row, kept inside it, so nothing can make the board wider than the window
-function span(start, end) {
-	const width = dayEnd.value - dayStart.value;
-	const inside = minutes => Math.min(Math.max(minutes, dayStart.value), dayEnd.value);
-	const from = inside(start);
-	const to = Math.max(inside(end), from);
-	return {
-		left: `${((from - dayStart.value) / width) * 100}%`,
-		width: `${((to - from) / width) * 100}%`,
-	};
-}
-
-// Blocks share one grid cell, placed across it by time
-function placed(start, end) {
-	const { left, width } = span(start, end);
-	return { gridArea: "1 / 1", marginLeft: left, width };
 }
 
 function cleaningPlace(booking) {
@@ -338,19 +325,24 @@ function openBooking(name) {
 
 			<div
 				v-else-if="board"
+				ref="timeline"
 				class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
+				@scroll="hideDetailsWhileScrolling"
 			>
-				<!-- one block as wide as a row, so the header, headings and rows scroll together -->
-				<div class="min-w-[896px]">
+				<!-- one block as wide as a row, so the header, headings and rows scroll together;
+				     the theatre column stays put while the day scrolls past it -->
+				<div :style="{ width: `${THEATRE_WIDTH + 24 * HOUR_WIDTH}px` }">
 					<div
-						class="sticky top-0 z-10 flex border-b border-outline-gray-2 bg-surface-base"
+						class="sticky top-0 z-30 flex border-b border-outline-gray-2 bg-surface-base"
 					>
-						<div class="w-44 shrink-0 p-2 text-sm text-ink-gray-5">
+						<div
+							class="sticky left-0 z-30 w-44 shrink-0 bg-surface-base p-2 text-sm text-ink-gray-5"
+						>
 							Theatre
 						</div>
-						<div class="relative h-8 min-w-[720px] flex-1 overflow-hidden">
+						<div class="relative h-8 flex-1 overflow-hidden">
 							<span
-								v-for="hour in hours.slice(0, -1)"
+								v-for="hour in HOURS.slice(0, -1)"
 								:key="hour"
 								class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
 								:style="span(hour * 60, hour * 60)"
@@ -364,7 +356,9 @@ function openBooking(name) {
 						<h2
 							class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
 						>
-							{{ group.name || "Theatres" }}
+							<span class="sticky left-2">{{
+								group.name || "Theatres"
+							}}</span>
 						</h2>
 						<div
 							v-for="theatre in group.theatres"
@@ -372,7 +366,7 @@ function openBooking(name) {
 							class="flex border-b border-outline-gray-1 last:border-b-0"
 						>
 							<div
-								class="w-44 shrink-0 p-2"
+								class="sticky left-0 z-20 w-44 shrink-0 bg-surface-base p-2"
 								@dragover.prevent="dragOver(theatre.name, null)"
 								@drop.prevent="drop(theatre.name)"
 							>
@@ -384,7 +378,7 @@ function openBooking(name) {
 								</p>
 							</div>
 							<div
-								class="relative grid h-24 min-w-[720px] flex-1 overflow-hidden py-1"
+								class="relative isolate grid h-24 flex-1 overflow-hidden py-1"
 								:class="
 									dropTheatre === theatre.name && 'bg-surface-gray-1'
 								"
@@ -392,34 +386,29 @@ function openBooking(name) {
 								@dragleave="dropTheatre = null"
 								@drop.prevent="drop(theatre.name)"
 							>
+								<RowWash
+									:work-start="workStart"
+									:work-end="workEnd"
+									:placed="placed"
+								/>
 								<span
-									v-for="hour in hours"
+									v-for="hour in HOURS"
 									:key="hour"
-									class="absolute inset-y-0 border-l border-outline-gray-1"
+									class="absolute inset-y-0 -z-10 border-l border-outline-gray-1"
 									:style="span(hour * 60, hour * 60)"
 								/>
-								<div
+								<UnavailableBlock
 									v-for="block in blocksIn(theatre.name)"
 									:key="block.name"
-									class="ot-hatch overflow-hidden rounded-4 bg-surface-red-1 px-2 py-1"
-									:style="
+									:block="block"
+									:quiet="scrolling"
+									:place="
 										placed(
 											minutesOf(block.start_time),
 											minutesOf(block.end_time),
 										)
 									"
-									:title="
-										[block.title, block.reason]
-											.filter(Boolean)
-											.join(' · ')
-									"
-								>
-									<p
-										class="truncate text-xs font-medium text-ink-red-7"
-									>
-										{{ block.title }}
-									</p>
-								</div>
+								/>
 								<template
 									v-for="booking in bookingsIn(theatre.name)"
 									:key="booking.name"
@@ -460,7 +449,8 @@ function openBooking(name) {
 													canEdit &&
 													['Tentative', 'Scheduled'].includes(
 														booking.status,
-													)
+													) &&
+													!hasPassed(booking)
 												"
 												@dragstart="
 													pickBooking(booking, $event)
@@ -503,6 +493,15 @@ function openBooking(name) {
 																		}}
 																	</span>
 																</p>
+																<LockIcon
+																	v-if="
+																		hasPassed(
+																			booking,
+																		)
+																	"
+																	class="size-3.5 shrink-0 text-ink-gray-5"
+																	title="Its time has passed: reschedule or cancel it"
+																/>
 																<FastingIcon
 																	class="size-3.5 shrink-0"
 																	:class="
@@ -594,7 +593,8 @@ function openBooking(name) {
 	</div>
 </template>
 
-<style scoped>
+<style>
+/* not scoped: unavailable_block.vue hatches its blocks the same way */
 .ot-hatch {
 	background-image: repeating-linear-gradient(
 		45deg,

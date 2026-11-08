@@ -7,13 +7,11 @@ import { toast } from "frappe-ui";
 import { post, showError } from "./api.js";
 import { hideDragImage, planDrop, snapFirstDrop, snapToGrid } from "./drop_plan.js";
 import { playDropSound } from "./sounds.js";
-import { minutesOf, twoDigits } from "./time.js";
+import { caseMinutes, DAY_MINUTES, minutesOf, pastUntil, twoDigits } from "./time.js";
 
 export function useDrop({
 	board,
 	day,
-	dayStart,
-	dayEnd,
 	canEdit,
 	bookingsIn,
 	blocksIn,
@@ -46,7 +44,7 @@ export function useDrop({
 	}
 
 	function caseLength(booking) {
-		return minutesOf(booking.scheduled_end) - minutesOf(booking.scheduled_start);
+		return caseMinutes(booking);
 	}
 
 	// A booked case dropped back on the pane is rescheduled, keeping its booking for another day
@@ -81,27 +79,26 @@ export function useDrop({
 	function pickBooking(booking, event) {
 		const block = event.currentTarget.getBoundingClientRect();
 		const row = event.currentTarget.parentElement.getBoundingClientRect();
-		const grab =
-			((event.clientX - block.left) / row.width) *
-			(dayEnd.value - dayStart.value);
+		const grab = ((event.clientX - block.left) / row.width) * DAY_MINUTES;
 		pick({ booking, grab, length: caseLength(booking) }, booking.name, event);
 	}
 
 	// What the drop would do at the cursor, shown on the row before the case is let go. Over
-	// the theatre's name (no event) a case lands at the start of the day.
+	// the theatre's name (no event) a case lands at the start of the working day.
 	function dragOver(theatre, event) {
 		if (!canEdit.value || !dragged.value) return;
 		dropTheatre.value = theatre;
 		const drag = dragged.value;
 		const cleaning = board.value.cleaning_minutes;
 		const cases = rowCases(theatre, drag.booking?.name);
-		const at = event ? cursorMinutes(event) : dayStart.value;
+		const workStart = minutesOf(board.value.day_start);
+		const at = event ? cursorMinutes(event) : workStart;
 		const start =
 			drag.grab === null
 				? snapFirstDrop(cases, at, cleaning)
 				: event
 				  ? snapToGrid(at - drag.grab)
-				  : dayStart.value;
+				  : workStart;
 		const blocks = blocksIn(theatre).map(block => ({
 			start: minutesOf(block.start_time),
 			end: minutesOf(block.end_time),
@@ -112,9 +109,10 @@ export function useDrop({
 			start,
 			length: drag.length,
 			cleaning,
-			// the configured end of the theatre day, not the board stretched to its cases
+			// the end of the usual working day: running past it is shown, not refused
 			dayEnd: minutesOf(board.value.day_end),
 			holiday: fullHoliday(),
+			pastUntil: pastUntil(day.value),
 			emergency: Boolean(
 				drag.request?.is_emergency || drag.booking?.is_emergency,
 			),
@@ -135,16 +133,13 @@ export function useDrop({
 				status: booking.status,
 				is_emergency: booking.is_emergency,
 				start: minutesOf(booking.scheduled_start),
-				end: minutesOf(booking.scheduled_end),
+				end: minutesOf(booking.scheduled_start) + caseMinutes(booking),
 			}));
 	}
 
 	function cursorMinutes(event) {
 		const row = event.currentTarget.getBoundingClientRect();
-		return (
-			dayStart.value +
-			((event.clientX - row.left) / row.width) * (dayEnd.value - dayStart.value)
-		);
+		return ((event.clientX - row.left) / row.width) * DAY_MINUTES;
 	}
 
 	function atTime(minutes) {
