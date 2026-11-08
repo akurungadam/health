@@ -24,6 +24,8 @@ defineProps({
 	passed: { type: Boolean, default: false },
 	place: { type: Object, required: true },
 	cleaningPlace: { type: Object, default: null },
+	// left out by the board's filters
+	dimmed: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:menuOpen", "update:previewOpen", "pick", "drop-end"]);
 </script>
@@ -33,6 +35,7 @@ const emit = defineEmits(["update:menuOpen", "update:previewOpen", "pick", "drop
 		v-if="cleaningMinutes"
 		class="ot-hatch bg-surface-gray-1"
 		:class="[
+			dimmed && 'opacity-30',
 			caseBorder(booking),
 			vertical ? 'rounded-b-4 border-t-0' : 'rounded-e-4 border-l-0',
 		]"
@@ -48,6 +51,7 @@ const emit = defineEmits(["update:menuOpen", "update:previewOpen", "pick", "drop
 			<button
 				class="overflow-hidden px-2 py-1 text-left"
 				:class="[
+					dimmed && 'opacity-30',
 					caseBorder(booking),
 					caseFill(booking),
 					!cleaningMinutes

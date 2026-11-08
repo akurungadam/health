@@ -18,7 +18,10 @@ import CaseCard from "./case_card.vue";
 import HourScale from "./hour_scale.vue";
 import DropGhost from "./drop_ghost.vue";
 import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
-import { confirmPublish } from "./publish.js";
+import BoardFilters from "./board_filters.vue";
+import { dayActions } from "./publish.js";
+import { useBoardFilters } from "./use_board_filters.js";
+import { useBoardLoad } from "./use_board_load.js";
 import SlotHighlight from "./slot_highlight.vue";
 import RowWash from "./row_wash.vue";
 import UnavailableBlock from "./unavailable_block.vue";
@@ -26,7 +29,7 @@ import { useDrop } from "./use_drop.js";
 import { useSlots } from "./use_slots.js";
 import DateBar from "./date_bar.vue";
 import RequestPanel from "./request_panel.vue";
-import { get, post, showError, toastSuccess } from "./api.js";
+import { post, showError, toastSuccess } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
 import {
@@ -52,9 +55,14 @@ const host = useHost();
 const day = ref(props.query.date || today());
 const company = ref(props.query.company || "");
 const department = ref(props.query.department || "");
-const board = ref(null);
-const requests = ref([]);
-const postponed = ref([]);
+const {
+	board,
+	requests,
+	postponed,
+	load,
+	filters: boardFilters,
+	current,
+} = useBoardLoad({ day, company, department });
 const reasonFor = ref(null);
 const reason = ref("");
 const menuFor = ref(null);
@@ -88,31 +96,29 @@ const boardGrid = computed(() => {
 const workStart = computed(() => minutesOf(board.value?.day_start || "08:00"));
 const workEnd = computed(() => minutesOf(board.value?.day_end || "20:00"));
 let scrolledDay = null;
-// a viewer who cannot change bookings sees the board read-only
-const canEdit = computed(() => Boolean(board.value?.can_edit));
-const tentativeCount = computed(
-	() =>
-		board.value?.bookings.filter(booking => booking.status === "Tentative")
-			.length || 0,
-);
+// a viewer who cannot change bookings sees the board read-only, as does anyone while it loads
+const canEdit = computed(() => current.value && Boolean(board.value.can_edit));
+const tentativeCount = computed(() => countOf(["Tentative"]));
+const scheduledCount = computed(() => countOf(["Scheduled"]));
+const {
+	practitioner: practitionerFilter,
+	patient: patientFilter,
+	theatre: theatreFilter,
+	caseDimmed,
+	theatreDimmed,
+} = useBoardFilters();
+
+function countOf(statuses) {
+	return (
+		board.value?.bookings.filter(row => statuses.includes(row.status)).length || 0
+	);
+}
 
 onMounted(() => {
 	emit("title", "OT Scheduler");
 	load();
 });
-// the page menu (the three dots) offers Publish while the day has Tentative cases
-watch([tentativeCount, canEdit, day], sendActions, { immediate: true });
 useBoardFeed(load);
-watch(day, value => (value ? load() : (day.value = today())));
-// the first load fills in the user's default company, which needs no second load; any other
-// change of company, the first pick of a user with no default included, loads the board
-let companyFromServer = false;
-watch(company, () => {
-	if (companyFromServer) return (companyFromServer = false);
-	department.value = "";
-	load();
-});
-watch(department, load);
 // a new day opens at the start of working hours; a reload of the same day stays where it is
 watch(board, scrollToWorkingHours, { flush: "post" });
 
@@ -139,7 +145,6 @@ const {
 	endDrag,
 } = useDrop({
 	board,
-	day,
 	vertical,
 	canEdit,
 	bookingsIn,
@@ -183,29 +188,11 @@ const {
 } = useAutoSchedule({ day, filters: boardFilters, reload: load });
 // a plan is for the day and filters it was made for
 watch([day, company, department], discardAutoPlan);
-
-// The board's set filters, for loading and publishing: an empty one arrives as "undefined"
-function boardFilters() {
-	const filters = { company: company.value, department: department.value };
-	return Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
-}
-
-async function load() {
-	try {
-		const filters = boardFilters();
-		[board.value, requests.value, postponed.value] = await Promise.all([
-			get("board.get_board", { date: day.value, ...filters }),
-			get("scheduling.get_open_requests", filters),
-			get("scheduling.get_postponed", filters),
-		]);
-		if (!company.value && board.value.company) {
-			companyFromServer = true;
-			company.value = board.value.company;
-		}
-	} catch (error) {
-		showError(error);
-	}
-}
+// the page menu (the three dots) offers Publish while the day has Tentative cases; set up
+// after useAutoSchedule, as its immediate first run reads the plan's preview
+watch([tentativeCount, canEdit, day, scheduledCount], sendActions, {
+	immediate: true,
+});
 
 // A change the server will refuse without a reason waits here for one
 function askReason(method, params, action) {
@@ -232,29 +219,24 @@ function previewOpened(booking, open) {
 	previewFor.value = open && !menuFor.value && !reasonFor.value ? booking.name : null;
 }
 
-function sendActions([count, editable, shownDay]) {
+function sendActions([count, editable, shownDay, published]) {
 	if (!editable) return emit("actions", []);
-	const actions = [
-		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
-	];
-	// a day gone by is not scheduled: nothing can be placed at a time that has passed
-	if (shownDay >= today())
-		actions.push({ label: "Auto Schedule the Day…", onClick: previewAutoPlan });
-	if (count)
-		actions.push({
-			label: `Publish ${count} case(s)`,
-			onClick: () =>
-				confirmPublish({
-					count,
-					day: day.value,
-					company: board.value.company,
-					department: department.value,
-					filters: boardFilters(),
-					host,
-					reload: load,
-				}),
-		});
-	emit("actions", actions);
+	emit(
+		"actions",
+		dayActions({
+			count,
+			published,
+			shownDay,
+			autoSchedule: previewAutoPlan,
+			newBooking: () => host.navigate?.("ot-booking/new"),
+			day: day.value,
+			company: board.value?.company,
+			department: department.value,
+			filters: boardFilters(),
+			host,
+			reload: load,
+		}),
+	);
 }
 
 async function createProcedures(booking) {
@@ -322,7 +304,15 @@ function openBooking(name) {
 			v-model:company="company"
 			v-model:department="department"
 			:board="board"
-		/>
+		>
+			<BoardFilters
+				v-if="board"
+				v-model:practitioner="practitionerFilter"
+				v-model:patient="patientFilter"
+				v-model:theatre="theatreFilter"
+				:board="board"
+			/>
+		</DateBar>
 
 		<ToastProvider />
 
@@ -436,6 +426,7 @@ function openBooking(name) {
 								:class="[
 									vertical ? 'border-l px-1' : 'border-b py-1',
 									dropTheatre === theatre.name && 'bg-surface-gray-1',
+									theatreDimmed(theatre.name) && 'opacity-40',
 								]"
 								@dragover.prevent="dragOver(theatre.name, $event)"
 								@dragleave="dropTheatre = null"
@@ -480,6 +471,7 @@ function openBooking(name) {
 									v-for="booking in bookingsIn(theatre.name)"
 									:key="booking.name"
 									:booking="booking"
+									:dimmed="caseDimmed(booking)"
 									:theatre-label="
 										[theatre.label, theatre.service_unit_type]
 											.filter(Boolean)

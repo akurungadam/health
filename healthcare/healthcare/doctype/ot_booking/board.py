@@ -162,14 +162,13 @@ def get_bookings(date, theatres):
 
 def add_surgeons_and_procedures(bookings):
 	names = [booking.name for booking in bookings]
-	surgeons = dict(
-		frappe.get_all(
-			"OT Booking Team",
-			fields=["parent", "practitioner_name"],
-			filters={"parent": ["in", names], "parenttype": "OT Booking", "is_primary": 1},
-			as_list=True,
-		)
+	team = frappe.get_all(
+		"OT Booking Team",
+		fields=["parent", "practitioner_name", "is_primary"],
+		filters={"parent": ["in", names], "parenttype": "OT Booking"},
+		order_by="idx",
 	)
+	surgeons = {member.parent: member.practitioner_name for member in team if member.is_primary}
 	procedures = frappe.get_all(
 		"OT Booking Procedure",
 		fields=["parent", "procedure_template", "clinical_procedure"],
@@ -181,6 +180,8 @@ def add_surgeons_and_procedures(bookings):
 		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
 		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
+		# everyone on the case, for the board's practitioner filter
+		booking.team_names = [member.practitioner_name for member in team if member.parent == booking.name]
 		rows = [row for row in procedures if row.parent == booking.name]
 		booking.procedures = [row.procedure_template for row in rows]
 		booking.fasting_confirmed = is_fasting_confirmed(booking, booking.procedures)

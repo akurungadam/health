@@ -17,7 +17,6 @@ import {
 
 export function useDrop({
 	board,
-	day,
 	vertical,
 	canEdit,
 	bookingsIn,
@@ -119,7 +118,7 @@ export function useDrop({
 			// the end of the usual working day: running past it is shown, not refused
 			dayEnd: minutesOf(board.value.day_end),
 			holiday: fullHoliday(),
-			pastUntil: pastUntil(day.value),
+			pastUntil: pastUntil(String(board.value.date)),
 			emergency: Boolean(
 				drag.request?.is_emergency || drag.booking?.is_emergency,
 			),
@@ -156,7 +155,8 @@ export function useDrop({
 	}
 
 	function atTime(minutes) {
-		return `${day.value} ${twoDigits(Math.floor(minutes / 60))}:${twoDigits(
+		// on the day the board shows, which is the day the user sees the case land on
+		return `${board.value.date} ${twoDigits(Math.floor(minutes / 60))}:${twoDigits(
 			minutes % 60,
 		)}:00`;
 	}
