@@ -35,6 +35,7 @@ def get_board(date: str, company: str | None = None, department: str | None = No
 	return {
 		"date": date,
 		"company": company,
+		"department": department or "",
 		# the board is read-only for a viewer who cannot change bookings
 		"can_edit": bool(frappe.has_permission("OT Booking", "write")),
 		"companies": frappe.get_list("Company", pluck="name", order_by="name", limit=0),
@@ -164,7 +165,7 @@ def add_surgeons_and_procedures(bookings):
 	names = [booking.name for booking in bookings]
 	team = frappe.get_all(
 		"OT Booking Team",
-		fields=["parent", "practitioner_name", "is_primary"],
+		fields=["parent", "practitioner_name", "role", "is_primary"],
 		filters={"parent": ["in", names], "parenttype": "OT Booking"},
 		order_by="idx",
 	)
@@ -180,8 +181,10 @@ def add_surgeons_and_procedures(bookings):
 		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
 		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
-		# everyone on the case, for the board's practitioner filter
-		booking.team_names = [member.practitioner_name for member in team if member.parent == booking.name]
+		# everyone on the case, for the board's practitioner filter and the practitioner-wise print
+		members = [member for member in team if member.parent == booking.name]
+		booking.team_names = [member.practitioner_name for member in members]
+		booking.team_roles = [{"name": member.practitioner_name, "role": member.role} for member in members]
 		rows = [row for row in procedures if row.parent == booking.name]
 		booking.procedures = [row.procedure_template for row in rows]
 		booking.fasting_confirmed = is_fasting_confirmed(booking, booking.procedures)

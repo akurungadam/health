@@ -18,5 +18,15 @@ export function useBoardFilters() {
 		return Boolean(theatre.value) && name !== theatre.value;
 	}
 
-	return { practitioner, patient, theatre, caseDimmed, theatreDimmed };
+	// the filters that are set, for the schedule sheet to print the same cases
+	function sheetFilters() {
+		const set = {
+			practitioner: practitioner.value,
+			patient: patient.value,
+			theatre: theatre.value,
+		};
+		return Object.fromEntries(Object.entries(set).filter(([, value]) => value));
+	}
+
+	return { practitioner, patient, theatre, caseDimmed, theatreDimmed, sheetFilters };
 }

@@ -10,14 +10,22 @@ import { today } from "./time.js";
 // nothing can be placed at a time that has passed. `count` and `published` are the day's
 // Tentative and Scheduled cases.
 export function dayActions({
+	editable,
 	count,
 	published,
 	shownDay,
 	autoSchedule,
 	newBooking,
+	print,
 	...day
 }) {
-	const actions = [{ label: "New OT Booking", onClick: newBooking }];
+	// anyone who can see the board can print it; the rest is for editors
+	const printing = [
+		{ label: "Print by Theatre", onClick: () => print("theatre") },
+		{ label: "Print by Practitioner", onClick: () => print("practitioner") },
+	];
+	if (!editable) return printing;
+	const actions = [{ label: "New OT Booking", onClick: newBooking }, ...printing];
 	if (shownDay >= today())
 		actions.push({ label: "Auto Schedule the Day", onClick: autoSchedule });
 	if (shownDay >= today() && count + published)

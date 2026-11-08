@@ -19,6 +19,7 @@ import HourScale from "./hour_scale.vue";
 import DropGhost from "./drop_ghost.vue";
 import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
 import BoardFilters from "./board_filters.vue";
+import { printDay } from "./print_day.js";
 import { dayActions } from "./publish.js";
 import { useBoardFilters } from "./use_board_filters.js";
 import { useBoardLoad } from "./use_board_load.js";
@@ -106,6 +107,7 @@ const {
 	theatre: theatreFilter,
 	caseDimmed,
 	theatreDimmed,
+	sheetFilters,
 } = useBoardFilters();
 
 function countOf(statuses) {
@@ -220,15 +222,16 @@ function previewOpened(booking, open) {
 }
 
 function sendActions([count, editable, shownDay, published]) {
-	if (!editable) return emit("actions", []);
 	emit(
 		"actions",
 		dayActions({
+			editable,
 			count,
 			published,
 			shownDay,
 			autoSchedule: previewAutoPlan,
 			newBooking: () => host.navigate?.("ot-booking/new"),
+			print: printBoard,
 			day: day.value,
 			company: board.value?.company,
 			department: department.value,
@@ -237,6 +240,12 @@ function sendActions([count, editable, shownDay, published]) {
 			reload: load,
 		}),
 	);
+}
+
+// the cases the filters leave clear, by theatre or by practitioner
+function printBoard(mode) {
+	const sheet = { date: day.value, ...boardFilters(), ...sheetFilters() };
+	printDay({ ...sheet, mode });
 }
 
 async function createProcedures(booking) {

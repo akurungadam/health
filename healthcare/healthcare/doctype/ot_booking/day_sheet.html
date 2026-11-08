@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{ title | e }}</title>
+	<style>
+		body { font: 12px system-ui, sans-serif; color: #171717; margin: 24px; }
+		h1 { font-size: 16px; margin: 0 0 16px; }
+		h2 { font-size: 13px; margin: 18px 0 6px; }
+		/* one fixed set of column widths, so the columns line up from section to section */
+		table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+		th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+		th { font-weight: 600; color: #525252; }
+		section { break-inside: avoid; }
+	</style>
+</head>
+<body>
+	<h1>{{ title | e }}</h1>
+	{% for section in sections %}
+	<section>
+		<h2>{{ section.heading | e }}</h2>
+		<table>
+			{% if mode == "practitioner" %}
+			<colgroup><col style="width: 9%"><col style="width: 8%"><col style="width: 10%"><col style="width: 19%"><col style="width: 20%"><col style="width: 18%"><col style="width: 7%"><col style="width: 9%"></colgroup>
+			{% else %}
+			<colgroup><col style="width: 10%"><col style="width: 22%"><col style="width: 25%"><col style="width: 23%"><col style="width: 9%"><col style="width: 11%"></colgroup>
+			{% endif %}
+			<thead><tr>
+				<th>Time</th>
+				{% if mode == "practitioner" %}<th>Theatre</th><th>Role</th>{% endif %}
+				<th>Patient</th><th>Procedures</th><th>Team</th><th>Priority</th><th>Status</th>
+			</tr></thead>
+			<tbody>
+				{% for row in section.cases %}
+				<tr>
+					<td>{{ row.time | e }}</td>
+					{% if mode == "practitioner" %}<td>{{ row.theatre | e }}</td><td>{{ row.role | e }}</td>{% endif %}
+					<td>{{ row.patient | e }}</td>
+					<td>{{ row.procedures | e }}</td>
+					<td>{{ row.team | e }}</td>
+					<td>{{ row.priority | e }}</td>
+					<td>{{ row.status | e }}</td>
+				</tr>
+				{% endfor %}
+			</tbody>
+		</table>
+	</section>
+	{% else %}
+	<p>No cases.</p>
+	{% endfor %}
+</body>
+</html>
