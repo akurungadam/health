@@ -141,6 +141,9 @@ function drop() {
 				</p>
 				<p class="break-words text-xs text-ink-gray-6">
 					{{ request.procedure }}
+					<span v-if="request.theatre_type" class="text-ink-gray-5">
+						&middot; {{ request.theatre_type }}
+					</span>
 				</p>
 				<p class="text-xs text-ink-gray-5">
 					{{ minutes(request.duration) }} &middot;
@@ -205,6 +208,9 @@ function drop() {
 				</p>
 				<p class="break-words text-xs text-ink-gray-6">
 					{{ booking.procedures.join(", ") }}
+					<span v-if="booking.theatre_type" class="text-ink-gray-5">
+						&middot; {{ booking.theatre_type }}
+					</span>
 				</p>
 				<p class="text-xs text-ink-gray-5">
 					{{ minutes(length(booking)) }} &middot;

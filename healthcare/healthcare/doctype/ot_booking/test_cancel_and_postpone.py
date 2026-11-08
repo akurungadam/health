@@ -59,6 +59,20 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		self.assertNotIn(request, [row.name for row in get_open_requests(company=COMPANY)])
 		self.assertIn(booking.name, [row.name for row in get_postponed(company=COMPANY)])
 
+	def test_a_postponed_case_carries_the_theatre_type_it_needs(self):
+		knee = create_ot_template("_Test Procedure - Knee Replacement", HOUR, "_Test Laminar Flow OT")
+		booking = make_booking(
+			self,
+			self.at(9),
+			templates=[knee.name],
+			theatre=create_theatre("_Test Laminar OT 1", "_Test Laminar Flow OT"),
+		)
+		booking.db_set("status", "Postponed")
+
+		listed = {row.name: row for row in get_postponed(company=COMPANY)}[booking.name]
+
+		self.assertEqual(listed.theatre_type, "_Test Laminar Flow OT")
+
 	def test_a_postponed_case_carries_its_priority(self):
 		_request, booking = self.booked_request()
 

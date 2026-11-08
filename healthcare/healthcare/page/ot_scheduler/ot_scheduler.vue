@@ -453,7 +453,11 @@ function openBooking(name) {
 									v-for="booking in bookingsIn(theatre.name)"
 									:key="booking.name"
 									:booking="booking"
-									:theatre-label="theatre.label"
+									:theatre-label="
+										[theatre.label, theatre.service_unit_type]
+											.filter(Boolean)
+											.join(' · ')
+									"
 									:cleaning-minutes="board.cleaning_minutes"
 									:vertical="vertical"
 									:menu-options="caseMenu(booking)"

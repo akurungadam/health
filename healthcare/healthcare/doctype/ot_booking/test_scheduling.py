@@ -57,6 +57,14 @@ class TestScheduling(HealthcareTestSuite):
 		self.assertEqual(listed[request.name].duration, HOUR)
 		self.assertEqual(listed[request.name].sex, frappe.db.get_value("Patient", self.patients[0], "sex"))
 
+	def test_an_open_request_carries_the_theatre_type_it_needs(self):
+		knee = create_ot_template("_Test Procedure - Knee Replacement", HOUR, "_Test Laminar Flow OT")
+		request = create_service_request(self.patients[0], self.practitioners[0], knee.name)
+
+		listed = {row.name: row for row in get_open_requests(company=COMPANY)}[request.name]
+
+		self.assertEqual(listed.theatre_type, "_Test Laminar Flow OT")
+
 	def test_an_open_request_carries_its_priority(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		request.db_set("priority", priority_named("STAT"))

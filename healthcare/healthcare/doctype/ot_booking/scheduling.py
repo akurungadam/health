@@ -71,6 +71,7 @@ def get_open_requests(company: str | None = None, department: str | None = None)
 	open_requests.sort(key=lambda request: (not request.expected_date, request.expected_date or ""))
 	for request in open_requests:
 		request.duration = templates[request.procedure].default_duration
+		request.theatre_type = templates[request.procedure].required_theatre_type
 	add_priority(open_requests)
 	if open_requests:
 		add_patient_details(open_requests, nowdate())
@@ -104,6 +105,7 @@ def get_postponed(company: str | None = None, department: str | None = None) -> 
 	if bookings:
 		add_priority(bookings)
 		add_surgeons_and_procedures(bookings)
+		add_theatre_types(bookings)
 		add_patient_details(bookings, nowdate())
 	if department and bookings:
 		departments = template_departments({name for booking in bookings for name in booking.procedures})
@@ -205,13 +207,28 @@ def validate_movable(booking, modified):
 
 
 def surgical_templates():
-	"""Template name → its default duration and medical department, for the templates needing an OT"""
+	"""Template name → its default duration, medical department and required theatre type, for the
+	templates needing an OT"""
 	templates = frappe.get_all(
 		"Clinical Procedure Template",
-		fields=["name", "default_duration", "medical_department"],
+		fields=["name", "default_duration", "medical_department", "required_theatre_type"],
 		filters={"requires_ot": 1},
 	)
 	return {template.name: template for template in templates}
+
+
+def add_theatre_types(bookings):
+	"""Each case's theatre type, the one its procedures require, if any"""
+	types = dict(
+		frappe.get_all(
+			"Clinical Procedure Template",
+			fields=["name", "required_theatre_type"],
+			filters={"name": ["in", list({name for booking in bookings for name in booking.procedures})]},
+			as_list=True,
+		)
+	)
+	for booking in bookings:
+		booking.theatre_type = ", ".join(sorted({types.get(name) for name in booking.procedures} - {None}))
 
 
 def template_departments(names):
