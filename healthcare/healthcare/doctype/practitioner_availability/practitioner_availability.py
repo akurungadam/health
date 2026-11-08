@@ -242,7 +242,16 @@ def find_unavailable_blocks(scopes, start, end):
 
 
 def overlaps_daily_window(block, start, end):
-	return get_time(start) < get_time(block.end_time) and get_time(block.start_time) < get_time(end)
+	"""Whether `start` to `end` meets the block's window on any day both cover, by full date and
+	time, so a case running past midnight meets a window late on its first day"""
+	first = max(getdate(start), getdate(block.start_date))
+	last = min(getdate(end), getdate(block.end_date))
+	for day in daterange(first, last) if first <= last else ():
+		window_start = datetime.combine(day, get_time(block.start_time))
+		window_end = datetime.combine(day, get_time(block.end_time))
+		if window_start < end and start < window_end:
+			return True
+	return False
 
 
 def daterange(start_date, end_date):

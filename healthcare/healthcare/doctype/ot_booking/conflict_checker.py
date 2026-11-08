@@ -20,14 +20,29 @@ MAX_OVERLAPPING_THEATRES = 2
 def validate_no_conflicts(booking):
 	if booking.status in INACTIVE_STATUSES:
 		return
-	lock_theatre(booking.theatre)
+	lock_theatre_and_people(booking)
 	for message in find_conflicts(booking):
 		frappe.throw(message, title=_("Booking Conflict"))
 
 
-def lock_theatre(theatre):
-	"""Two coordinators booking the same gap wait for each other instead of both succeeding"""
-	frappe.db.get_value("Healthcare Service Unit", theatre, "name", for_update=True)
+def lock_theatre_and_people(booking):
+	"""Two coordinators booking the same theatre, patient or team member wait for each other
+	instead of both succeeding. The locks are always taken in one order (the theatre, the patient,
+	then the team by name), so two bookings never wait on each other."""
+	frappe.db.get_value("Healthcare Service Unit", booking.theatre, "name", for_update=True)
+	frappe.db.get_value("Patient", booking.patient, "name", for_update=True)
+	lock_team(booking)
+
+
+def lock_team(booking):
+	"""The whole team in one query: looked up by name, the rows are read, and locked, in name order"""
+	team = list({member.practitioner for member in booking.team if member.practitioner})
+	if not team:
+		return
+	practitioner = frappe.qb.DocType("Healthcare Practitioner")
+	frappe.qb.from_(practitioner).select(practitioner.name).where(
+		practitioner.name.isin(team)
+	).for_update().run()
 
 
 def find_conflicts(booking):
@@ -125,7 +140,9 @@ def patient_conflicts(booking):
 
 def overlapping(booking, start, end):
 	"""Other active bookings that start before `end` and end after `start`. The date
-	range keeps the query on the (theatre, scheduled_date) index."""
+	range keeps the query on the (theatre, scheduled_date) index. It is a locking read: one made
+	after waiting for another coordinator's booking sees it, where a plain read would still see
+	the transaction's older snapshot (with snapshot isolation, MariaDB refuses rather than miss it)."""
 	table = frappe.qb.DocType("OT Booking")
 	return (
 		frappe.qb.from_(table)
@@ -135,6 +152,7 @@ def overlapping(booking, start, end):
 		.where(table.scheduled_date[add_days(getdate(start), -1) : getdate(end)])
 		.where(table.scheduled_start < end)
 		.where(table.scheduled_end > start)
+		.for_update()
 	)
 
 

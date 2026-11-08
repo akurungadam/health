@@ -50,19 +50,32 @@ def validate_release(booking):
 
 
 def validate_procedures_follow(booking):
-	"""A submitted procedure keeps the theatre and time it was submitted with, so its case cannot
-	move until it is cancelled; a draft one follows the case (sync_procedures)"""
+	"""A submitted procedure keeps the theatre, time and surgeon it was submitted with, so its case
+	cannot move or change surgeon until it is cancelled; a draft one follows the case
+	(sync_procedures)"""
 	before = booking.get_doc_before_save()
-	if not before or booking.status in INACTIVE_STATUSES or not is_moved(booking, before):
+	if not before or booking.status in INACTIVE_STATUSES:
+		return
+	change = changed_schedule(booking, before)
+	if not change:
 		return
 	for row in booking.procedures:
 		if row.clinical_procedure and not is_draft(row.clinical_procedure):
 			frappe.throw(
-				_("Row {0}: Clinical Procedure {1} is already submitted, so this case cannot move").format(
-					row.idx, frappe.bold(row.clinical_procedure)
+				_("Row {0}: Clinical Procedure {1} is already submitted, so this case cannot {2}").format(
+					row.idx, frappe.bold(row.clinical_procedure), change
 				),
 				title=_("Procedure Submitted"),
 			)
+
+
+def changed_schedule(booking, before):
+	"""What the change would alter on the case's procedures, if anything"""
+	if is_moved(booking, before):
+		return _("move")
+	if primary_surgeon(booking) != primary_surgeon(before):
+		return _("change surgeon")
+	return None
 
 
 def release_procedures(booking):
@@ -95,7 +108,6 @@ def new_procedure(booking, row, start):
 	else:
 		procedure = procedure_from_template(booking, row.procedure_template)
 	procedure.update(schedule(booking, row, start))
-	procedure.practitioner = primary_surgeon(booking)
 	procedure.ot_booking = booking.name
 	procedure.priority = booking.priority
 	procedure.inpatient_record = booking.inpatient_record or procedure.inpatient_record
@@ -134,11 +146,12 @@ def schedule(booking, row, start):
 		"start_date": getdate(start),
 		"start_time": get_time(start),
 		"planned_end_datetime": add_to_date(start, seconds=cint(row.duration)),
+		"practitioner": primary_surgeon(booking),
 	}
 
 
 def primary_surgeon(booking):
-	return next(member.practitioner for member in booking.team if member.is_primary)
+	return next((member.practitioner for member in booking.team if member.is_primary), None)
 
 
 def is_draft(procedure):

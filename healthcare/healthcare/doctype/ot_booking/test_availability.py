@@ -88,6 +88,19 @@ class TestAvailability(HealthcareTestSuite):
 		frappe.db.set_single_value("Healthcare Settings", "ot_holiday_list", holiday_list)
 		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_holiday_list", saved)
 
+	def test_a_block_late_on_the_first_day_of_an_overnight_case_is_refused(self):
+		overnight = create_ot_template("_Test Procedure - Two Hours", duration=2 * HOUR)
+		create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day, "23:30:00", "23:59:00")
+
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"is unavailable",
+			make_booking,
+			self,
+			self.at(23),
+			templates=[overnight.name],
+		)
+
 	@skip_without_hrms
 	def test_a_surgeon_on_leave_is_refused(self):
 		create_approved_leave(link_new_employee(self, self.practitioners[0]), self.day, self.day)

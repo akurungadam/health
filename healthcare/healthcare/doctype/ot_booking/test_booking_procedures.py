@@ -6,6 +6,8 @@ from frappe.utils import add_days, add_to_date, get_datetime, nowdate, nowtime
 
 from healthcare.healthcare.doctype.ot_booking.ot_booking import make_ot_booking
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
+from healthcare.healthcare.doctype.ot_booking.scheduling import book_request, get_open_requests
+from healthcare.healthcare.doctype.ot_booking.test_day_rules import create_user
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -130,6 +132,52 @@ class TestBookingProcedures(HealthcareTestSuite):
 		booking.procedures[0].clinical_procedure = other.create_clinical_procedures()[0]
 
 		self.assertRaisesRegex(frappe.ValidationError, "linked by the system", booking.save)
+
+	def test_a_linked_row_keeps_its_procedure(self):
+		booking = make_booking(self, self.at(9))
+		booking.create_clinical_procedures()
+		booking.reload()
+		booking.procedures[0].procedure_template = create_ot_template("_Test Procedure - Other", HOUR).name
+
+		self.assertRaisesRegex(frappe.ValidationError, "procedure cannot change", booking.save)
+
+	def test_a_linked_row_cannot_be_removed(self):
+		booking = make_booking(self, self.at(9))
+		booking.create_clinical_procedures()
+		booking.reload()
+		booking.procedures = []
+		booking.append("procedures", {"procedure_template": self.template.name})
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot be removed", booking.save)
+
+	def test_an_ot_coordinator_alone_can_book_a_request_and_make_its_procedures(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		frappe.set_user(create_user("_test_ot_coordinator@example.com", "OT Coordinator"))
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		self.assertIn(request.name, [row.name for row in get_open_requests(company="_Test Company")])
+		booking = frappe.get_doc("OT Booking", book_request(request.name, self.theatre, str(self.at(9))))
+		self.assertTrue(booking.create_clinical_procedures())
+
+	def test_a_draft_procedure_follows_a_new_surgeon(self):
+		booking = make_booking(self, self.at(9))
+		procedure = booking.create_clinical_procedures()[0]
+		booking.reload()
+		booking.team[0].practitioner = self.practitioners[1]
+
+		booking.save()
+
+		self.assertEqual(
+			frappe.db.get_value("Clinical Procedure", procedure, "practitioner"), self.practitioners[1]
+		)
+
+	def test_a_submitted_procedure_keeps_its_surgeon(self):
+		booking = make_booking(self, self.at(9))
+		frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0]).submit()
+		booking.reload()
+		booking.team[0].practitioner = self.practitioners[1]
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot change surgeon", booking.save)
 
 	def test_a_withdrawn_request_makes_no_procedure(self):
 		booking = self.book_from_request(self.at(9))

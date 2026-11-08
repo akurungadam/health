@@ -150,27 +150,37 @@ class OTBooking(Document):
 
 	def validate_procedure_links(self):
 		"""A row's Clinical Procedure is linked by the server when it makes it for this booking, so a
-		save keeps each row's link as stored: none on a new row, never another procedure"""
-		stored = (
-			{}
-			if self.is_new()
-			else dict(
-				frappe.get_all(
-					"OT Booking Procedure",
-					fields=["name", "clinical_procedure"],
-					filters={"parent": self.name, "parenttype": "OT Booking"},
-					as_list=True,
-				)
-			)
-		)
+		save keeps each row's link as stored: none on a new row, never another procedure. A linked
+		row describes its procedure, so its procedure and request stay, and it stays in the booking."""
+		stored = self.stored_procedure_rows()
 		for row in self.procedures:
-			if (row.clinical_procedure or None) != (stored.get(row.name) or None):
-				frappe.throw(
-					_(
-						"Row {0}: the Clinical Procedure is linked by the system and cannot be set by hand"
-					).format(row.idx),
-					title=_("Not Allowed"),
+			before = stored.get(row.name) or frappe._dict()
+			if (row.clinical_procedure or None) != (before.clinical_procedure or None):
+				self.refuse_row(
+					row.idx, _("the Clinical Procedure is linked by the system and cannot be set by hand")
 				)
+			if before.clinical_procedure and (
+				row.procedure_template != before.procedure_template
+				or (row.service_request or None) != (before.service_request or None)
+			):
+				self.refuse_row(row.idx, _("its Clinical Procedure is made, so its procedure cannot change"))
+		kept = {row.name for row in self.procedures}
+		for name, before in stored.items():
+			if before.clinical_procedure and name not in kept:
+				self.refuse_row(before.idx, _("its Clinical Procedure is made, so the row cannot be removed"))
+
+	def stored_procedure_rows(self):
+		if self.is_new():
+			return {}
+		rows = frappe.get_all(
+			"OT Booking Procedure",
+			fields=["name", "idx", "clinical_procedure", "procedure_template", "service_request"],
+			filters={"parent": self.name, "parenttype": "OT Booking"},
+		)
+		return {row.name: row for row in rows}
+
+	def refuse_row(self, idx, reason):
+		frappe.throw(_("Row {0}: {1}").format(idx, reason), title=_("Not Allowed"))
 
 	def validate_service_requests(self):
 		seen = set()

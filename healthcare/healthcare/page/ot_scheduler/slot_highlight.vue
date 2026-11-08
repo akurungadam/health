@@ -1,7 +1,10 @@
 <script setup>
 // A picked slot on its theatre row: the case and its cleaning time outlined in green, with
-// Book here, and a way to let the slot go.
+// Book here inside, and a small round ✕ on its top-right corner to let the slot go. Nothing is
+// clipped, so both stay in reach however narrow the slot.
 import { computed } from "vue";
+import { Button } from "frappe-ui";
+import CloseIcon from "~icons/lucide/x";
 
 import { clock } from "./time.js";
 
@@ -15,22 +18,20 @@ const time = computed(() => `${clock(props.gap.start)}–${clock(props.gap.end)}
 
 <template>
 	<div
-		class="z-10 flex items-center gap-1 overflow-hidden rounded-4 border-2 border-dashed border-outline-green-5 bg-surface-green-2 px-1"
+		class="relative z-10 flex items-center rounded-4 border-2 border-dashed border-outline-green-5 bg-surface-green-2 px-1"
 		:style="place"
 		:title="`${time} fits, with cleaning`"
 	>
-		<button
-			class="shrink-0 rounded-3 bg-surface-gray-9 px-2 py-1 text-xs text-ink-white"
-			@click="emit('book')"
-		>
+		<Button size="sm" variant="solid" class="shrink-0" @click="emit('book')">
 			Book here
-		</button>
+		</Button>
 		<button
-			class="shrink-0 rounded-3 px-1 text-xs text-ink-gray-7"
+			class="absolute -right-2.5 -top-1 flex size-5 items-center justify-center rounded-full border border-outline-gray-3 bg-surface-base text-ink-gray-7 shadow-sm hover:bg-surface-gray-2"
 			aria-label="Clear the picked slot"
+			title="Clear the picked slot"
 			@click="emit('clear')"
 		>
-			✕
+			<CloseIcon class="size-3" />
 		</button>
 	</div>
 </template>

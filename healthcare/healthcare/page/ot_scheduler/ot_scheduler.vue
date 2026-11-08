@@ -65,9 +65,6 @@ const timeline = ref(null);
 const workStart = computed(() => minutesOf(board.value?.day_start || "08:00"));
 const workEnd = computed(() => minutesOf(board.value?.day_end || "20:00"));
 let scrolledDay = null;
-// hover details close while the board scrolls, or they would float over the theatre column
-const scrolling = ref(false);
-let scrollEnd = null;
 // a viewer who cannot change bookings sees the board read-only
 const canEdit = computed(() => Boolean(board.value?.can_edit));
 const tentativeCount = computed(
@@ -95,13 +92,6 @@ watch(company, () => {
 watch(department, load);
 // a new day opens at the start of working hours; a reload of the same day stays where it is
 watch(board, scrollToWorkingHours, { flush: "post" });
-
-function hideDetailsWhileScrolling() {
-	scrolling.value = true;
-	previewFor.value = null;
-	clearTimeout(scrollEnd);
-	scrollEnd = setTimeout(() => (scrolling.value = false), 300);
-}
 
 function scrollToWorkingHours() {
 	if (!timeline.value || scrolledDay === day.value) return;
@@ -194,7 +184,8 @@ function changeWithReason({ close }) {
 	close();
 }
 
-// A case's menu and its preview never show together, and neither opens over the reason dialog
+// A case's menu and its preview never show together, and neither opens over the reason
+// dialog. Any preview, a case's or a block's, closes while the board scrolls.
 function menuOpened(booking, open) {
 	menuFor.value = open && !reasonFor.value ? booking.name : null;
 	if (open) previewFor.value = null;
@@ -327,7 +318,7 @@ function openBooking(name) {
 				v-else-if="board"
 				ref="timeline"
 				class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
-				@scroll="hideDetailsWhileScrolling"
+				@scroll="previewFor = null"
 			>
 				<!-- one block as wide as a row, so the header, headings and rows scroll together;
 				     the theatre column stays put while the day scrolls past it -->
@@ -401,7 +392,14 @@ function openBooking(name) {
 									v-for="block in blocksIn(theatre.name)"
 									:key="block.name"
 									:block="block"
-									:quiet="scrolling"
+									:open="previewFor === block.name"
+									@update:open="open => previewOpened(block, open)"
+									@view="
+										name =>
+											host.navigate?.(
+												`practitioner-availability/${name}`,
+											)
+									"
 									:place="
 										placed(
 											minutesOf(block.start_time),

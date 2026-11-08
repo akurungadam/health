@@ -14,6 +14,7 @@ from healthcare.healthcare.doctype.ot_booking.board import (
 	add_surgeons_and_procedures,
 )
 from healthcare.healthcare.doctype.ot_booking.booking_procedures import ACTIVE_REQUEST_STATUS
+from healthcare.healthcare.doctype.ot_booking.conflict_checker import lock_theatre_and_people
 from healthcare.healthcare.doctype.ot_booking.ot_booking import make_ot_booking
 from healthcare.healthcare.doctype.ot_booking.priority import add_priority
 from healthcare.healthcare.doctype.ot_booking.push import push_following
@@ -172,8 +173,10 @@ def make_room(booking, reason):
 	"""The case's new slot, then the cases after it pushed back to fit it. While they are pushed,
 	a moved case holds its new slot, so each is checked against where the case is going and
 	never against the slot it is leaving. It gets its old slot back before its own save, which
-	must see the move to check it; any refusal undoes all of it."""
+	must see the move to check it; any refusal undoes all of it. The locks a save takes come
+	first, in the same order, so a booking waiting for this theatre never holds up this case."""
 	booking.set_schedule()
+	lock_theatre_and_people(booking)
 	if booking.is_new():
 		return push_following(booking, reason)
 	fields = ("theatre", "scheduled_start", "scheduled_end", "scheduled_date")

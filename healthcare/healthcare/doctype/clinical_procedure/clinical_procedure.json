@@ -393,7 +393,7 @@
    "link_fieldname": "reference_name"
   }
  ],
- "modified": "2026-11-07 14:04:58.811339",
+ "modified": "2026-11-08 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure",
@@ -426,6 +426,18 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "OT Coordinator"
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "report": 1,
+   "role": "OT Manager"
   }
  ],
  "restrict_to_domain": "Healthcare",

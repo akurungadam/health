@@ -8,6 +8,8 @@ import { get } from "./api.js";
 export function useSlots({ day, filters, change }) {
 	const finder = ref(closedFinder());
 	const picked = ref(null);
+	// each search is numbered, so only the latest one's reply is shown
+	let searches = 0;
 
 	function closedFinder() {
 		return { for: null, target: null, loading: false, slots: [], error: "" };
@@ -18,20 +20,22 @@ export function useSlots({ day, filters, change }) {
 		const name = (target.request || target.booking).name;
 		if (finder.value.for === name) return close();
 		picked.value = null;
+		const search = ++searches;
 		finder.value = { ...closedFinder(), for: name, target, loading: true };
+		const which = target.request ? { service_request: name } : { booking: name };
+		let slots = [];
+		let error = "";
 		try {
-			const which = target.request
-				? { service_request: name }
-				: { booking: name };
-			finder.value.slots = await get("slots.find_slots", {
-				...which,
-				...filters(),
-			});
-		} catch (error) {
-			finder.value.error =
-				error?.messages?.join(" ") || error?.message || String(error);
+			slots = await get("slots.find_slots", { ...which, ...filters() });
+		} catch (refusal) {
+			error =
+				refusal?.messages?.flat().join(" ") ||
+				refusal?.message ||
+				String(refusal);
 		}
-		finder.value.loading = false;
+		// a reply that comes after this finder was closed, or opened on another card, is old
+		if (search !== searches) return;
+		Object.assign(finder.value, { slots, error, loading: false });
 	}
 
 	function pick(slot) {
@@ -69,6 +73,7 @@ export function useSlots({ day, filters, change }) {
 	}
 
 	function close() {
+		searches++;
 		finder.value = closedFinder();
 		picked.value = null;
 	}

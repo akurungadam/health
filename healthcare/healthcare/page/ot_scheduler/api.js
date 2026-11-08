@@ -12,10 +12,12 @@ export function post(method, params) {
 	return frappeRequest({ url: `${API}.${method}`, params, method: "POST", headers });
 }
 
-// The first server message is the toast; any others go beneath it
+// The first server message is the toast; any others go beneath it. A refusal of several
+// messages at once (frappe.throw with as_list) arrives as one list among them.
 export function showError(error) {
-	const [first, ...rest] = error?.messages?.length
-		? error.messages
+	const messages = (error?.messages || []).flat().filter(Boolean);
+	const [first, ...rest] = messages.length
+		? messages
 		: [error?.message || String(error)];
 	toast.error(first, { description: rest.join(" ") || undefined });
 }
