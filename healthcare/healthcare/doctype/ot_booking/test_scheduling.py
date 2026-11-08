@@ -24,6 +24,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 from healthcare.tests.utils import HealthcareTestSuite
 
 DEPARTMENT = "_Test Medical Department"
+# named, not taken from the user's default, which other modules' tests may leave set
+COMPANY = "_Test Company"
 
 
 class TestScheduling(HealthcareTestSuite):
@@ -40,7 +42,7 @@ class TestScheduling(HealthcareTestSuite):
 		return get_datetime(f"{self.day} {hour:02d}:00:00")
 
 	def open_request_names(self):
-		return [request.name for request in get_open_requests()]
+		return [request.name for request in get_open_requests(company=COMPANY)]
 
 	def move(self, booking, hour, theatre=None, reason=None):
 		return move_booking(
@@ -50,7 +52,7 @@ class TestScheduling(HealthcareTestSuite):
 	def test_an_open_surgical_request_is_listed_with_its_duration(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 
-		listed = {row.name: row for row in get_open_requests()}
+		listed = {row.name: row for row in get_open_requests(company=COMPANY)}
 
 		self.assertEqual(listed[request.name].duration, HOUR)
 		self.assertEqual(listed[request.name].sex, frappe.db.get_value("Patient", self.patients[0], "sex"))
@@ -59,7 +61,7 @@ class TestScheduling(HealthcareTestSuite):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		request.db_set("priority", priority_named("STAT"))
 
-		listed = {row.name: row for row in get_open_requests()}[request.name]
+		listed = {row.name: row for row in get_open_requests(company=COMPANY)}[request.name]
 
 		self.assertEqual((listed.priority_label, listed.is_emergency), ("STAT", True))
 
@@ -70,9 +72,12 @@ class TestScheduling(HealthcareTestSuite):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		frappe.db.set_value("Service Request", request.name, "medical_department", None)
 
-		self.assertIn(request.name, [row.name for row in get_open_requests(department=DEPARTMENT)])
+		self.assertIn(
+			request.name, [row.name for row in get_open_requests(company=COMPANY, department=DEPARTMENT)]
+		)
 		self.assertNotIn(
-			request.name, [row.name for row in get_open_requests(department="_Test Other Department")]
+			request.name,
+			[row.name for row in get_open_requests(company=COMPANY, department="_Test Other Department")],
 		)
 
 	def test_the_pane_shows_the_default_company_when_none_is_given(self):
@@ -83,9 +88,9 @@ class TestScheduling(HealthcareTestSuite):
 		self.addCleanup(frappe.defaults.set_user_default, "company", saved)
 
 		frappe.defaults.set_user_default("company", "_Test Company")
-		self.assertIn(request.name, self.open_request_names())
+		self.assertIn(request.name, [row.name for row in get_open_requests()])
 		frappe.defaults.set_user_default("company", other_company)
-		self.assertNotIn(request.name, self.open_request_names())
+		self.assertNotIn(request.name, [row.name for row in get_open_requests()])
 
 	def test_the_most_pressing_request_comes_first(self):
 		later = create_service_request(self.patients[0], self.practitioners[0])

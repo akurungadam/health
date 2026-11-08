@@ -1,27 +1,18 @@
 <script setup>
 // The OT Scheduler: one day of every theatre.
 //
-// Theatres are rows grouped by OT complex, and time runs across. Each case shows
+// Theatres are rows grouped by OT complex, and time runs across; or, by the Healthcare
+// Settings' OT Scheduler Layout, theatres are columns and time runs down. Each case shows
 // its cleaning time after it, blocked theatre time is hatched, and the
 // practitioners who are away that day are listed above the board. A request from
 // the panel dropped onto a row is booked there; a case dragged elsewhere moves.
 // The server checks every drop, so a refused one stays where it was.
 import { computed, onMounted, ref, watch } from "vue";
-import {
-	Badge,
-	ContextMenu,
-	HoverCard,
-	Dialog,
-	FormControl,
-	toast,
-	ToastProvider,
-} from "frappe-ui";
+import { Badge, Dialog, FormControl, toast, ToastProvider } from "frappe-ui";
 import { useHost } from "@framework/ui/island";
 
-import FastingIcon from "~icons/lucide/utensils-crossed";
-import LockIcon from "~icons/lucide/lock";
-
-import BookingPreview from "./booking_preview.vue";
+import CaseCard from "./case_card.vue";
+import HourScale from "./hour_scale.vue";
 import DropGhost from "./drop_ghost.vue";
 import { caseMenu as buildCaseMenu, statusParams } from "./case_menu.js";
 import { confirmPublish } from "./publish.js";
@@ -30,14 +21,23 @@ import RowWash from "./row_wash.vue";
 import UnavailableBlock from "./unavailable_block.vue";
 import { useDrop } from "./use_drop.js";
 import { useSlots } from "./use_slots.js";
-import { caseBorder, caseFill } from "./case_style.js";
 import DateBar from "./date_bar.vue";
-import { patientFacts } from "./patient.js";
 import RequestPanel from "./request_panel.vue";
 import { get, post, showError } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
-import { clock, minutesOf, pastUntil, placed, span, today } from "./time.js";
+import {
+	clock,
+	DAY_SIZE,
+	HOUR_SIZE,
+	HOURS,
+	caseOnDay,
+	minutesOf,
+	pastUntil,
+	placed,
+	span,
+	today,
+} from "./time.js";
 
 const props = defineProps({
 	route: { type: Array, default: () => [] },
@@ -58,10 +58,17 @@ const menuFor = ref(null);
 const previewFor = ref(null);
 
 // The whole day, midnight to midnight, scrolled to the usual working hours; any hour is bookable
-const HOUR_WIDTH = 96; // pixels: the usual 12-hour day is about a window wide
-const THEATRE_WIDTH = 176; // the theatre column, w-44
-const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
 const timeline = ref(null);
+const vertical = computed(() => board.value?.layout === "Theatres in Columns");
+const boardGrid = computed(() => {
+	if (!vertical.value) return { gridTemplateColumns: `176px ${DAY_SIZE}px` };
+	const count = board.value.complexes.flatMap(group => group.theatres).length;
+	return {
+		gridTemplateColumns: `56px repeat(${count}, 144px)`,
+		gridTemplateRows: `auto ${DAY_SIZE}px`,
+		gridAutoFlow: "column",
+	};
+});
 const workStart = computed(() => minutesOf(board.value?.day_start || "08:00"));
 const workEnd = computed(() => minutesOf(board.value?.day_end || "20:00"));
 let scrolledDay = null;
@@ -95,8 +102,9 @@ watch(board, scrollToWorkingHours, { flush: "post" });
 
 function scrollToWorkingHours() {
 	if (!timeline.value || scrolledDay === day.value) return;
-	// a quarter of an hour early, so a case at the start of the day clears the theatre column
-	timeline.value.scrollLeft = ((workStart.value - 15) / 60) * HOUR_WIDTH;
+	// a quarter of an hour early, so a case at the start of the day clears the theatre names
+	const offset = ((workStart.value - 15) / 60) * HOUR_SIZE;
+	timeline.value[vertical.value ? "scrollTop" : "scrollLeft"] = offset;
 	scrolledDay = day.value;
 }
 
@@ -116,6 +124,7 @@ const {
 } = useDrop({
 	board,
 	day,
+	vertical,
 	canEdit,
 	bookingsIn,
 	blocksIn,
@@ -238,7 +247,7 @@ async function change(method, params) {
 
 // a case whose time has passed stays put: it can only be rescheduled or cancelled
 function hasPassed(booking) {
-	return minutesOf(booking.scheduled_start) < pastUntil(day.value);
+	return caseOnDay(booking, boardDay()).start < pastUntil(boardDay());
 }
 
 function bookingsIn(theatre) {
@@ -249,9 +258,25 @@ function blocksIn(theatre) {
 	return board.value.blocks.filter(block => block.scope === theatre);
 }
 
+// The day the board's cases are for. Next and Previous change `day` at once, but the cases shown
+// are the old day's until the new day loads, and are placed against their own day meanwhile.
+function boardDay() {
+	return String(board.value?.date || day.value);
+}
+
+// a place along a lane, in the board's direction
+function place(start, end) {
+	return placed(start, end, vertical.value);
+}
+
+function casePlace(booking) {
+	const { start, end } = caseOnDay(booking, boardDay());
+	return place(start, end);
+}
+
 function cleaningPlace(booking) {
-	const end = minutesOf(booking.scheduled_end);
-	return placed(end, end + board.value.cleaning_minutes);
+	const { end } = caseOnDay(booking, boardDay());
+	return place(end, end + board.value.cleaning_minutes);
 }
 
 function openBooking(name) {
@@ -320,47 +345,45 @@ function openBooking(name) {
 				class="flex-1 overflow-auto rounded-4 border border-outline-gray-2"
 				@scroll="previewFor = null"
 			>
-				<!-- one block as wide as a row, so the header, headings and rows scroll together;
-				     the theatre column stays put while the day scrolls past it -->
-				<div :style="{ width: `${THEATRE_WIDTH + 24 * HOUR_WIDTH}px` }">
+				<!-- one grid, so the hours, the theatres and their lanes scroll together, with the
+				     theatre names and the hours pinned. Theatres are rows, or columns by setting. -->
+				<div class="grid w-max" :style="boardGrid">
 					<div
-						class="sticky top-0 z-30 flex border-b border-outline-gray-2 bg-surface-base"
+						class="sticky left-0 top-0 z-30 border-b border-outline-gray-2 bg-surface-base p-2 text-sm text-ink-gray-5"
 					>
-						<div
-							class="sticky left-0 z-30 w-44 shrink-0 bg-surface-base p-2 text-sm text-ink-gray-5"
-						>
-							Theatre
-						</div>
-						<div class="relative h-8 flex-1 overflow-hidden">
-							<span
-								v-for="hour in HOURS.slice(0, -1)"
-								:key="hour"
-								class="absolute top-2 -translate-x-1/2 text-xs text-ink-gray-5"
-								:style="span(hour * 60, hour * 60)"
-							>
-								{{ String(hour).padStart(2, "0") }}:00
-							</span>
-						</div>
+						{{ vertical ? "" : "Theatre" }}
 					</div>
-
-					<section v-for="group in board.complexes" :key="group.name">
+					<HourScale :vertical="vertical" />
+					<template v-for="group in board.complexes" :key="group.name">
 						<h2
-							class="bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
+							v-if="!vertical"
+							class="col-span-full bg-surface-gray-1 px-2 py-1 text-sm font-semibold text-ink-gray-7"
 						>
 							<span class="sticky left-2">{{
 								group.name || "Theatres"
 							}}</span>
 						</h2>
-						<div
-							v-for="theatre in group.theatres"
+						<template
+							v-for="(theatre, index) in group.theatres"
 							:key="theatre.name"
-							class="flex border-b border-outline-gray-1 last:border-b-0"
 						>
 							<div
-								class="sticky left-0 z-20 w-44 shrink-0 bg-surface-base p-2"
+								class="sticky z-20 bg-surface-base p-2"
+								:class="
+									vertical
+										? 'top-0 border-b border-l border-outline-gray-2'
+										: 'left-0 border-b border-outline-gray-1'
+								"
 								@dragover.prevent="dragOver(theatre.name, null)"
 								@drop.prevent="drop(theatre.name)"
 							>
+								<p
+									v-if="vertical"
+									class="truncate text-xs font-semibold text-ink-gray-7"
+									:class="index && 'invisible'"
+								>
+									{{ group.name || "Theatres" }}
+								</p>
 								<p class="truncate text-base text-ink-gray-8">
 									{{ theatre.label }}
 								</p>
@@ -369,10 +392,11 @@ function openBooking(name) {
 								</p>
 							</div>
 							<div
-								class="relative isolate grid h-24 flex-1 overflow-hidden py-1"
-								:class="
-									dropTheatre === theatre.name && 'bg-surface-gray-1'
-								"
+								class="relative isolate grid overflow-hidden border-outline-gray-1"
+								:class="[
+									vertical ? 'border-l px-1' : 'h-24 border-b py-1',
+									dropTheatre === theatre.name && 'bg-surface-gray-1',
+								]"
 								@dragover.prevent="dragOver(theatre.name, $event)"
 								@dragleave="dropTheatre = null"
 								@drop.prevent="drop(theatre.name)"
@@ -380,13 +404,18 @@ function openBooking(name) {
 								<RowWash
 									:work-start="workStart"
 									:work-end="workEnd"
-									:placed="placed"
+									:placed="place"
 								/>
 								<span
 									v-for="hour in HOURS"
 									:key="hour"
-									class="absolute inset-y-0 -z-10 border-l border-outline-gray-1"
-									:style="span(hour * 60, hour * 60)"
+									class="absolute -z-10 border-outline-gray-1"
+									:class="
+										vertical
+											? 'inset-x-0 border-t'
+											: 'inset-y-0 border-l'
+									"
+									:style="span(hour * 60, hour * 60, vertical)"
 								/>
 								<UnavailableBlock
 									v-for="block in blocksIn(theatre.name)"
@@ -401,162 +430,50 @@ function openBooking(name) {
 											)
 									"
 									:place="
-										placed(
+										place(
 											minutesOf(block.start_time),
 											minutesOf(block.end_time),
 										)
 									"
 								/>
-								<template
+								<CaseCard
 									v-for="booking in bookingsIn(theatre.name)"
 									:key="booking.name"
-								>
-									<div
-										v-if="board.cleaning_minutes"
-										class="ot-hatch rounded-e-4 bg-surface-gray-1"
-										:class="[caseBorder(booking), 'border-l-0']"
-										:style="cleaningPlace(booking)"
-										title="Cleaning"
-									/>
-									<ContextMenu
-										:options="caseMenu(booking)"
-										:open="menuFor === booking.name"
-										@update:open="open => menuOpened(booking, open)"
-									>
-										<template #default="{ setOpen }">
-											<button
-												class="overflow-hidden px-2 py-1 text-left"
-												:class="[
-													caseBorder(booking),
-													caseFill(booking),
-													board.cleaning_minutes
-														? 'rounded-s-4 border-r-0'
-														: 'rounded-4',
-												]"
-												:style="
-													placed(
-														minutesOf(
-															booking.scheduled_start,
-														),
-														minutesOf(
-															booking.scheduled_end,
-														),
-													)
-												"
-												:draggable="
-													canEdit &&
-													['Tentative', 'Scheduled'].includes(
-														booking.status,
-													) &&
-													!hasPassed(booking)
-												"
-												@dragstart="
-													pickBooking(booking, $event)
-												"
-												@dragend="endDrag"
-												@click="setOpen(true)"
-											>
-												<HoverCard
-													:hover-delay="500"
-													:open="previewFor === booking.name"
-													@update:open="
-														open =>
-															previewOpened(booking, open)
-													"
-												>
-													<template #trigger>
-														<div
-															class="flex h-full flex-col"
-														>
-															<div
-																class="flex items-start gap-1"
-															>
-																<p
-																	class="flex min-w-0 flex-1 flex-wrap gap-x-1 text-sm"
-																>
-																	<span
-																		class="max-w-full truncate font-medium text-ink-gray-9"
-																	>
-																		{{
-																			booking.patient_name
-																		}}
-																	</span>
-																	<span
-																		class="shrink-0 text-ink-gray-5"
-																	>
-																		{{
-																			patientFacts(
-																				booking,
-																			)
-																		}}
-																	</span>
-																</p>
-																<LockIcon
-																	v-if="
-																		hasPassed(
-																			booking,
-																		)
-																	"
-																	class="size-3.5 shrink-0 text-ink-gray-5"
-																	title="Its time has passed: reschedule or cancel it"
-																/>
-																<FastingIcon
-																	class="size-3.5 shrink-0"
-																	:class="
-																		booking.fasting_confirmed
-																			? 'text-ink-green-3'
-																			: 'text-ink-gray-4'
-																	"
-																	:title="
-																		booking.fasting_confirmed
-																			? 'Fasting confirmed'
-																			: 'Fasting not confirmed'
-																	"
-																/>
-															</div>
-															<p
-																class="truncate text-xs text-ink-gray-6"
-															>
-																{{
-																	clock(
-																		booking.scheduled_start,
-																	)
-																}}&ndash;{{
-																	clock(
-																		booking.scheduled_end,
-																	)
-																}}
-															</p>
-															<p
-																class="truncate text-xs text-ink-gray-6"
-															>
-																{{ booking.surgeon }}
-															</p>
-														</div>
-													</template>
-													<BookingPreview
-														:booking="booking"
-														:theatre="theatre.label"
-														:time="`${clock(
-															booking.scheduled_start,
-														)}–${clock(
-															booking.scheduled_end,
-														)}`"
-													/>
-												</HoverCard>
-											</button>
-										</template>
-									</ContextMenu>
-								</template>
+									:booking="booking"
+									:theatre-label="theatre.label"
+									:cleaning-minutes="board.cleaning_minutes"
+									:vertical="vertical"
+									:menu-options="caseMenu(booking)"
+									:menu-open="menuFor === booking.name"
+									@update:menu-open="
+										open => menuOpened(booking, open)
+									"
+									:preview-open="previewFor === booking.name"
+									@update:preview-open="
+										open => previewOpened(booking, open)
+									"
+									:movable="
+										canEdit &&
+										['Tentative', 'Scheduled'].includes(
+											booking.status,
+										) &&
+										!hasPassed(booking)
+									"
+									:passed="hasPassed(booking)"
+									:place="casePlace(booking)"
+									:cleaning-place="cleaningPlace(booking)"
+									@pick="event => pickBooking(booking, event)"
+									@drop-end="endDrag"
+								/>
 								<DropGhost
 									v-if="plan && dropTheatre === theatre.name"
 									:plan="plan"
-									:placed="placed"
+									:placed="place"
 								/>
 								<SlotHighlight
 									v-if="slotIn(theatre.name)"
 									:place="
-										placed(
+										place(
 											minutesOf(picked.start),
 											minutesOf(picked.end) +
 												board.cleaning_minutes,
@@ -567,8 +484,8 @@ function openBooking(name) {
 									@clear="picked = null"
 								/>
 							</div>
-						</div>
-					</section>
+						</template>
+					</template>
 				</div>
 			</div>
 		</div>

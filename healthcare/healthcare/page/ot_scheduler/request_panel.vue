@@ -144,7 +144,7 @@ function drop() {
 				</p>
 				<p class="text-xs text-ink-gray-5">
 					{{ minutes(request.duration) }} &middot;
-					{{ request.practitioner_name }} &middot;
+					{{ request.practitioner_name }} &middot; Ordered
 					{{ formatDate(request.order_date) }}
 				</p>
 				<p

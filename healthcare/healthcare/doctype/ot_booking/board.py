@@ -4,13 +4,13 @@
 """One day of the OT Scheduler: the theatres grouped by OT complex, the day's bookings,
 the theatre holiday, the time theatres are blocked and the practitioners who are away."""
 
-from datetime import datetime
+from datetime import datetime, time
 
 from dateutil.relativedelta import relativedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_time, getdate
+from frappe.utils import add_days, cint, get_time, getdate
 
 from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave import find_leaves
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import ot_setting
@@ -42,6 +42,7 @@ def get_board(date: str, company: str | None = None, department: str | None = No
 		"day_start": start,
 		"day_end": end,
 		"cleaning_minutes": cint(ot_setting("ot_cleaning_minutes")),
+		"layout": ot_setting("ot_board_layout"),
 		"holiday": get_holiday(company, date),
 		"complexes": group_by_complex(theatres),
 		"bookings": get_bookings(date, list(theatres)),
@@ -127,6 +128,8 @@ def get_holiday(company, date):
 
 
 def get_bookings(date, theatres):
+	"""The day's cases, and the night's from the day before that run on into it. A case is shorter
+	than a day, so looking one day back finds them all."""
 	if not theatres:
 		return []
 	bookings = frappe.get_list(
@@ -143,7 +146,8 @@ def get_bookings(date, theatres):
 			"modified",
 		],
 		filters={
-			"scheduled_date": date,
+			"scheduled_date": ["between", [add_days(date, -1), date]],
+			"scheduled_end": [">", datetime.combine(date, time.min)],
 			"status": ["not in", INACTIVE_STATUSES],
 			"theatre": ["in", theatres],
 		},

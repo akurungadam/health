@@ -9,6 +9,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_lea
 	link_new_employee,
 	skip_without_hrms,
 )
+from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import ot_setting
 from healthcare.healthcare.doctype.ot_booking.board import (
 	add_patient_details,
 	age_text,
@@ -107,6 +108,29 @@ class TestBoard(HealthcareTestSuite):
 		self.day = add_days(self.day, -1)
 
 		self.assertEqual(self.board()["bookings"], [])
+
+	def test_the_board_carries_its_layout(self):
+		self.assertEqual(self.board()["layout"], ot_setting("ot_board_layout"))
+		saved = frappe.db.get_single_value("Healthcare Settings", "ot_board_layout")
+		frappe.db.set_single_value("Healthcare Settings", "ot_board_layout", "Theatres in Columns")
+		self.addCleanup(frappe.db.set_single_value, "Healthcare Settings", "ot_board_layout", saved)
+
+		self.assertEqual(self.board()["layout"], "Theatres in Columns")
+
+	def night_before(self, hour):
+		return get_datetime(f"{add_days(self.day, -1)} {hour:02d}:00:00")
+
+	def test_a_case_from_the_night_before_is_shown(self):
+		overnight = create_ot_template("_Test Procedure - Two Hours", duration=2 * HOUR)
+		booking = make_booking(self, self.night_before(23), templates=[overnight.name])
+
+		self.assertIn(booking.name, [row.name for row in self.board()["bookings"]])
+
+	def test_a_case_ending_at_midnight_stays_on_its_own_day(self):
+		overnight = create_ot_template("_Test Procedure - Two Hours", duration=2 * HOUR)
+		booking = make_booking(self, self.night_before(22), templates=[overnight.name])
+
+		self.assertNotIn(booking.name, [row.name for row in self.board()["bookings"]])
 
 	def test_a_blocked_theatre_is_shown(self):
 		block = create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)

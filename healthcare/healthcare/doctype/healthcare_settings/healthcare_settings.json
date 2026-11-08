@@ -59,6 +59,7 @@
   "column_break_ot",
   "ot_day_start_time",
   "ot_day_end_time",
+  "ot_board_layout",
   "ot_fasting_activity",
   "billing_accounts",
   "healthcare_service_items",
@@ -432,6 +433,14 @@
    "label": "Day End Time"
   },
   {
+   "default": "Theatres in Rows",
+   "description": "How the OT Scheduler lays out the day: each theatre a row with time running across, or each theatre a column with time running down",
+   "fieldname": "ot_board_layout",
+   "fieldtype": "Select",
+   "label": "OT Scheduler Layout",
+   "options": "Theatres in Rows\nTheatres in Columns"
+  },
+  {
    "description": "The ward's Nursing Task for a Scheduled case's fasting. Leave empty to send none",
    "fieldname": "ot_fasting_activity",
    "fieldtype": "Link",
@@ -683,7 +692,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-07 11:35:11.900620",
+ "modified": "2026-11-08 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Healthcare Settings",

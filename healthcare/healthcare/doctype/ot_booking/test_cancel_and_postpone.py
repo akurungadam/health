@@ -23,6 +23,8 @@ from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 from healthcare.tests.utils import HealthcareTestSuite
 
 DEPARTMENT = "_Test Medical Department"
+# named, not taken from the user's default, which other modules' tests may leave set
+COMPANY = "_Test Company"
 
 
 class TestCancelAndPostpone(HealthcareTestSuite):
@@ -54,15 +56,15 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		self.stop(booking, "Postponed")
 
 		self.assertFalse(frappe.db.exists("Clinical Procedure", procedure))
-		self.assertNotIn(request, [row.name for row in get_open_requests()])
-		self.assertIn(booking.name, [row.name for row in get_postponed()])
+		self.assertNotIn(request, [row.name for row in get_open_requests(company=COMPANY)])
+		self.assertIn(booking.name, [row.name for row in get_postponed(company=COMPANY)])
 
 	def test_a_postponed_case_carries_its_priority(self):
 		_request, booking = self.booked_request()
 
 		self.stop(booking, "Postponed")
 
-		listed = {row.name: row for row in get_postponed()}[booking.name]
+		listed = {row.name: row for row in get_postponed(company=COMPANY)}[booking.name]
 		self.assertEqual((listed.priority_label, listed.is_emergency), ("Routine", False))
 
 	def test_a_postponed_case_is_in_its_procedures_department(self):
@@ -72,9 +74,12 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		_request, booking = self.booked_request()
 		self.stop(booking, "Postponed")
 
-		self.assertIn(booking.name, [row.name for row in get_postponed(department=DEPARTMENT)])
+		self.assertIn(
+			booking.name, [row.name for row in get_postponed(company=COMPANY, department=DEPARTMENT)]
+		)
 		self.assertNotIn(
-			booking.name, [row.name for row in get_postponed(department="_Test Other Department")]
+			booking.name,
+			[row.name for row in get_postponed(company=COMPANY, department="_Test Other Department")],
 		)
 
 	def test_a_cancelled_case_frees_its_request(self):
@@ -82,7 +87,7 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 
 		self.stop(booking, "Cancelled")
 
-		self.assertIn(request, [row.name for row in get_open_requests()])
+		self.assertIn(request, [row.name for row in get_open_requests(company=COMPANY)])
 		self.assertFalse(frappe.db.exists("Clinical Procedure", {"ot_booking": booking.name}))
 
 	def test_a_case_with_a_submitted_procedure_cannot_be_cancelled(self):
@@ -118,7 +123,7 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 
 		set_status(booking.name, "Postponed", str(booking.modified))
 
-		self.assertIn(booking.name, [row.name for row in get_postponed()])
+		self.assertIn(booking.name, [row.name for row in get_postponed(company=COMPANY)])
 
 	def test_a_scheduled_case_needs_a_reason_to_be_rescheduled(self):
 		booking = make_booking(self, self.at(9))

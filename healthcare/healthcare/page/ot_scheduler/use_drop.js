@@ -7,11 +7,19 @@ import { toast } from "frappe-ui";
 import { post, showError } from "./api.js";
 import { hideDragImage, planDrop, snapFirstDrop, snapToGrid } from "./drop_plan.js";
 import { playDropSound } from "./sounds.js";
-import { caseMinutes, DAY_MINUTES, minutesOf, pastUntil, twoDigits } from "./time.js";
+import {
+	caseMinutes,
+	caseOnDay,
+	DAY_MINUTES,
+	minutesOf,
+	pastUntil,
+	twoDigits,
+} from "./time.js";
 
 export function useDrop({
 	board,
 	day,
+	vertical,
 	canEdit,
 	bookingsIn,
 	blocksIn,
@@ -78,8 +86,8 @@ export function useDrop({
 	// Where in the case it was grabbed, so the case keeps that point under the cursor
 	function pickBooking(booking, event) {
 		const block = event.currentTarget.getBoundingClientRect();
-		const row = event.currentTarget.parentElement.getBoundingClientRect();
-		const grab = ((event.clientX - block.left) / row.width) * DAY_MINUTES;
+		const lane = event.currentTarget.parentElement.getBoundingClientRect();
+		const grab = alongLane(event, lane, block);
 		pick({ booking, grab, length: caseLength(booking) }, booking.name, event);
 	}
 
@@ -132,14 +140,20 @@ export function useDrop({
 				patient_name: booking.patient_name,
 				status: booking.status,
 				is_emergency: booking.is_emergency,
-				start: minutesOf(booking.scheduled_start),
-				end: minutesOf(booking.scheduled_start) + caseMinutes(booking),
+				...caseOnDay(booking, String(board.value.date)),
 			}));
 	}
 
 	function cursorMinutes(event) {
-		const row = event.currentTarget.getBoundingClientRect();
-		return ((event.clientX - row.left) / row.width) * DAY_MINUTES;
+		return alongLane(event, event.currentTarget.getBoundingClientRect());
+	}
+
+	// The cursor's time on a lane, measured from the start of `from` (the lane, or a case on it):
+	// across the lane on rows, down it on columns
+	function alongLane(event, lane, from = lane) {
+		if (vertical.value)
+			return ((event.clientY - from.top) / lane.height) * DAY_MINUTES;
+		return ((event.clientX - from.left) / lane.width) * DAY_MINUTES;
 	}
 
 	function atTime(minutes) {

@@ -18,7 +18,7 @@ const time = computed(() => `${clock(props.gap.start)}–${clock(props.gap.end)}
 
 <template>
 	<div
-		class="relative z-10 flex items-center rounded-4 border-2 border-dashed border-outline-green-5 bg-surface-green-2 px-1"
+		class="relative z-10 flex items-center justify-center rounded-4 border-2 border-dashed border-outline-green-5 bg-surface-green-2 px-1"
 		:style="place"
 		:title="`${time} fits, with cleaning`"
 	>

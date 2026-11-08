@@ -1,29 +1,48 @@
 // Times and dates as the board reads and shows them. A time is minutes since midnight.
 
-// the board always shows the whole day, midnight to midnight
+// the board always shows the whole day, midnight to midnight, an hour to every HOUR_SIZE pixels
 export const DAY_MINUTES = 24 * 60;
+export const HOUR_SIZE = 96;
+export const DAY_SIZE = 24 * HOUR_SIZE;
+export const HOURS = Array.from({ length: 25 }, (_, hour) => hour);
 
-// A position on the row, kept inside the day; a case running past midnight is cut there
-export function span(start, end) {
+// A position along a lane, in pixels from midnight, kept inside the day; a case running past
+// midnight is cut there. Across the lane on rows, down it on columns.
+export function span(start, end, vertical = false) {
 	const inside = minutes => Math.min(Math.max(minutes, 0), DAY_MINUTES);
 	const from = inside(start);
 	const to = Math.max(inside(end < start ? DAY_MINUTES : end), from);
-	return {
-		left: `${(from / DAY_MINUTES) * 100}%`,
-		width: `${((to - from) / DAY_MINUTES) * 100}%`,
-	};
+	const [offset, length] = [pixels(from), pixels(to - from)];
+	return vertical ? { top: offset, height: length } : { left: offset, width: length };
 }
 
-// Blocks share one grid cell, placed across it by time
-export function placed(start, end) {
-	const { left, width } = span(start, end);
-	return { gridArea: "1 / 1", marginLeft: left, width };
+// Everything on a lane shares one grid cell, placed along it by time
+export function placed(start, end, vertical = false) {
+	const place = span(start, end, vertical);
+	return vertical
+		? { gridArea: "1 / 1", marginTop: place.top, height: place.height }
+		: { gridArea: "1 / 1", marginLeft: place.left, width: place.width };
+}
+
+function pixels(minutes) {
+	return `${(minutes / 60) * HOUR_SIZE}px`;
 }
 
 // A case's length in minutes, from its full start and end, so one running past midnight counts
 export function caseMinutes(booking) {
 	const at = value => new Date(String(value).replace(" ", "T"));
 	return (at(booking.scheduled_end) - at(booking.scheduled_start)) / 60000;
+}
+
+// Where a case sits on the board's `day`, in minutes since its midnight: one carried over from
+// the night before starts at 00:00, one running past midnight stops at 24:00, and one on another
+// day has no length at all
+export function caseOnDay(booking, day) {
+	const midnight = new Date(`${day}T00:00:00`);
+	const at = value => (new Date(String(value).replace(" ", "T")) - midnight) / 60000;
+	const inside = minutes => Math.min(Math.max(minutes, 0), DAY_MINUTES);
+	const start = inside(at(booking.scheduled_start));
+	return { start, end: Math.max(inside(at(booking.scheduled_end)), start) };
 }
 
 export function minutesOf(value) {
