@@ -60,11 +60,24 @@ const previewFor = ref(null);
 // The whole day, midnight to midnight, scrolled to the usual working hours; any hour is bookable
 const timeline = ref(null);
 const vertical = computed(() => board.value?.layout === "Theatres in Columns");
+// A theatre's lane is at least 96px tall as a row, or 144px wide as a column, and shares out
+// whatever room the board has left, so a few theatres fill the screen and many scroll
+const LANE = { row: "minmax(96px, 1fr)", column: "minmax(144px, 1fr)" };
 const boardGrid = computed(() => {
-	if (!vertical.value) return { gridTemplateColumns: `176px ${DAY_SIZE}px` };
-	const count = board.value.complexes.flatMap(group => group.theatres).length;
+	const groups = board.value.complexes;
+	if (!vertical.value) {
+		const rows = groups.flatMap(group => [
+			"auto",
+			...group.theatres.map(() => LANE.row),
+		]);
+		return {
+			gridTemplateColumns: `176px ${DAY_SIZE}px`,
+			gridTemplateRows: ["auto", ...rows].join(" "),
+		};
+	}
+	const count = groups.flatMap(group => group.theatres).length;
 	return {
-		gridTemplateColumns: `56px repeat(${count}, 144px)`,
+		gridTemplateColumns: `56px repeat(${count}, ${LANE.column})`,
 		gridTemplateRows: `auto ${DAY_SIZE}px`,
 		gridAutoFlow: "column",
 	};
@@ -347,7 +360,7 @@ function openBooking(name) {
 			>
 				<!-- one grid, so the hours, the theatres and their lanes scroll together, with the
 				     theatre names and the hours pinned. Theatres are rows, or columns by setting. -->
-				<div class="grid w-max" :style="boardGrid">
+				<div class="grid min-h-full w-max min-w-full" :style="boardGrid">
 					<div
 						class="sticky left-0 top-0 z-30 border-b border-outline-gray-2 bg-surface-base p-2 text-sm text-ink-gray-5"
 					>
@@ -394,7 +407,7 @@ function openBooking(name) {
 							<div
 								class="relative isolate grid overflow-hidden border-outline-gray-1"
 								:class="[
-									vertical ? 'border-l px-1' : 'h-24 border-b py-1',
+									vertical ? 'border-l px-1' : 'border-b py-1',
 									dropTheatre === theatre.name && 'bg-surface-gray-1',
 								]"
 								@dragover.prevent="dragOver(theatre.name, $event)"
