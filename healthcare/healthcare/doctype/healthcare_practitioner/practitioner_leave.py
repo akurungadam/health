@@ -49,9 +49,14 @@ def is_half_day_only(leave, start_date, end_date):
 
 
 def leave_message(leave):
+	"""The practitioner by name; the leave's own details belong to HR"""
+	who = frappe.bold(
+		frappe.db.get_value("Healthcare Practitioner", leave.practitioner, "practitioner_name", cache=True)
+		or leave.practitioner
+	)
 	if leave.is_half_day:
-		return _("{0} is on half-day leave ({1})").format(frappe.bold(leave.practitioner), leave.name)
-	return _("{0} is on leave ({1})").format(frappe.bold(leave.practitioner), leave.name)
+		return _("{0} is on half-day leave").format(who)
+	return _("{0} is on leave").format(who)
 
 
 def linked_employees(practitioners):

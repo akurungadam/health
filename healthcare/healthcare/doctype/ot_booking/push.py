@@ -26,8 +26,8 @@ def push_following(booking, reason=None):
 		pushed.check_permission("write")
 		if pushed.status not in PUSHABLE_STATUSES:
 			frappe.throw(
-				_("{0} is {1}, so it cannot be pushed back to make room").format(
-					frappe.bold(pushed.name), _(pushed.status)
+				_("{0}'s case is {1}, so it cannot be pushed back to make room").format(
+					frappe.bold(pushed.patient_name), _(pushed.status)
 				),
 				title=_("No Room"),
 			)

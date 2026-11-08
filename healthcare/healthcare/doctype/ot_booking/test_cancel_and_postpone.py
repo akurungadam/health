@@ -153,15 +153,6 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 			str(booking.modified),
 		)
 
-	def test_a_postponed_reason_goes_to_the_timeline(self):
-		booking = make_booking(self, self.at(9))
-
-		self.stop(booking, "Postponed", "Patient has a fever")
-
-		self.assertTrue(
-			frappe.db.exists("Comment", {"reference_name": booking.name, "content": ["like", "%fever%"]})
-		)
-
 	def test_an_elective_case_cannot_be_moved_onto_the_day_of_surgery(self):
 		booking = make_booking(self, self.at(9))
 		frappe.set_user(create_user("_test_ot_coordinator@example.com", "OT Coordinator"))

@@ -54,16 +54,19 @@ def theatre_holiday_list(company):
 def blocked_messages(booking):
 	scopes = team_practitioners(booking)
 	scopes.append(booking.theatre)
-	return [
-		_("{0} is unavailable from {1} to {2} on {3} ({4})").format(
-			frappe.bold(block.scope),
-			format_time(block.start_time),
-			format_time(block.end_time),
-			format_date(block.start_date),
-			block.name,
-		)
-		for block in find_unavailable_blocks(scopes, *booking_slot(booking))
-	]
+	return [blocked_message(block) for block in find_unavailable_blocks(scopes, *booking_slot(booking))]
+
+
+def blocked_message(block):
+	"""Who is away, by name, and why if the block says"""
+	who = frappe.db.get_value("Healthcare Practitioner", block.scope, "practitioner_name", cache=True)
+	message = _("{0} is unavailable from {1} to {2} on {3}").format(
+		frappe.bold(who or block.scope),
+		format_time(block.start_time),
+		format_time(block.end_time),
+		format_date(block.start_date),
+	)
+	return f"{message} ({_(block.reason)})" if block.reason else message
 
 
 def booking_leaves(booking):

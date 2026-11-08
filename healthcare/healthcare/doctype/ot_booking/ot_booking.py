@@ -17,6 +17,7 @@ from healthcare.healthcare.doctype.ot_booking.booking_procedures import (
 )
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 	INACTIVE_STATUSES,
+	lock_theatre_and_people,
 	validate_no_conflicts,
 )
 from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
@@ -52,6 +53,9 @@ class OTBooking(Document):
 		self.validate_theatre()
 		self.validate_procedures()
 		self.validate_procedure_links()
+		if self.status not in INACTIVE_STATUSES:
+			# before the request check, so two bookings of one request (one patient) take turns
+			lock_theatre_and_people(self)
 		self.validate_service_requests()
 		self.validate_inpatient_record()
 		self.validate_primary_surgeon()
@@ -69,11 +73,16 @@ class OTBooking(Document):
 
 	@frappe.whitelist()
 	def create_clinical_procedures(self):
-		self.check_permission("write")
+		"""From the saved booking, never from unsaved edits a form sent along with the call"""
+		# locked, so two calls at once take turns instead of both making the procedures
+		saved = frappe.get_doc(self.doctype, self.name, for_update=True)
+		saved.check_permission("write")
 		frappe.has_permission("Clinical Procedure", "create", throw=True)
-		if self.status in INACTIVE_STATUSES or self.status == "Completed":
-			frappe.throw(_("Procedures cannot be created for a {0} booking").format(_(self.status)))
-		return create_procedures(self)
+		if saved.status in INACTIVE_STATUSES or saved.status == "Completed":
+			frappe.throw(_("Procedures cannot be created for a {0} booking").format(_(saved.status)))
+		created = create_procedures(saved)
+		self.reload()
+		return created
 
 	def set_templates_from_requests(self):
 		"""A row booked from a Service Request performs the procedure that was ordered"""
@@ -102,7 +111,9 @@ class OTBooking(Document):
 			)
 
 	def validate_durations(self):
-		"""A row of no time, or less, would make the case end before it starts"""
+		"""A row of no time, or less, would make the case end before it starts; and a case is
+		shorter than a day, which the clash checks, the board and the slot finder rely on when they
+		look one day back for cases still running"""
 		for row in self.procedures:
 			if cint(row.duration) <= 0:
 				frappe.throw(
@@ -110,6 +121,8 @@ class OTBooking(Document):
 						row.idx, frappe.bold(row.procedure_template)
 					)
 				)
+		if sum(cint(row.duration) for row in self.procedures) >= 24 * 60 * 60:
+			frappe.throw(_("A case must take less than 24 hours"), title=_("Case Too Long"))
 
 	def set_schedule(self):
 		self.scheduled_date = getdate(self.scheduled_start)
@@ -184,9 +197,13 @@ class OTBooking(Document):
 
 	def validate_service_requests(self):
 		seen = set()
+		stored = self.stored_procedure_rows()
 		for row in self.procedures:
 			if not row.service_request:
 				continue
+			if row.service_request != (stored.get(row.name) or frappe._dict()).service_request:
+				# newly attached: an order put on hold or revoked since it was picked reserves no time
+				validate_open_surgical_request(request_details(row.service_request))
 			if row.service_request in seen:
 				frappe.throw(
 					_("Row {0}: Service Request {1} is already in this booking").format(
@@ -200,7 +217,7 @@ class OTBooking(Document):
 						row.idx, frappe.bold(row.service_request)
 					)
 				)
-			other_booking = find_active_booking(row.service_request, exclude=self.name)
+			other_booking = find_active_booking(row.service_request, exclude=self.name, for_update=True)
 			if other_booking:
 				frappe.throw(
 					_("Row {0}: Service Request {1} is already booked in {2}").format(
@@ -258,11 +275,28 @@ def make_ot_booking(service_request: str) -> Document:
 	return booking
 
 
+def request_details(service_request):
+	fields = ["name", "template_dt", "template_dn", "docstatus", "status"]
+	return frappe.db.get_value("Service Request", service_request, fields, as_dict=True)
+
+
 def template_duration(template):
 	return frappe.db.get_value("Clinical Procedure Template", template, "default_duration")
 
 
 def validate_bookable(request):
+	validate_open_surgical_request(request)
+	booking = find_active_booking(request.name)
+	if booking:
+		frappe.throw(
+			_("Service Request {0} is already booked in {1}").format(
+				frappe.bold(request.name), frappe.bold(booking)
+			)
+		)
+
+
+def validate_open_surgical_request(request):
+	"""A submitted, active order for a procedure that needs an operation theatre"""
 	is_surgical = request.template_dt == "Clinical Procedure Template" and frappe.db.get_value(
 		"Clinical Procedure Template", request.template_dn, "requires_ot"
 	)
@@ -274,17 +308,11 @@ def validate_bookable(request):
 		)
 	if request.docstatus != 1 or request.status != ACTIVE_REQUEST_STATUS:
 		frappe.throw(_("Service Request {0} is not active").format(frappe.bold(request.name)))
-	booking = find_active_booking(request.name)
-	if booking:
-		frappe.throw(
-			_("Service Request {0} is already booked in {1}").format(
-				frappe.bold(request.name), frappe.bold(booking)
-			)
-		)
 
 
-def find_active_booking(service_request, exclude=None):
-	"""The booking holding a request. A Postponed one still holds it; only a cancel frees it."""
+def find_active_booking(service_request, exclude=None, for_update=False):
+	"""The booking holding a request. A Postponed one still holds it; only a cancel frees it. A
+	locking read sees a booking another coordinator saved while this one waited for its locks."""
 	booking = frappe.qb.DocType("OT Booking")
 	row = frappe.qb.DocType("OT Booking Procedure")
 	query = (
@@ -298,6 +326,8 @@ def find_active_booking(service_request, exclude=None):
 		.where(booking.name != (exclude or ""))
 		.limit(1)
 	)
+	if for_update:
+		query = query.for_update()
 	result = query.run()
 	return result[0][0] if result else None
 

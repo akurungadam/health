@@ -156,6 +156,28 @@ class TestOTBooking(HealthcareTestSuite):
 			frappe.db.set_value, "Healthcare Practitioner", practitioner, "allow_overlapping_theatres", 0
 		)
 
+	def test_a_clash_names_the_surgeon_and_the_other_patient(self):
+		first = make_booking(self, self.at(9))
+		surgeon = frappe.db.get_value("Healthcare Practitioner", self.practitioners[0], "practitioner_name")
+
+		with self.assertRaises(frappe.ValidationError) as refused:
+			make_booking(self, self.at(9), theatre=self.other_theatre, patient=1)
+
+		self.assertIn(f"{surgeon}</strong> is in theatre", str(refused.exception))
+		self.assertIn(f"with {first.patient_name}", str(refused.exception))
+
+	def test_a_case_of_a_day_or_more_is_refused(self):
+		day_long = create_ot_template("_Test Procedure - Day Long", duration=24 * HOUR)
+
+		self.assertRaisesRegex(
+			frappe.ValidationError,
+			"less than 24 hours",
+			make_booking,
+			self,
+			self.at(9),
+			templates=[day_long.name],
+		)
+
 	def test_patient_cannot_have_two_overlapping_bookings(self):
 		make_booking(self, self.at(9))
 

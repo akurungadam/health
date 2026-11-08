@@ -21,7 +21,8 @@ def publish_day(date: str, company: str | None = None, department: str | None = 
 	for name in tentative_cases(getdate(date), company, department):
 		error = publish_case(name)
 		if error:
-			failed.append({"name": name, "message": error})
+			patient = frappe.db.get_value("OT Booking", name, "patient_name")
+			failed.append({"name": name, "patient_name": patient, "message": error})
 		else:
 			published.append(name)
 	return {"published": published, "failed": failed}

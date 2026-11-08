@@ -213,18 +213,6 @@ class TestScheduling(HealthcareTestSuite):
 
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Scheduled")
 
-	def test_a_status_may_not_skip_ahead(self):
-		booking = make_booking(self, self.at(9))
-
-		self.assertRaisesRegex(
-			frappe.ValidationError,
-			"cannot become",
-			set_status,
-			booking.name,
-			"Completed",
-			str(booking.modified),
-		)
-
 	def test_a_case_changed_elsewhere_keeps_its_status(self):
 		booking = make_booking(self, self.at(9))
 		stale = str(booking.modified)

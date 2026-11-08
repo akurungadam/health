@@ -102,10 +102,13 @@ class TestAvailability(HealthcareTestSuite):
 		)
 
 	@skip_without_hrms
-	def test_a_surgeon_on_leave_is_refused(self):
+	def test_a_surgeon_on_leave_is_refused_by_name(self):
 		create_approved_leave(link_new_employee(self, self.practitioners[0]), self.day, self.day)
+		name = frappe.db.get_value("Healthcare Practitioner", self.practitioners[0], "practitioner_name")
 
-		self.assertRaisesRegex(frappe.ValidationError, "is on leave", make_booking, self, self.at(9))
+		self.assertRaisesRegex(
+			frappe.ValidationError, f"{name}</strong> is on leave", make_booking, self, self.at(9)
+		)
 
 	@skip_without_hrms
 	def test_a_surgeon_on_half_day_leave_is_only_warned_about(self):

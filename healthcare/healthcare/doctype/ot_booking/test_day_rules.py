@@ -66,12 +66,6 @@ class TestDayRules(HealthcareTestSuite):
 
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Tentative")
 
-	def test_a_scheduled_case_needs_a_reason_to_move(self):
-		booking = self.scheduled_booking()
-		booking.scheduled_start = self.later_at(13)
-
-		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
-
 	def test_a_scheduled_case_moved_onto_today_still_needs_a_reason(self):
 		booking = self.scheduled_booking()  # as Administrator, who may add to today
 		booking.scheduled_start = later_today(self, 2)

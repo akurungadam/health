@@ -19,13 +19,19 @@ from healthcare.healthcare.doctype.service_request.service_request import make_c
 def create_procedures(booking):
 	created = []
 	for row, start in rows_with_start(booking):
-		if row.clinical_procedure:
+		if row.clinical_procedure or linked_meanwhile(row):
 			continue
 		procedure = new_procedure(booking, row, start)
 		procedure.insert()
 		row.db_set("clinical_procedure", procedure.name)
 		created.append(procedure.name)
 	return created
+
+
+def linked_meanwhile(row):
+	"""Whether a call that held the booking first made the row's procedure. A locking read, as the
+	row loaded with the booking can be older than that call's change."""
+	return frappe.db.get_value(row.doctype, row.name, "clinical_procedure", for_update=True)
 
 
 def sync_procedures(booking):

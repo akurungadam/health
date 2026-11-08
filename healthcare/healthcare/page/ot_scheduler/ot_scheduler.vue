@@ -8,7 +8,7 @@
 // the panel dropped onto a row is booked there; a case dragged elsewhere moves.
 // The server checks every drop, so a refused one stays where it was.
 import { computed, onMounted, ref, watch } from "vue";
-import { Badge, Dialog, FormControl, toast, ToastProvider } from "frappe-ui";
+import { Badge, Dialog, FormControl, ToastProvider } from "frappe-ui";
 import { useHost } from "@framework/ui/island";
 
 import CaseCard from "./case_card.vue";
@@ -23,7 +23,7 @@ import { useDrop } from "./use_drop.js";
 import { useSlots } from "./use_slots.js";
 import DateBar from "./date_bar.vue";
 import RequestPanel from "./request_panel.vue";
-import { get, post, showError } from "./api.js";
+import { get, post, showError, toastSuccess } from "./api.js";
 import { useBoardFeed } from "./feed.js";
 import { playDropSound } from "./sounds.js";
 import {
@@ -242,7 +242,7 @@ function sendActions([count, editable]) {
 async function createProcedures(booking) {
 	const created = await change("create_procedures", { name: booking.name });
 	if (created?.length)
-		toast.success(`Created ${created.length} Clinical Procedure(s)`);
+		toastSuccess(`Created ${created.length} Clinical Procedure(s)`);
 }
 
 async function change(method, params) {

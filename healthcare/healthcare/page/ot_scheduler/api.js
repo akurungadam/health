@@ -19,5 +19,14 @@ export function showError(error) {
 	const [first, ...rest] = messages.length
 		? messages
 		: [error?.message || String(error)];
-	toast.error(first, { description: rest.join(" ") || undefined });
+	toastError(first, rest.join(" "));
+}
+
+// The board's toasts stay longer than frappe-ui's 4 seconds: a refusal says why, and needs reading
+export function toastError(message, description) {
+	toast.error(message, { description: description || undefined, duration: 10000 });
+}
+
+export function toastSuccess(message) {
+	toast.success(message, { duration: 6000 });
 }

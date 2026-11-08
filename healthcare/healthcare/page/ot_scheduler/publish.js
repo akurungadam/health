@@ -1,9 +1,7 @@
 // Publishing the day shown on the board: every Tentative case in its company and department
 // becomes Scheduled. It commits the day's list, so desk's own confirm asks first. A case that
 // fails its checks stays Tentative and is reported on its own.
-import { toast } from "frappe-ui";
-
-import { post, showError } from "./api.js";
+import { post, showError, toastError, toastSuccess } from "./api.js";
 import { playDropSound } from "./sounds.js";
 
 export function confirmPublish({
@@ -29,8 +27,9 @@ async function publish(day, filters, reload) {
 	try {
 		const result = await post("publishing.publish_day", { date: day, ...filters });
 		if (result.published.length)
-			toast.success(`Published ${result.published.length} case(s)`);
-		for (const row of result.failed) toast.error(`${row.name}: ${row.message}`);
+			toastSuccess(`Published ${result.published.length} case(s)`);
+		for (const row of result.failed)
+			toastError(`${row.patient_name || row.name}: ${row.message}`);
 		playDropSound(result.failed.length ? "refused" : "placed");
 	} catch (error) {
 		showError(error);

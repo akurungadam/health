@@ -20,7 +20,7 @@ MAX_OVERLAPPING_THEATRES = 2
 def validate_no_conflicts(booking):
 	if booking.status in INACTIVE_STATUSES:
 		return
-	lock_theatre_and_people(booking)
+	lock_theatre_and_people(booking)  # held already when OTBooking.validate took them
 	for message in find_conflicts(booking):
 		frappe.throw(message, title=_("Booking Conflict"))
 
@@ -56,8 +56,8 @@ def theatre_conflicts(booking):
 	bookings = overlapping(booking, start - cleaning, end + cleaning).where(table.theatre == booking.theatre)
 	return [
 		_(
-			"Theatre {0} is booked from {1} to {2} ({3}), and needs {4} minutes of cleaning after each case"
-		).format(frappe.bold(booking.theatre), *slot_text(other), other.name, cleaning.seconds // 60)
+			"Theatre {0} is booked from {1} to {2} for {3}, and needs {4} minutes of cleaning after each case"
+		).format(frappe.bold(booking.theatre), *slot_text(other), other.patient_name, cleaning.seconds // 60)
 		for other in bookings.run(as_dict=True)
 	]
 
@@ -72,7 +72,7 @@ def team_conflicts(booking):
 		overlapping(booking, *booking_slot(booking))
 		.join(team)
 		.on(team.parent == table.name)
-		.select(team.practitioner, table.theatre)
+		.select(team.practitioner, team.practitioner_name, table.theatre)
 		.where(team.parenttype == "OT Booking")
 		.where(team.practitioner.isin(practitioners))
 	)
@@ -80,8 +80,11 @@ def team_conflicts(booking):
 	may_overlap = practitioners_allowed_to_overlap(practitioners)
 	crowded = crowded_practitioners(others, may_overlap, *booking_slot(booking))
 	return [
-		_("{0} is in theatre {1} from {2} to {3} ({4})").format(
-			frappe.bold(other.practitioner), other.theatre, *slot_text(other), other.name
+		_("{0} is in theatre {1} from {2} to {3}, with {4}").format(
+			frappe.bold(other.practitioner_name or other.practitioner),
+			other.theatre,
+			*slot_text(other),
+			other.patient_name,
 		)
 		for other in others
 		if other.practitioner not in may_overlap or other.practitioner in crowded
@@ -131,8 +134,8 @@ def patient_conflicts(booking):
 	table = frappe.qb.DocType("OT Booking")
 	bookings = overlapping(booking, *booking_slot(booking)).where(table.patient == booking.patient)
 	return [
-		_("Patient {0} already has a booking from {1} to {2} ({3})").format(
-			frappe.bold(booking.patient), *slot_text(other), other.name
+		_("Patient {0} already has a booking from {1} to {2} in {3}").format(
+			frappe.bold(booking.patient_name or booking.patient), *slot_text(other), other.theatre
 		)
 		for other in bookings.run(as_dict=True)
 	]
@@ -146,7 +149,7 @@ def overlapping(booking, start, end):
 	table = frappe.qb.DocType("OT Booking")
 	return (
 		frappe.qb.from_(table)
-		.select(table.name, table.scheduled_start, table.scheduled_end)
+		.select(table.name, table.patient_name, table.theatre, table.scheduled_start, table.scheduled_end)
 		.where(table.name != (booking.name or ""))
 		.where(table.status.notin(INACTIVE_STATUSES))
 		.where(table.scheduled_date[add_days(getdate(start), -1) : getdate(end)])

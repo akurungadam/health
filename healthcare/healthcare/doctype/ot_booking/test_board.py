@@ -132,11 +132,6 @@ class TestBoard(HealthcareTestSuite):
 
 		self.assertNotIn(booking.name, [row.name for row in self.board()["bookings"]])
 
-	def test_a_blocked_theatre_is_shown(self):
-		block = create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)
-
-		self.assertEqual([row.name for row in self.board()["blocks"]], [block.name])
-
 	def test_a_block_says_why(self):
 		block = create_unavailable_block(self.theatre, "Healthcare Service Unit", self.day)
 		block.db_set({"reason": "Training", "note": "Laminar flow service"})

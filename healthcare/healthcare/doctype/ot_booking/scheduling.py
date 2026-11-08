@@ -193,8 +193,8 @@ def make_room(booking, reason):
 def validate_unchanged(booking, modified):
 	if str(booking.modified) != modified:
 		frappe.throw(
-			_("{0} was changed by someone else. Reload the board and try again").format(
-				frappe.bold(booking.name)
+			_("{0}'s case was changed by someone else. Reload the board and try again").format(
+				frappe.bold(booking.patient_name)
 			),
 			title=_("Changed Elsewhere"),
 		)

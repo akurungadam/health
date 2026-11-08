@@ -2,9 +2,8 @@
 // moved to another time or theatre. While a case is over a theatre row, `plan` says where it
 // would land and what the drop would do there; on the drop the server makes the change.
 import { ref } from "vue";
-import { toast } from "frappe-ui";
 
-import { post, showError } from "./api.js";
+import { post, showError, toastError } from "./api.js";
 import { hideDragImage, planDrop, snapFirstDrop, snapToGrid } from "./drop_plan.js";
 import { playDropSound } from "./sounds.js";
 import {
@@ -170,7 +169,7 @@ export function useDrop({
 		plan.value = null;
 		if (!drag || !landing) return;
 		if (landing.problem) {
-			toast.error(landing.problem);
+			toastError(landing.problem);
 			return playDropSound("refused");
 		}
 		const start = atTime(landing.start);
@@ -201,7 +200,7 @@ export function useDrop({
 				params: JSON.stringify(params),
 			});
 			if (!refusal) return askReason(method, params, action);
-			toast.error(refusal);
+			toastError(refusal);
 		} catch (error) {
 			showError(error);
 		}

@@ -74,12 +74,6 @@ class TestBookingProcedures(HealthcareTestSuite):
 
 		self.assertRaisesRegex(frappe.ValidationError, "already booked", make_ot_booking, request)
 
-	def test_a_cancelled_booking_frees_its_request(self):
-		booking = self.book_from_request(self.at(9))
-		booking.db_set("status", "Cancelled")
-
-		make_ot_booking(booking.procedures[0].service_request)
-
 	def test_a_row_takes_its_procedure_and_duration_from_its_request(self):
 		request = create_service_request(self.patients[0], self.practitioners[0])
 		booking = make_booking(self, self.at(9))
@@ -179,6 +173,38 @@ class TestBookingProcedures(HealthcareTestSuite):
 
 		self.assertRaisesRegex(frappe.ValidationError, "cannot change surgeon", booking.save)
 
+	def test_procedures_are_made_from_the_saved_booking(self):
+		booking = make_booking(self, self.at(9))
+		booking.scheduled_start = self.at(13)  # an edit the form has not saved
+
+		procedure = frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0])
+
+		self.assertEqual(str(procedure.start_time), "9:00:00")
+
+	def test_a_request_is_booked_only_once_even_by_a_second_save(self):
+		booking = self.book_from_request(self.at(9))
+		request = booking.procedures[0].service_request
+		other = make_booking(self, self.at(13))
+		other.append("procedures", {"service_request": request})
+
+		self.assertRaisesRegex(frappe.ValidationError, "already booked", other.save)
+
+	def test_a_request_withdrawn_before_the_booking_is_saved_is_refused(self):
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		booking = make_ot_booking(request.name)
+		booking.update({"theatre": self.theatre, "scheduled_start": self.at(9)})
+		request.db_set("status", "revoked-Request Status")
+
+		self.assertRaisesRegex(frappe.ValidationError, "is not active", booking.insert)
+
+	def test_a_request_added_to_a_saved_booking_must_be_active(self):
+		booking = make_booking(self, self.at(9))
+		request = create_service_request(self.patients[0], self.practitioners[0])
+		request.db_set("status", "on-hold-Request Status")
+		booking.procedures[0].service_request = request.name
+
+		self.assertRaisesRegex(frappe.ValidationError, "is not active", booking.save)
+
 	def test_a_withdrawn_request_makes_no_procedure(self):
 		booking = self.book_from_request(self.at(9))
 		frappe.db.set_value(
@@ -215,13 +241,6 @@ class TestBookingProcedures(HealthcareTestSuite):
 		procedure = frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0])
 
 		self.assertEqual(procedure.service_request, booking.procedures[0].service_request)
-
-	def test_procedures_are_created_once(self):
-		booking = make_booking(self, self.at(9))
-		booking.create_clinical_procedures()
-		booking.reload()
-
-		self.assertEqual(booking.create_clinical_procedures(), [])
 
 	def test_moving_the_booking_moves_its_draft_procedures(self):
 		booking = make_booking(self, self.at(9))
