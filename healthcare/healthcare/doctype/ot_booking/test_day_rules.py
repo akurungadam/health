@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe.utils import add_days, get_datetime, nowdate
+from frappe.utils import add_days, add_to_date, get_datetime, getdate, now_datetime, nowdate
 
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
@@ -24,9 +24,6 @@ class TestDayRules(HealthcareTestSuite):
 		test_names = sorted(name for name in dir(self) if name.startswith("test_"))
 		self.later_day = add_days(nowdate(), 1200 + test_names.index(self._testMethodName))
 
-	def today_at(self, hour):
-		return get_datetime(f"{nowdate()} {hour:02d}:00:00")
-
 	def later_at(self, hour):
 		return get_datetime(f"{self.later_day} {hour:02d}:00:00")
 
@@ -44,7 +41,7 @@ class TestDayRules(HealthcareTestSuite):
 		self.as_coordinator()
 
 		self.assertRaisesRegex(
-			frappe.ValidationError, "Only an emergency", make_booking, self, self.today_at(19)
+			frappe.ValidationError, "Only an emergency", make_booking, self, later_today(self, 2)
 		)
 
 	def test_an_asap_case_is_not_an_emergency(self):
@@ -55,17 +52,17 @@ class TestDayRules(HealthcareTestSuite):
 			"Only an emergency",
 			make_booking,
 			self,
-			self.today_at(19),
+			later_today(self, 2),
 			priority=priority_named("ASAP"),
 		)
 
 	def test_an_emergency_can_be_added_on_its_own_day(self):
 		self.as_coordinator()
 
-		make_booking(self, self.today_at(19), priority=priority_named("STAT"))
+		make_booking(self, later_today(self, 2), priority=priority_named("STAT"))
 
 	def test_an_ot_manager_adds_an_elective_case_on_its_own_day_without_a_reason(self):
-		booking = make_booking(self, self.today_at(19))
+		booking = make_booking(self, later_today(self, 2))
 
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Tentative")
 
@@ -77,7 +74,7 @@ class TestDayRules(HealthcareTestSuite):
 
 	def test_a_scheduled_case_moved_onto_today_still_needs_a_reason(self):
 		booking = self.scheduled_booking()  # as Administrator, who may add to today
-		booking.scheduled_start = self.today_at(19)
+		booking.scheduled_start = later_today(self, 2)
 
 		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
 
@@ -103,7 +100,7 @@ class TestDayRules(HealthcareTestSuite):
 		self.assertFalse(frappe.db.get_value("OT Booking", booking.name, "change_reason"))
 
 	def test_a_postponed_case_cannot_be_restored_onto_today_by_a_coordinator(self):
-		booking = make_booking(self, self.today_at(19), priority=priority_named("STAT"))
+		booking = make_booking(self, later_today(self, 2), priority=priority_named("STAT"))
 		booking.db_set({"status": "Postponed", "priority": priority_named("Routine")})
 		booking.reload()
 		self.as_coordinator()
@@ -112,8 +109,8 @@ class TestDayRules(HealthcareTestSuite):
 		self.assertRaisesRegex(frappe.ValidationError, "Only an emergency", booking.save)
 
 	def test_a_tentative_case_on_its_own_day_moves_without_a_reason(self):
-		booking = make_booking(self, self.today_at(19), priority=priority_named("STAT"))
-		booking.scheduled_start = self.today_at(20)
+		booking = make_booking(self, later_today(self, 2), priority=priority_named("STAT"))
+		booking.scheduled_start = later_today(self, 3)
 
 		booking.save()
 
@@ -129,11 +126,65 @@ class TestDayRules(HealthcareTestSuite):
 
 		booking.save()
 
+	def past_booking(self, status="Tentative"):
+		booking = make_booking(self, self.later_at(9))
+		frappe.db.set_value(
+			"OT Booking",
+			booking.name,
+			{
+				"status": status,
+				"scheduled_date": getdate(yesterday_at(9)),
+				"scheduled_start": yesterday_at(9),
+				"scheduled_end": yesterday_at(10),
+			},
+		)
+		return frappe.get_doc("OT Booking", booking.name)
+
+	def test_a_case_cannot_be_booked_at_a_time_that_has_passed(self):
+		self.assertRaisesRegex(frappe.ValidationError, "has passed", make_booking, self, yesterday_at(9))
+
+	def test_a_case_can_be_booked_for_now(self):
+		now = now_datetime().replace(second=0, microsecond=0)
+		start = add_to_date(now, minutes=-(now.minute % 15))  # the grid step just gone
+
+		make_booking(self, start, priority=priority_named("STAT"))
+
+	def test_a_case_whose_time_has_passed_cannot_be_moved(self):
+		booking = self.past_booking()
+		booking.scheduled_start = self.later_at(13)
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot be moved", booking.save)
+
+	def test_a_case_whose_time_has_passed_can_be_rescheduled_or_cancelled(self):
+		for status in ("Postponed", "Cancelled"):
+			booking = self.past_booking("Scheduled")
+			booking.update({"status": status, "change_reason": "Patient did not come"})
+
+			booking.save()
+
+	def test_a_rescheduled_case_cannot_be_placed_in_the_past(self):
+		booking = self.past_booking("Postponed")
+		booking.status = "Tentative"
+
+		self.assertRaisesRegex(frappe.ValidationError, "has passed", booking.save)
+
 	def test_moving_a_scheduled_case_forward_in_status_needs_no_reason(self):
 		booking = self.scheduled_booking()
 		booking.status = "In Progress"
 
 		booking.save()
+
+
+def later_today(test, hours):
+	"""A whole hour later today; the test is skipped when that would be tomorrow"""
+	start = add_to_date(now_datetime().replace(minute=0, second=0, microsecond=0), hours=hours)
+	if getdate(start) != getdate(nowdate()):
+		test.skipTest("too close to midnight for a case later today")
+	return start
+
+
+def yesterday_at(hour):
+	return get_datetime(f"{add_days(nowdate(), -1)} {hour:02d}:00:00")
 
 
 def has_reason_comment(booking, text):

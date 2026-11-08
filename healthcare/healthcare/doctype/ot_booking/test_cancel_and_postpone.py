@@ -13,7 +13,7 @@ from healthcare.healthcare.doctype.ot_booking.scheduling import (
 	set_status,
 )
 from healthcare.healthcare.doctype.ot_booking.test_booking_procedures import create_service_request
-from healthcare.healthcare.doctype.ot_booking.test_day_rules import create_user
+from healthcare.healthcare.doctype.ot_booking.test_day_rules import create_user, later_today
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
 	HOUR,
 	create_ot_template,
@@ -105,7 +105,7 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 		)
 
 	def test_a_postponed_case_from_today_is_rescheduled_without_a_reason(self):
-		booking = make_booking(self, self.at(19, nowdate()), priority=priority_named("STAT"))
+		booking = make_booking(self, later_today(self, 2), priority=priority_named("STAT"))
 		self.stop(booking, "Postponed", "Theatre flooded")
 		booking.reload()
 
@@ -154,6 +154,6 @@ class TestCancelAndPostpone(HealthcareTestSuite):
 			move_booking,
 			booking.name,
 			self.theatre,
-			str(self.at(19, nowdate())),
+			str(later_today(self, 2)),
 			str(booking.modified),
 		)
