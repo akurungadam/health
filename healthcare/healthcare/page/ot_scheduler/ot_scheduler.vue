@@ -11,6 +11,9 @@ import { computed, onMounted, ref, watch } from "vue";
 import { Badge, Dialog, FormControl, ToastProvider } from "frappe-ui";
 import { useHost } from "@framework/ui/island";
 
+import AutoSchedule from "./auto_schedule.vue";
+import PlannedCase from "./planned_case.vue";
+import { useAutoSchedule } from "./use_auto_schedule.js";
 import CaseCard from "./case_card.vue";
 import HourScale from "./hour_scale.vue";
 import DropGhost from "./drop_ghost.vue";
@@ -98,7 +101,7 @@ onMounted(() => {
 	load();
 });
 // the page menu (the three dots) offers Publish while the day has Tentative cases
-watch([tentativeCount, canEdit], sendActions, { immediate: true });
+watch([tentativeCount, canEdit, day], sendActions, { immediate: true });
 useBoardFeed(load);
 watch(day, value => (value ? load() : (day.value = today())));
 // the first load fills in the user's default company, which needs no second load; any other
@@ -169,6 +172,18 @@ const {
 // slots found for other theatres no longer apply
 watch([company, department], closeSlots);
 
+const {
+	plan: autoPlan,
+	busy: autoBusy,
+	preview: previewAutoPlan,
+	book: bookAutoPlan,
+	discard: discardAutoPlan,
+	plannedIn,
+	plannedByName,
+} = useAutoSchedule({ day, filters: boardFilters, reload: load });
+// a plan is for the day and filters it was made for
+watch([day, company, department], discardAutoPlan);
+
 // The board's set filters, for loading and publishing: an empty one arrives as "undefined"
 function boardFilters() {
 	const filters = { company: company.value, department: department.value };
@@ -217,11 +232,14 @@ function previewOpened(booking, open) {
 	previewFor.value = open && !menuFor.value && !reasonFor.value ? booking.name : null;
 }
 
-function sendActions([count, editable]) {
+function sendActions([count, editable, shownDay]) {
 	if (!editable) return emit("actions", []);
 	const actions = [
 		{ label: "New OT Booking", onClick: () => host.navigate?.("ot-booking/new") },
 	];
+	// a day gone by is not scheduled: nothing can be placed at a time that has passed
+	if (shownDay >= today())
+		actions.push({ label: "Auto Schedule the Day…", onClick: previewAutoPlan });
 	if (count)
 		actions.push({
 			label: `Publish ${count} case(s)`,
@@ -308,6 +326,14 @@ function openBooking(name) {
 
 		<ToastProvider />
 
+		<AutoSchedule
+			v-if="autoPlan"
+			:plan="autoPlan"
+			:busy="autoBusy"
+			@book="bookAutoPlan"
+			@discard="discardAutoPlan"
+		/>
+
 		<div
 			v-if="board?.away.length"
 			class="flex shrink-0 flex-wrap items-center gap-2 text-sm"
@@ -342,6 +368,7 @@ function openBooking(name) {
 				:picked="picked"
 				@find="findSlots"
 				@pick-slot="pickSlot"
+				:planned="plannedByName"
 			/>
 
 			<p
@@ -486,6 +513,12 @@ function openBooking(name) {
 									v-if="plan && dropTheatre === theatre.name"
 									:plan="plan"
 									:placed="place"
+								/>
+								<PlannedCase
+									v-for="row in plannedIn(theatre.name)"
+									:key="row.name"
+									:row="row"
+									:place="casePlace(row)"
 								/>
 								<SlotHighlight
 									v-if="slotIn(theatre.name)"

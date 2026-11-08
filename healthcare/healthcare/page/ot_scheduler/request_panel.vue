@@ -7,6 +7,7 @@ import { useHost } from "@framework/ui/island";
 
 import { priorityBorder, priorityTheme } from "./case_style.js";
 import FinderButton from "./finder_button.vue";
+import PlannedLine from "./planned_line.vue";
 import { patientFacts } from "./patient.js";
 import SlotList from "./slot_list.vue";
 import { caseMinutes, today } from "./time.js";
@@ -19,6 +20,8 @@ const props = defineProps({
 	// the slot finder: which card it is open on and what it found (use_slots.js)
 	finder: { type: Object, required: true },
 	picked: { type: Object, default: null },
+	// the cases an Auto Schedule preview places, by name (use_auto_schedule.js)
+	planned: { type: Object, default: () => ({}) },
 });
 const emit = defineEmits([
 	"pick",
@@ -71,6 +74,13 @@ function isPast(date) {
 	return String(date) < today();
 }
 
+// a case the Auto Schedule preview places is outlined in green, as its card on the board is
+function cardBorder(row) {
+	return props.planned[row.name]
+		? "border-2 border-outline-green-5"
+		: priorityBorder(row);
+}
+
 function drop() {
 	over.value = false;
 	emit("unschedule");
@@ -114,7 +124,7 @@ function drop() {
 				:key="request.name"
 				draggable="true"
 				class="cursor-grab rounded-4 bg-surface-base p-2"
-				:class="priorityBorder(request)"
+				:class="cardBorder(request)"
 				@dragstart="emit('pick', request, $event)"
 				@dragend="emit('done')"
 			>
@@ -161,6 +171,7 @@ function drop() {
 				>
 					Expected by {{ formatDate(request.expected_date) }}
 				</p>
+				<PlannedLine :row="planned[request.name]" />
 				<SlotList
 					v-if="finder.for === request.name"
 					class="mt-2"
@@ -181,7 +192,7 @@ function drop() {
 				:key="booking.name"
 				draggable="true"
 				class="cursor-grab rounded-4 border-dashed bg-surface-base p-2"
-				:class="priorityBorder(booking)"
+				:class="cardBorder(booking)"
 				@dragstart="emit('pickPostponed', booking, $event)"
 				@dragend="emit('done')"
 			>
@@ -217,6 +228,7 @@ function drop() {
 					{{ booking.surgeon }} &middot;
 					{{ booking.name }}
 				</p>
+				<PlannedLine :row="planned[booking.name]" />
 				<SlotList
 					v-if="finder.for === booking.name"
 					class="mt-2"
