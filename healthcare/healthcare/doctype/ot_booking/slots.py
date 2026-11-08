@@ -88,7 +88,8 @@ def coming_days(case, days):
 	return [add_days(first, offset) for offset in range(days)]
 
 
-def day_candidates(case, company, theatres, day):
+def day_candidates(case, company, theatres, day, also=()):
+	"""Each theatre's free starts that day; `also` holds more starts worth trying"""
 	if not theatres or not case.length or skipped_day(case, company, day):
 		return []
 	start, end = day_window(day)
@@ -99,7 +100,7 @@ def day_candidates(case, company, theatres, day):
 	slots = []
 	for theatre in theatres:
 		busy = theatre_busy_times(case, theatre.name, start, end) + people_busy
-		gaps = free_starts(start, end, case.length, busy, also=team_ends)
+		gaps = free_starts(start, end, case.length, busy, also=[*team_ends, *also])
 		slots += [slot(case, theatre, gap) for gap in gaps]
 	return slots
 

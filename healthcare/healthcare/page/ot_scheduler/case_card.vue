@@ -9,6 +9,7 @@ import LockIcon from "~icons/lucide/lock";
 
 import BookingPreview from "./booking_preview.vue";
 import { caseBorder, caseFill } from "./case_style.js";
+import OtherCases from "./other_cases.vue";
 import { patientFacts } from "./patient.js";
 import { clock } from "./time.js";
 
@@ -86,6 +87,7 @@ const emit = defineEmits(["update:menuOpen", "update:previewOpen", "pick", "drop
 										{{ patientFacts(booking) }}
 									</span>
 								</p>
+								<OtherCases :cases="booking.other_cases" />
 								<LockIcon
 									v-if="passed"
 									class="size-3.5 shrink-0 text-ink-gray-5"

@@ -23,6 +23,7 @@ from healthcare.healthcare.doctype.ot_booking.conflict_checker import (
 from healthcare.healthcare.doctype.ot_booking.day_rules import log_change_reason, validate_day_rules
 from healthcare.healthcare.doctype.ot_booking.fasting import is_fasting_confirmed, sync_fasting_task
 from healthcare.healthcare.doctype.ot_booking.priority import set_priority
+from healthcare.healthcare.doctype.ot_booking.same_patient import warn_other_cases
 
 # the statuses a case may move to next from the OT Scheduler
 NEXT_STATUSES = {
@@ -30,9 +31,15 @@ NEXT_STATUSES = {
 	"Scheduled": ("Tentative", "In Progress", "Postponed", "Cancelled"),
 	"In Progress": ("Completed",),
 }
-# every status change a save may make: the scheduler's, and a postponed case put back on a day
-# or cancelled. A booking follows its procedures without a save, so that is not one of them.
-ALLOWED_STATUS_CHANGES = {**NEXT_STATUSES, "Postponed": ("Tentative", "Cancelled")}
+# every status change a save may make: the scheduler's, a postponed case put back on a day or
+# cancelled, and a started case cancelled once its procedures are (validate_release refuses it
+# while a row still holds a submitted one). A booking follows its procedures without a save, so
+# that is not one of them.
+ALLOWED_STATUS_CHANGES = {
+	**NEXT_STATUSES,
+	"In Progress": ("Completed", "Cancelled"),
+	"Postponed": ("Tentative", "Cancelled"),
+}
 NEW_STATUSES = ("Tentative", "Scheduled")
 
 
@@ -70,6 +77,7 @@ class OTBooking(Document):
 		sync_procedures(self)
 		sync_fasting_task(self)
 		log_change_reason(self)
+		warn_other_cases(self)
 
 	@frappe.whitelist()
 	def create_clinical_procedures(self):

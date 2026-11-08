@@ -51,6 +51,12 @@ const STATUS_THEMES = {
 			<dd :class="booking.is_emergency ? 'text-ink-red-7' : 'text-ink-gray-8'">
 				{{ booking.priority_label }}
 			</dd>
+			<template v-if="booking.other_cases?.length">
+				<dt class="text-ink-gray-5">Also today</dt>
+				<dd class="text-ink-amber-7">
+					<p v-for="other in booking.other_cases" :key="other">{{ other }}</p>
+				</dd>
+			</template>
 			<dt class="text-ink-gray-5">Fasting</dt>
 			<dd class="text-ink-gray-8">
 				{{ booking.fasting_confirmed ? "Confirmed" : "Not confirmed" }}

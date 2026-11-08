@@ -1,11 +1,14 @@
 # Copyright (c) 2026, earthians Health Informatics Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, nowdate
 
-from healthcare.healthcare.doctype.ot_booking.auto_schedule import book_day, plan_day
+from healthcare.healthcare.doctype.ot_booking.auto_schedule import book_day, place_case, plan_day
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
+from healthcare.healthcare.doctype.ot_booking.scheduling import book_request
 from healthcare.healthcare.doctype.ot_booking.test_availability import create_unavailable_block
 from healthcare.healthcare.doctype.ot_booking.test_booking_procedures import create_service_request
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
@@ -53,6 +56,9 @@ class TestAutoSchedule(HealthcareTestSuite):
 
 	def plan(self):
 		return plan_day(str(self.day), COMPANY, DEPARTMENT)
+
+	def book(self, plan):
+		return book_day(str(self.day), COMPANY, DEPARTMENT, json.dumps(plan["placed"], default=str))
 
 	def placed(self, plan):
 		return [(row["name"], row["start"]) for row in plan["placed"]]
@@ -106,7 +112,7 @@ class TestAutoSchedule(HealthcareTestSuite):
 		self.plan()
 		self.assertEqual(frappe.db.count("OT Booking"), before)
 
-		book_day(str(self.day), COMPANY, DEPARTMENT)
+		self.book(self.plan())
 		booking = frappe.get_doc("OT Booking", {"status": ["!=", "Cancelled"], "patient": self.patients[0]})
 		self.assertEqual((booking.status, get_datetime(booking.scheduled_start)), ("Tentative", self.at(8)))
 		self.assertEqual(booking.procedures[0].service_request, stat)
@@ -123,3 +129,59 @@ class TestAutoSchedule(HealthcareTestSuite):
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		self.assertRaises(frappe.PermissionError, self.plan)
+
+	def test_a_patients_next_case_goes_just_before_in_the_same_theatre(self):
+		make_booking(self, self.at(14))
+		urgent = self.waiting(0, "Urgent")
+
+		plan = self.plan()
+
+		# ends with its 30 minutes of cleaning as the 14:00 case begins, not at the day's first 08:00
+		self.assertIn((urgent, "12:30"), self.placed(plan))
+		self.assertEqual(plan["placed"][0]["patient"], self.patients[0])
+
+	def test_a_patients_next_case_goes_just_after_when_before_is_taken(self):
+		make_booking(self, self.at(14))
+		make_booking(self, self.at(12), patient=1, surgeon=1)
+		urgent = self.waiting(0, "Urgent")
+
+		plan = self.plan()
+
+		self.assertIn((urgent, "15:30"), self.placed(plan))
+
+	def test_a_request_booked_meanwhile_is_reported_alone(self):
+		request = self.waiting(0, "STAT")
+		book_request(request, self.theatre, str(self.at(10)))
+		waiting = frappe._dict(
+			kind="request", name=request, patient=self.patients[0], patient_name="", procedures=""
+		)
+
+		place = place_case(waiting, self.day, COMPANY, DEPARTMENT)
+
+		self.assertTrue(place["reason"])
+
+	def test_booking_books_only_what_the_plan_showed(self):
+		previewed = self.waiting(0, "STAT")
+		plan = self.plan()
+		arrived_later = self.waiting(1, "STAT")
+
+		booked = self.book(plan)
+
+		self.assertEqual([row["name"] for row in booked["placed"]], [previewed])
+		self.assertTrue(frappe.db.exists("Service Request", arrived_later))
+		self.assertFalse(frappe.db.exists("OT Booking Procedure", {"service_request": arrived_later}))
+
+	def test_a_previewed_slot_taken_meanwhile_is_reported_not_moved(self):
+		previewed = self.waiting(0, "STAT")
+		plan = self.plan()
+		make_booking(self, self.at(8), patient=1, surgeon=1)
+
+		booked = self.book(plan)
+
+		self.assertEqual([row["name"] for row in booked["not_placed"]], [previewed])
+		self.assertFalse(frappe.db.exists("OT Booking Procedure", {"service_request": previewed}))
+
+	def test_booking_needs_a_plan(self):
+		self.assertRaisesRegex(
+			frappe.ValidationError, "Preview the day", book_day, str(self.day), COMPANY, DEPARTMENT
+		)

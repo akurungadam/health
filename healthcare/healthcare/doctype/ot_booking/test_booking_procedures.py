@@ -110,6 +110,94 @@ class TestBookingProcedures(HealthcareTestSuite):
 
 		self.assertRaisesRegex(frappe.ValidationError, "cannot move", booking.save)
 
+	def cancel_its_procedure(self, booking):
+		procedure = frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0])
+		procedure.submit()
+		procedure.cancel()
+		booking.reload()
+		return procedure.name
+
+	def test_a_cancelled_procedure_is_released_and_kept(self):
+		booking = make_booking(self, self.at(9))
+
+		procedure = self.cancel_its_procedure(booking)
+
+		self.assertIsNone(booking.procedures[0].clinical_procedure)
+		self.assertEqual(
+			frappe.db.get_value("Clinical Procedure", procedure, ["docstatus", "ot_booking"]),
+			(2, booking.name),
+		)
+
+	def test_a_case_whose_procedure_was_cancelled_can_move(self):
+		booking = make_booking(self, self.at(9))
+		self.cancel_its_procedure(booking)
+		booking.scheduled_start = self.at(13)
+
+		booking.save()
+
+		self.assertEqual(get_datetime(booking.scheduled_start), self.at(13))
+
+	def test_a_case_whose_procedure_was_cancelled_can_be_cancelled(self):
+		booking = make_booking(self, self.at(9))
+		procedure = self.cancel_its_procedure(booking)
+		booking.status = "Cancelled"
+
+		booking.save()
+
+		self.assertTrue(frappe.db.exists("Clinical Procedure", procedure))
+
+	def test_a_request_gets_a_new_procedure_after_one_is_cancelled(self):
+		booking = self.book_from_request(self.at(9))
+		cancelled = self.cancel_its_procedure(booking)
+
+		made = booking.create_clinical_procedures()
+
+		self.assertEqual(len(made), 1)
+		self.assertNotEqual(made[0], cancelled)
+
+	def test_a_submitted_procedure_keeps_its_times(self):
+		booking = make_booking(self, self.at(9))
+		booking.procedures[0].duration = 2 * HOUR
+		booking.save()
+		frappe.get_doc("Clinical Procedure", booking.create_clinical_procedures()[0]).submit()
+		booking.reload()
+		booking.procedures[0].duration = HOUR
+
+		self.assertRaisesRegex(frappe.ValidationError, "cannot change its times", booking.save)
+
+	def test_a_procedure_takes_its_theatres_store(self):
+		store = self.theatre_store()
+
+		booking = make_booking(self, self.at(9))
+
+		procedure = booking.create_clinical_procedures()[0]
+		self.assertEqual(frappe.db.get_value("Clinical Procedure", procedure, "warehouse"), store)
+
+	def test_a_draft_procedure_moved_to_a_theatre_without_a_store_takes_the_companys(self):
+		self.theatre_store()
+		booking = make_booking(self, self.at(9))
+		procedure = booking.create_clinical_procedures()[0]
+		booking.reload()
+
+		booking.theatre = self.other_theatre
+		booking.save()
+
+		company_store = frappe.db.get_value("Company", booking.company, "default_warehouse")
+		self.assertEqual(frappe.db.get_value("Clinical Procedure", procedure, "warehouse"), company_store)
+
+	def theatre_store(self):
+		"""A store of the company other than its default, given to the first theatre"""
+		default = frappe.db.get_value("Company", "_Test Company", "default_warehouse")
+		store = frappe.get_all(
+			"Warehouse",
+			filters={"company": "_Test Company", "is_group": 0, "name": ["!=", default]},
+			pluck="name",
+			limit=1,
+		)[0]
+		frappe.db.set_value("Healthcare Service Unit", self.theatre, "warehouse", store)
+		frappe.db.set_value("Healthcare Service Unit", self.other_theatre, "warehouse", None)
+		return store
+
 	def test_another_patients_procedure_cannot_be_linked(self):
 		other = make_booking(self, self.at(13), patient=1, surgeon=1)
 		theirs = other.create_clinical_procedures()[0]

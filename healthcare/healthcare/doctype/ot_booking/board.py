@@ -20,6 +20,7 @@ from healthcare.healthcare.doctype.ot_booking.day_rules import needs_change_reas
 from healthcare.healthcare.doctype.ot_booking.fasting import is_fasting_confirmed
 from healthcare.healthcare.doctype.ot_booking.ot_booking import NEXT_STATUSES
 from healthcare.healthcare.doctype.ot_booking.priority import add_priority
+from healthcare.healthcare.doctype.ot_booking.same_patient import add_other_cases
 from healthcare.healthcare.doctype.practitioner_availability.practitioner_availability import (
 	find_unavailable_blocks,
 )
@@ -142,6 +143,7 @@ def get_bookings(date, theatres):
 			"patient_name",
 			"status",
 			"priority",
+			"scheduled_date",
 			"scheduled_start",
 			"scheduled_end",
 			"modified",
@@ -158,6 +160,7 @@ def get_bookings(date, theatres):
 	if bookings:
 		add_surgeons_and_procedures(bookings)
 		add_patient_details(bookings, date)
+		add_other_cases(bookings)
 	return bookings
 
 
@@ -178,7 +181,6 @@ def add_surgeons_and_procedures(bookings):
 	)
 	add_priority(bookings)
 	for booking in bookings:
-		booking.next_statuses = NEXT_STATUSES.get(booking.status, ())
 		booking.needs_reason = needs_change_reason(booking)
 		booking.surgeon = surgeons.get(booking.name)
 		# everyone on the case, for the board's practitioner filter and the practitioner-wise print
@@ -186,11 +188,21 @@ def add_surgeons_and_procedures(bookings):
 		booking.team_names = [member.practitioner_name for member in members]
 		booking.team_roles = [{"name": member.practitioner_name, "role": member.role} for member in members]
 		rows = [row for row in procedures if row.parent == booking.name]
+		booking.next_statuses = next_statuses(booking, rows)
 		booking.procedures = [row.procedure_template for row in rows]
 		booking.fasting_confirmed = is_fasting_confirmed(booking, booking.procedures)
 		booking.procedures_pending = booking.status != "Completed" and any(
 			not row.clinical_procedure for row in rows
 		)
+
+
+def next_statuses(booking, rows):
+	"""A started case may also be cancelled once no row holds a procedure, as cancelling its
+	procedures releases them"""
+	statuses = NEXT_STATUSES.get(booking.status, ())
+	if booking.status == "In Progress" and not any(row.clinical_procedure for row in rows):
+		statuses = (*statuses, "Cancelled")
+	return statuses
 
 
 def add_patient_details(rows, on_date):

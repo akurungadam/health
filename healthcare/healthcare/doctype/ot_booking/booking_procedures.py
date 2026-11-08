@@ -56,32 +56,35 @@ def validate_release(booking):
 
 
 def validate_procedures_follow(booking):
-	"""A submitted procedure keeps the theatre, time and surgeon it was submitted with, so its case
-	cannot move or change surgeon until it is cancelled; a draft one follows the case
-	(sync_procedures)"""
+	"""A submitted procedure keeps the theatre, times and surgeon it was submitted with, so a move,
+	a surgeon change, or a row's duration or order that shifts it is refused until it is
+	cancelled; a draft one follows the case (sync_procedures)"""
 	before = booking.get_doc_before_save()
 	if not before or booking.status in INACTIVE_STATUSES:
 		return
-	change = changed_schedule(booking, before)
-	if not change:
-		return
-	for row in booking.procedures:
-		if row.clinical_procedure and not is_draft(row.clinical_procedure):
+	was = {
+		row.clinical_procedure: schedule(before, row, start)
+		for row, start in rows_with_start(before)
+		if row.clinical_procedure
+	}
+	for row, start in rows_with_start(booking):
+		procedure = row.clinical_procedure
+		if procedure in was and was[procedure] != schedule(booking, row, start) and not is_draft(procedure):
 			frappe.throw(
 				_("Row {0}: Clinical Procedure {1} is already submitted, so this case cannot {2}").format(
-					row.idx, frappe.bold(row.clinical_procedure), change
+					row.idx, frappe.bold(procedure), changed_schedule(booking, before)
 				),
 				title=_("Procedure Submitted"),
 			)
 
 
 def changed_schedule(booking, before):
-	"""What the change would alter on the case's procedures, if anything"""
+	"""What the change would alter on the case's procedures"""
 	if is_moved(booking, before):
 		return _("move")
 	if primary_surgeon(booking) != primary_surgeon(before):
 		return _("change surgeon")
-	return None
+	return _("change its times")
 
 
 def release_procedures(booking):
@@ -140,7 +143,6 @@ def procedure_from_template(booking, template):
 	procedure.patient = booking.patient
 	procedure.company = booking.company
 	procedure.consume_stock = frappe.db.get_value("Clinical Procedure Template", template, "consume_stock")
-	procedure.warehouse = frappe.db.get_value("Company", booking.company, "default_warehouse")
 	if procedure.consume_stock:
 		set_stock_items(procedure, template, "Clinical Procedure Template")
 	return procedure
@@ -149,11 +151,19 @@ def procedure_from_template(booking, template):
 def schedule(booking, row, start):
 	return {
 		"service_unit": booking.theatre,
+		"warehouse": theatre_warehouse(booking),
 		"start_date": getdate(start),
 		"start_time": get_time(start),
 		"planned_end_datetime": add_to_date(start, seconds=cint(row.duration)),
 		"practitioner": primary_surgeon(booking),
 	}
+
+
+def theatre_warehouse(booking):
+	"""The theatre's own store for the procedure's supplies, else the company's, as make_procedure"""
+	return frappe.db.get_value("Healthcare Service Unit", booking.theatre, "warehouse") or (
+		frappe.db.get_value("Company", booking.company, "default_warehouse")
+	)
 
 
 def primary_surgeon(booking):

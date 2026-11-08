@@ -119,21 +119,34 @@ def get_postponed(company: str | None = None, department: str | None = None) -> 
 
 @frappe.whitelist()
 def book_request(service_request: str, theatre: str, start: str, reason: str | None = None) -> str:
+	return place_request(service_request, theatre, start, reason)
+
+
+def place_request(service_request, theatre, start, reason=None, push=True):
+	"""A new case for the request; with `push`, the cases after it move back to make room, else a
+	case in the way refuses it"""
 	booking = make_ot_booking(service_request)
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
-	make_room(booking, reason)
+	if push:
+		make_room(booking, reason)
 	return booking.insert().name
 
 
 @frappe.whitelist()
 def move_booking(name: str, theatre: str, start: str, modified: str, reason: str | None = None) -> str:
+	return place_booking(name, theatre, start, modified, reason)
+
+
+def place_booking(name, theatre, start, modified, reason=None, push=True):
+	"""The case moved, or restored from the To schedule pane; `push` as for place_request"""
 	booking = frappe.get_doc("OT Booking", name)
 	booking.check_permission("write")
 	validate_movable(booking, modified)
 	booking.update({"theatre": theatre, "scheduled_start": start, "change_reason": reason})
 	if booking.status == "Postponed":
 		booking.status = "Tentative"
-	make_room(booking, reason)
+	if push:
+		make_room(booking, reason)
 	return booking.save().name
 
 

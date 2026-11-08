@@ -8,6 +8,7 @@ started must not be stopped by a booking check, such as a block added since it w
 The ward's fasting task is still tidied up, since the case no longer needs it."""
 
 import frappe
+from frappe import _
 
 from healthcare.healthcare.doctype.ot_booking.conflict_checker import INACTIVE_STATUSES
 from healthcare.healthcare.doctype.ot_booking.fasting import sync_fasting_task
@@ -20,6 +21,33 @@ def lock_booking(procedure):
 	take turns and always lock in the same order"""
 	if procedure.ot_booking:
 		frappe.db.get_value("OT Booking", procedure.ot_booking, "name", for_update=True)
+
+
+def release_cancelled(procedure):
+	"""A cancelled procedure no longer holds its case. Its booking row lets go of it, so the case
+	can move, be postponed or cancelled, or have a new procedure made; the cancelled record keeps
+	its OT Booking, and the booking's timeline says what happened."""
+	if not procedure.ot_booking:
+		return
+	rows = frappe.get_all(
+		"OT Booking Procedure",
+		fields=["name", "idx"],
+		filters={
+			"parent": procedure.ot_booking,
+			"parenttype": "OT Booking",
+			"clinical_procedure": procedure.name,
+		},
+	)
+	for row in rows:
+		frappe.db.set_value(
+			"OT Booking Procedure", row.name, "clinical_procedure", None, update_modified=False
+		)
+		frappe.get_doc("OT Booking", procedure.ot_booking).add_comment(
+			"Info",
+			_("Row {0}: Clinical Procedure {1} was cancelled, so the row no longer holds it").format(
+				row.idx, procedure.name
+			),
+		)
 
 
 def follow_procedure(procedure):

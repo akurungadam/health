@@ -21,7 +21,11 @@ from erpnext.stock.stock_ledger import get_previous_sle
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import get_account
 from healthcare.healthcare.doctype.lab_test.lab_test import create_sample_doc
 from healthcare.healthcare.doctype.nursing_task.nursing_task import NursingTask
-from healthcare.healthcare.doctype.ot_booking.procedure_status import follow_procedure, lock_booking
+from healthcare.healthcare.doctype.ot_booking.procedure_status import (
+	follow_procedure,
+	lock_booking,
+	release_cancelled,
+)
 from healthcare.healthcare.doctype.service_request.service_request import (
 	update_service_request_status,
 )
@@ -43,11 +47,13 @@ class ClinicalProcedure(Document):
 		self.set_price_list()
 
 	def before_cancel(self):
+		lock_booking(self)  # before this procedure's own row, in the order starting one takes
 		self.set_status()
 
 	def on_cancel(self):
 		if self.service_request:
 			update_service_request_status(self.service_request, "active-Request Status")
+		release_cancelled(self)
 
 	def after_insert(self):
 		if self.appointment:

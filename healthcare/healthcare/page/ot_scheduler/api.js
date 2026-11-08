@@ -9,7 +9,26 @@ export function get(method, params = {}) {
 
 export function post(method, params) {
 	const headers = { "X-Frappe-CSRF-Token": window.frappe?.csrf_token };
-	return frappeRequest({ url: `${API}.${method}`, params, method: "POST", headers });
+	return frappeRequest({
+		url: `${API}.${method}`,
+		params,
+		method: "POST",
+		headers,
+		onServerMessages: toastWarnings,
+	});
+}
+
+// A change that went through but is worth knowing about, such as a patient's second case of
+// the day, comes back as an orange server message
+function toastWarnings(messages) {
+	for (const entry of messages) {
+		const message = JSON.parse(entry);
+		if (!["orange", "yellow"].includes(message.indicator)) continue;
+		toast.warning(message.title || "Note", {
+			description: String(message.message).replace(/<[^>]+>/g, ""),
+			duration: 10000,
+		});
+	}
 }
 
 // The first server message is the toast; any others go beneath it. A refusal of several

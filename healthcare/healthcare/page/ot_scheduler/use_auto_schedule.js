@@ -28,7 +28,10 @@ export function useAutoSchedule({ day, filters, reload }) {
 	async function book() {
 		busy.value = true;
 		try {
-			const result = await post("auto_schedule.book_day", plan.value.selection);
+			const result = await post("auto_schedule.book_day", {
+				...plan.value.selection,
+				placements: JSON.stringify(plan.value.placed.map(placement)),
+			});
 			if (result.placed.length)
 				toastSuccess(`Booked ${result.placed.length} case(s)`);
 			for (const row of result.not_placed)
@@ -60,6 +63,12 @@ export function useAutoSchedule({ day, filters, reload }) {
 	}
 
 	return { plan, busy, preview, book, discard, plannedIn, plannedByName };
+}
+
+// what the plan showed for a case, for booking to book that and nothing else
+function placement(row) {
+	const { name, patient_name, theatre, scheduled_start } = row;
+	return { name, patient_name, theatre, scheduled_start };
 }
 
 // a server message as text: its bold markup dropped, never rendered as HTML

@@ -64,8 +64,9 @@ def is_published_change(booking, before):
 
 
 def needs_change_reason(booking):
-	"""Whether moving or stopping the case needs a reason: only once its day's list is published"""
-	return booking.status == "Scheduled"
+	"""Whether moving or stopping the case needs a reason: only once its day's list is published,
+	which a started case was"""
+	return booking.status in ("Scheduled", "In Progress")
 
 
 def validate_same_day_addition(booking):
