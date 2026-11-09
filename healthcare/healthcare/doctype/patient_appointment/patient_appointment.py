@@ -31,6 +31,10 @@ from healthcare.healthcare.doctype.fee_validity.fee_validity import (
 	validate_fee_validity_cancellation,
 	validate_visit_access,
 )
+from healthcare.healthcare.doctype.healthcare_practitioner.practitioner_leave import (
+	find_leaves,
+	leave_message,
+)
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
 	get_income_account,
 	get_receivable_account,
@@ -56,6 +60,7 @@ class PatientAppointment(Document):
 		self.validate_service_unit()
 		self.set_appointment_datetime()
 		self.validate_practitioner_unavailability()
+		self.validate_practitioner_leave()
 		self.validate_customer_created()
 		self.set_status()
 		self.set_title()
@@ -344,6 +349,22 @@ class PatientAppointment(Document):
 			frappe.throw(
 				_(f"This Appointment conflicts with Practitioner Availability of type 'Unavailable': {msg}.")
 			)
+
+	def validate_practitioner_leave(self):
+		"""Checked only when the practitioner or the day changes, so a leave approved later
+		does not stop the appointment from being checked in or closed"""
+		if not self.practitioner or self.status == "Cancelled":
+			return
+		if not (
+			self.is_new()
+			or self.has_value_changed("practitioner")
+			or self.has_value_changed("appointment_date")
+		):
+			return
+		for leave in find_leaves([self.practitioner], self.appointment_date, self.appointment_date):
+			if not leave.is_half_day:
+				frappe.throw(leave_message(leave), title=_("Not Available"))
+			frappe.msgprint(leave_message(leave), title=_("Not Available"), indicator="orange")
 
 	def set_appointment_datetime(self):
 		self.appointment_datetime = f"{self.appointment_date} {self.appointment_time or '00:00:00'}"
