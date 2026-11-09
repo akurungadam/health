@@ -22,6 +22,20 @@ class ClinicalProcedureTemplate(Document):
 
 	def validate(self):
 		self.enable_disable_item()
+		self.validate_theatre_type()
+
+	def validate_theatre_type(self):
+		if not self.requires_ot:
+			self.required_theatre_type = None
+			return
+		if self.required_theatre_type and not frappe.db.get_value(
+			"Healthcare Service Unit Type", self.required_theatre_type, "is_ot"
+		):
+			frappe.throw(
+				_("Required Theatre Type {0} is not an operation theatre type").format(
+					frappe.bold(self.required_theatre_type)
+				)
+			)
 
 	def after_insert(self):
 		if not self.link_existing_item:

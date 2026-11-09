@@ -73,6 +73,8 @@ class HealthcareServiceUnitType(Document):
 		doc_before_save = self.get_doc_before_save()
 		if not doc_before_save:
 			return
+		if doc_before_save.is_ot != self.is_ot:
+			self.update_service_units_is_ot()
 		if (
 			doc_before_save.rate != self.rate
 			or doc_before_save.is_billable != self.is_billable
@@ -94,6 +96,15 @@ class HealthcareServiceUnitType(Document):
 				frappe.db.set_value("Item Price", item_price, "price_list_rate", self.rate)
 
 		self.reload()
+
+	def update_service_units_is_ot(self):
+		frappe.db.set_value(
+			"Healthcare Service Unit",
+			{"service_unit_type": self.name},
+			"is_ot",
+			self.is_ot,
+			update_modified=False,
+		)
 
 	@frappe.whitelist()
 	def create_service_unit_item(self):

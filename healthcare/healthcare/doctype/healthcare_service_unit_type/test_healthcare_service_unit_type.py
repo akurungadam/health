@@ -33,3 +33,18 @@ class TestHealthcareServiceUnitType(HealthcareTestSuite):
 			}
 		)
 		self.assertRaises(frappe.ValidationError, duplicate.insert)
+
+
+def create_theatre_type(name, is_ot=1):
+	"""The type as saved, the way a form loads it: a freshly inserted one still holds None where the
+	database has 0, which its on_update would take for a change to the billing item"""
+	if not frappe.db.exists("Healthcare Service Unit Type", name):
+		frappe.get_doc(
+			{
+				"doctype": "Healthcare Service Unit Type",
+				"service_unit_type": name,
+				"inpatient_occupancy": 1,
+				"is_ot": is_ot,
+			}
+		).insert()
+	return frappe.get_doc("Healthcare Service Unit Type", name)

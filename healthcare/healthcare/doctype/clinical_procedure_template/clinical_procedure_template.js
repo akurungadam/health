@@ -59,6 +59,14 @@ frappe.ui.form.on("Clinical Procedure Template", {
 				},
 			};
 		});
+
+		frm.set_query("required_theatre_type", function () {
+			return {
+				filters: {
+					is_ot: 1,
+				},
+			};
+		});
 	},
 
 	link_existing_item: function (frm) {

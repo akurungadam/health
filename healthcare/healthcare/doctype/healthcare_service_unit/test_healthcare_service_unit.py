@@ -8,6 +8,10 @@ from healthcare.healthcare.doctype.healthcare_service_unit.healthcare_service_un
 	add_multiple_service_units,
 	get_bed_warehouse_group,
 )
+from healthcare.healthcare.doctype.healthcare_service_unit_type.test_healthcare_service_unit_type import (
+	create_theatre_type,
+)
+from healthcare.patches.v16_0 import set_is_ot_on_service_units
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -83,6 +87,28 @@ class TestHealthcareServiceUnit(HealthcareTestSuite):
 
 		bed.reload()
 		self.assertTrue(bed.warehouse)
+
+	def test_unit_of_an_ot_type_is_an_ot(self):
+		theatre = create_beds("_Test OT Complex A", service_unit_type=create_theatre_type("_Test OT").name)[0]
+
+		self.assertTrue(theatre.is_ot)
+
+	def test_changing_is_ot_on_the_type_updates_its_units(self):
+		unit_type = create_theatre_type("_Test Convertible OT")
+		theatre = create_beds("_Test OT Complex B", service_unit_type=unit_type.name)[0]
+
+		unit_type.is_ot = 0
+		unit_type.save()
+
+		self.assertFalse(frappe.db.get_value("Healthcare Service Unit", theatre.name, "is_ot"))
+
+	def test_patch_marks_units_of_ot_types(self):
+		theatre = create_beds("_Test OT Complex C", service_unit_type=create_theatre_type("_Test OT").name)[0]
+		frappe.db.set_value("Healthcare Service Unit", theatre.name, "is_ot", 0)
+
+		set_is_ot_on_service_units.execute()
+
+		self.assertTrue(frappe.db.get_value("Healthcare Service Unit", theatre.name, "is_ot"))
 
 
 def create_beds(ward_name, count=1, warehouse=None, service_unit_type="_Test Service Unit Type - Occupancy"):

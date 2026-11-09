@@ -18,6 +18,8 @@
   "pre_op_nursing_checklist_template",
   "post_op_nursing_checklist_template",
   "default_duration",
+  "requires_ot",
+  "required_theatre_type",
   "billing_section",
   "column_break_ea5h",
   "link_existing_item",
@@ -267,6 +269,20 @@
    "hide_days": 1,
    "hide_seconds": 1,
    "label": "Default Duration"
+  },
+  {
+   "default": "0",
+   "fieldname": "requires_ot",
+   "fieldtype": "Check",
+   "label": "Requires OT"
+  },
+  {
+   "depends_on": "requires_ot",
+   "description": "Leave empty to allow any operation theatre",
+   "fieldname": "required_theatre_type",
+   "fieldtype": "Link",
+   "label": "Required Theatre Type",
+   "options": "Healthcare Service Unit Type"
   }
  ],
  "links": [
@@ -275,7 +291,7 @@
    "link_fieldname": "procedure_template"
   }
  ],
- "modified": "2026-02-15 17:59:28.208401",
+ "modified": "2026-11-09 20:51:35.980059",
  "modified_by": "Administrator",
  "module": "Healthcare",
  "name": "Clinical Procedure Template",

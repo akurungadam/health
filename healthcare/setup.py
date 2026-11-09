@@ -35,6 +35,8 @@ data = {
 		"Nursing User",
 		"Physician",
 		"Patient",
+		"OT Coordinator",
+		"OT Manager",
 	],
 	"custom_fields": {
 		"Sales Invoice": [
