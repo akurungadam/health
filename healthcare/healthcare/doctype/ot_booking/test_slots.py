@@ -76,6 +76,11 @@ class TestSlots(HealthcareTestSuite):
 
 		self.assertEqual(self.first_start(), self.at(12))
 
+	def test_another_cases_own_cleaning_time_is_kept(self):
+		self.busy(self.at(8), 9).db_set("cleaning_minutes", 90)
+
+		self.assertEqual(self.first_start(), self.at(10, 30))
+
 	def test_a_theatre_block_is_skipped(self):
 		create_unavailable_block(
 			self.theatre, "Healthcare Service Unit", self.tomorrow, "08:00:00", "12:00:00"
