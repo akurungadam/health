@@ -70,7 +70,7 @@ class TestProcedures(HealthcareTestSuite):
 
 	def test_procedures_are_made_once_and_from_the_saved_booking(self):
 		booking = make_booking(self, self.at(9))
-		booking.scheduled_start = self.at(13)  # an edit the form has not saved
+		booking.scheduled_start = self.at(13)
 
 		self.assertEqual(str(self.first_procedure(booking).start_time), "9:00:00")
 		self.assertEqual(booking.create_clinical_procedures(), [])
@@ -123,7 +123,7 @@ class TestProcedures(HealthcareTestSuite):
 		)
 		self.assertEqual((moved.practitioner, moved.practitioner_name), (self.practitioners[1], surgeon_name))
 		company_store = frappe.db.get_value("Company", booking.company, "default_warehouse")
-		self.assertEqual(moved.warehouse, company_store)  # the new theatre has no store of its own
+		self.assertEqual(moved.warehouse, company_store)
 
 	def test_a_submitted_procedure_keeps_its_theatre_times_and_surgeon(self):
 		booking = make_booking(self, self.at(9))
@@ -177,8 +177,8 @@ class TestProcedures(HealthcareTestSuite):
 		booking.reload()
 
 		booking.update({"scheduled_start": self.at(13), "change_reason": "Patient unwell"})
-		booking.save()  # it can move
-		made = booking.create_clinical_procedures()  # and its row gets a new procedure
+		booking.save()
+		made = booking.create_clinical_procedures()
 
 		self.assertEqual(len(made), 1)
 		self.assertEqual(frappe.db.get_value("Clinical Procedure", cancelled.name, "docstatus"), 2)
@@ -188,7 +188,7 @@ class TestProcedures(HealthcareTestSuite):
 		cancelled = self.submitted(booking)
 		cancelled.cancel()
 
-		amended = frappe.copy_doc(cancelled)  # as Amend copies it, no-copy fields included
+		amended = frappe.copy_doc(cancelled)
 		amended.update({"amended_from": cancelled.name, "docstatus": 0})
 		amended.insert()
 
@@ -270,11 +270,10 @@ class TestProcedures(HealthcareTestSuite):
 		frappe.set_user(create_user("_test_ot_coordinator@example.com", "OT Coordinator"))
 		self.assertTrue(booking.create_clinical_procedures())
 
-		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		frappe.set_user("test_user@marleyhealth.io")
 		self.assertRaises(frappe.PermissionError, booking.create_clinical_procedures)
 
 	def theatre_store(self):
-		"""A store of the company other than its default, given to the first theatre"""
 		default = frappe.db.get_value("Company", "_Test Company", "default_warehouse")
 		store = frappe.get_all(
 			"Warehouse",

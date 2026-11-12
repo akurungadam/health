@@ -165,7 +165,7 @@ class TestBoard(HealthcareTestSuite):
 	def test_no_one_is_away_for_a_caller_who_cannot_read_practitioners(self):
 		create_unavailable_block(self.practitioners[0], "Healthcare Practitioner", self.day)
 		start, end = day_window(getdate(self.day))
-		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		frappe.set_user("test_user@marleyhealth.io")
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		self.assertEqual(get_away(getdate(self.day), start, end, "_Test Company"), [])
@@ -185,7 +185,6 @@ class TestBoard(HealthcareTestSuite):
 		self.assertFalse(self.board()["can_edit"])
 
 	def test_an_inpatient_case_shows_its_admission_and_bed(self):
-		# a new patient, as one left admitted by another test cannot be admitted again
 		patient = frappe.get_doc({"doctype": "Patient", "first_name": "_Test OT Inpatient", "sex": "Female"})
 		self.patients = [patient.insert(ignore_permissions=True).name]
 		admission = create_inpatient(self.patients[0])
@@ -222,7 +221,7 @@ class TestBoard(HealthcareTestSuite):
 
 	def test_a_caller_who_cannot_read_patients_gets_no_age_or_sex(self):
 		row = frappe._dict(patient=self.patients[0])
-		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		frappe.set_user("test_user@marleyhealth.io")
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		add_patient_details([row], self.day)
@@ -230,7 +229,7 @@ class TestBoard(HealthcareTestSuite):
 		self.assertEqual((row.sex, row.age), (None, None))
 
 	def test_the_board_needs_permission(self):
-		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		frappe.set_user("test_user@marleyhealth.io")
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		self.assertRaises(frappe.PermissionError, self.board)

@@ -67,7 +67,7 @@ class TestDayRules(HealthcareTestSuite):
 		self.assertEqual(frappe.db.get_value("OT Booking", booking.name, "status"), "Tentative")
 
 	def test_a_scheduled_case_moved_onto_today_still_needs_a_reason(self):
-		booking = self.scheduled_booking()  # as Administrator, who may add to today
+		booking = self.scheduled_booking()
 		booking.scheduled_start = later_today(self, 2)
 
 		self.assertRaisesRegex(frappe.ValidationError, "Change Reason", booking.save)
@@ -139,7 +139,7 @@ class TestDayRules(HealthcareTestSuite):
 
 	def test_a_case_can_be_booked_for_now(self):
 		now = now_datetime().replace(second=0, microsecond=0)
-		start = add_to_date(now, minutes=-(now.minute % 15))  # the grid step just gone
+		start = add_to_date(now, minutes=-(now.minute % 15))
 
 		make_booking(self, start, priority=priority_named("STAT"))
 
@@ -192,7 +192,6 @@ class TestDayRules(HealthcareTestSuite):
 
 
 def later_today(test, hours):
-	"""A whole hour later today; the test is skipped when that would be tomorrow"""
 	start = add_to_date(now_datetime().replace(minute=0, second=0, microsecond=0), hours=hours)
 	if getdate(start) != getdate(nowdate()):
 		test.skipTest("too close to midnight for a case later today")

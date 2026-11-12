@@ -69,7 +69,7 @@ class TestStartOver(HealthcareTestSuite):
 		)
 
 	def test_starting_over_needs_permission(self):
-		frappe.set_user("test_user@marleyhealth.io")  # a login with no clinical role
+		frappe.set_user("test_user@marleyhealth.io")
 		self.addCleanup(frappe.set_user, "Administrator")
 
 		self.assertRaises(frappe.PermissionError, start_over_day, str(self.day), COMPANY)

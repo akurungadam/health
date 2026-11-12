@@ -169,7 +169,7 @@ class TestFasting(HealthcareTestSuite):
 		self.assertFalse(self.confirmed(booking))
 
 	def test_starting_the_procedure_cancels_the_fasting_task(self):
-		booking = self.scheduled(hour=9)  # a Scheduled case gets its procedure
+		booking = self.scheduled(hour=9)
 		procedure = frappe.get_doc("Clinical Procedure", {"ot_booking": booking.name})
 		procedure.submit()
 
