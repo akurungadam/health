@@ -6,7 +6,8 @@ import { useHost } from "@framework/ui/island";
 import FinderButton from "./finder_button.vue";
 import PaneCard from "./pane_card.vue";
 import SlotList from "./slot_list.vue";
-import { caseMinutes } from "../time.js";
+import ChevronIcon from "~icons/lucide/chevron-right";
+import { caseMinutes, isoDate, today } from "../time.js";
 
 const props = defineProps({
 	requests: { type: Array, default: () => [] },
@@ -28,12 +29,66 @@ const emit = defineEmits([
 const host = useHost();
 const search = ref("");
 const over = ref(false);
+const previewFor = ref(null);
+
+function previewOpened(name, open) {
+	if (open) previewFor.value = name;
+	else if (previewFor.value === name) previewFor.value = null;
+}
 
 const cards = computed(() =>
 	[...props.requests.map(requestCard), ...props.postponed.map(postponedCard)]
 		.filter(card => matches(card.searchText))
 		.sort(byExpectedDate),
 );
+
+const NO_DATE = "No Expected By date";
+const tomorrow = isoDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+const expanded = ref(new Set([today(), tomorrow]));
+
+const groups = computed(() => {
+	const byDate = new Map();
+	for (const card of cards.value) {
+		const date = card.row.expected_date || NO_DATE;
+		byDate.set(date, [...(byDate.get(date) || []), card]);
+	}
+	const dates = search.value.trim() ? [...byDate.keys()] : everyDay(byDate);
+	return dates.map(date => ({
+		date,
+		label: dateLabel(date),
+		cards: byDate.get(date) || [],
+	}));
+});
+
+function everyDay(byDate) {
+	const dated = [...byDate.keys(), today(), tomorrow]
+		.filter(date => date !== NO_DATE)
+		.map(String)
+		.sort();
+	const days = [];
+	const day = new Date(`${dated[0]}T00:00`);
+	while (isoDate(day) <= dated.at(-1)) {
+		days.push(isoDate(day));
+		day.setDate(day.getDate() + 1);
+	}
+	return byDate.has(NO_DATE) ? [...days, NO_DATE] : days;
+}
+
+function dateLabel(date) {
+	if (date === NO_DATE) return date;
+	const formatted = host.format?.(date, { fieldtype: "Date" }) ?? date;
+	return date === today() ? `${formatted} (Today)` : formatted;
+}
+
+function isOpen(date) {
+	return Boolean(search.value.trim()) || expanded.value.has(date);
+}
+
+function toggle(date) {
+	const open = new Set(expanded.value);
+	open.has(date) ? open.delete(date) : open.add(date);
+	expanded.value = open;
+}
 
 function requestCard(request) {
 	return {
@@ -125,9 +180,6 @@ function drop() {
 		@dragleave="over = false"
 		@drop.prevent="drop"
 	>
-		<p class="text-sm font-semibold text-ink-gray-7">
-			To schedule ({{ requests.length + postponed.length }})
-		</p>
 		<p
 			v-if="dropping"
 			class="rounded-4 p-3 text-center text-sm text-ink-gray-6"
@@ -137,39 +189,62 @@ function drop() {
 		</p>
 		<FormControl
 			v-model="search"
-			placeholder="Search patient, procedure, surgeon"
+			:placeholder="`Search ${cards.length} to schedule`"
 		/>
-		<div class="flex flex-col gap-2 overflow-y-auto">
+		<div class="flex flex-col gap-2 overflow-y-auto" @scroll="previewFor = null">
 			<p v-if="!cards.length" class="p-4 text-center text-sm text-ink-gray-5">
 				{{ search ? "Nothing matches" : "Every surgical request is booked" }}
 			</p>
-			<PaneCard
-				v-for="card in cards"
-				:key="card.row.name"
-				:row="card.row"
-				:route="card.route"
-				:preview="card.preview"
-				:postponed="Boolean(card.postponed)"
-				:procedures="card.procedures"
-				:duration="card.duration"
-				:details="card.details"
-				@pick="card.pick"
-				@done="emit('done')"
+			<section
+				v-for="group in groups"
+				:key="group.date"
+				class="flex flex-col gap-2"
 			>
-				<template #actions>
-					<FinderButton
-						:open="finder.for === card.row.name"
-						@click="emit('find', card.find)"
+				<button
+					class="flex items-center gap-1 text-left text-sm font-medium text-ink-gray-6"
+					@click="toggle(group.date)"
+				>
+					<ChevronIcon
+						class="size-4 shrink-0 transition-transform"
+						:class="{ 'rotate-90': isOpen(group.date) }"
 					/>
+					<span class="flex-1">{{ group.label }}</span>
+					<span class="text-ink-gray-5">({{ group.cards.length }})</span>
+				</button>
+				<template v-if="isOpen(group.date)">
+					<PaneCard
+						v-for="card in group.cards"
+						:key="card.row.name"
+						:row="card.row"
+						:route="card.route"
+						:preview="card.preview"
+						:preview-open="previewFor === card.row.name"
+						@update:preview-open="
+							open => previewOpened(card.row.name, open)
+						"
+						:postponed="Boolean(card.postponed)"
+						:procedures="card.procedures"
+						:duration="card.duration"
+						:details="card.details"
+						@pick="card.pick"
+						@done="emit('done')"
+					>
+						<template #actions>
+							<FinderButton
+								:open="finder.for === card.row.name"
+								@click="emit('find', card.find)"
+							/>
+						</template>
+						<SlotList
+							v-if="finder.for === card.row.name"
+							class="mt-2"
+							:finder="finder"
+							:picked="picked"
+							@pick="slot => emit('pickSlot', slot)"
+						/>
+					</PaneCard>
 				</template>
-				<SlotList
-					v-if="finder.for === card.row.name"
-					class="mt-2"
-					:finder="finder"
-					:picked="picked"
-					@pick="slot => emit('pickSlot', slot)"
-				/>
-			</PaneCard>
+			</section>
 		</div>
 	</aside>
 </template>
