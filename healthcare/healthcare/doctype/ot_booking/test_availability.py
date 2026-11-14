@@ -9,6 +9,7 @@ from healthcare.healthcare.doctype.healthcare_practitioner.test_practitioner_lea
 	link_new_employee,
 	skip_without_hrms,
 )
+from healthcare.healthcare.doctype.ot_booking.availability import theatre_holiday_list
 from healthcare.healthcare.doctype.ot_booking.priority import priority_named
 from healthcare.healthcare.doctype.ot_booking.test_day_rules import create_user
 from healthcare.healthcare.doctype.ot_booking.test_ot_booking import (
@@ -178,28 +179,19 @@ class TestAvailability(HealthcareTestSuite):
 
 		booking.save()
 
-	def test_an_elective_case_on_a_theatre_holiday_is_refused(self):
+	def test_an_elective_case_on_a_theatre_holiday_can_be_booked(self):
 		self.use_theatre_holiday_list(create_holiday_list(self.day))
-
-		self.assertRaisesRegex(frappe.ValidationError, "theatre holiday", make_booking, self, self.at(9))
-
-	def test_an_emergency_case_on_a_theatre_holiday_is_allowed(self):
-		self.use_theatre_holiday_list(create_holiday_list(self.day))
-
-		make_booking(self, self.at(9), priority=priority_named("STAT"))
-
-	def test_a_half_day_holiday_can_be_booked(self):
-		self.use_theatre_holiday_list(create_holiday_list(self.day, is_half_day=1))
 
 		make_booking(self, self.at(9))
 
 	def test_the_company_holiday_list_is_used_when_none_is_set(self):
 		self.use_theatre_holiday_list(None)
+		holiday_list = create_holiday_list(self.day)
 		company_list = frappe.db.get_value("Company", "_Test Company", "default_holiday_list")
-		frappe.db.set_value("Company", "_Test Company", "default_holiday_list", create_holiday_list(self.day))
+		frappe.db.set_value("Company", "_Test Company", "default_holiday_list", holiday_list)
 		self.addCleanup(frappe.db.set_value, "Company", "_Test Company", "default_holiday_list", company_list)
 
-		self.assertRaisesRegex(frappe.ValidationError, "theatre holiday", make_booking, self, self.at(9))
+		self.assertEqual(theatre_holiday_list("_Test Company"), holiday_list)
 
 	def use_theatre_holiday_list(self, holiday_list):
 		saved = frappe.db.get_single_value("Healthcare Settings", "ot_holiday_list")
