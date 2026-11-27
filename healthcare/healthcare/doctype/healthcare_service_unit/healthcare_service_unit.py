@@ -193,19 +193,7 @@ def add_multiple_service_units(parent, data):
 
 	service_unit_name = "{}".format(data.get("healthcare_service_unit_name").strip(" -"))
 
-	last_suffix = frappe.db.sql(
-		"""SELECT
-		IFNULL(MAX(CAST(SUBSTRING(name FROM %(start)s FOR 4) AS UNSIGNED)), 0)
-		FROM `tabHealthcare Service Unit`
-		WHERE name like %(prefix)s AND company=%(company)s""",
-		{
-			"start": len(service_unit_name) + 2,
-			"prefix": f"{service_unit_name}-%",
-			"company": company,
-		},
-		as_list=1,
-	)[0][0]
-	start_suffix = cint(last_suffix) + 1
+	start_suffix = get_last_suffix(service_unit_name, company) + 1
 
 	failed_list = []
 	for i in range(start_suffix, count + start_suffix):
@@ -218,6 +206,16 @@ def add_multiple_service_units(parent, data):
 			failed_list.append(service_unit["healthcare_service_unit_name"])
 
 	return failed_list
+
+
+def get_last_suffix(service_unit_name, company):
+	start = len(service_unit_name) + 1
+	names = frappe.get_all(
+		"Healthcare Service Unit",
+		filters={"name": ["like", f"{service_unit_name}-%"], "company": company},
+		pluck="name",
+	)
+	return max((cint(name[start : start + 4]) for name in names), default=0)
 
 
 def on_doctype_update():

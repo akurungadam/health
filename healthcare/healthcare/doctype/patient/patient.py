@@ -158,14 +158,9 @@ class Patient(Document):
 		self.set_full_name()
 		name = self.patient_name
 		if frappe.db.get_value("Patient", name):
-			count = frappe.db.sql(
-				"""select ifnull(MAX(CAST(SUBSTRING_INDEX(name, ' ', -1) AS UNSIGNED)), 0) from tabPatient
-				 where name like %s""",
-				f"%{name} - %",
-				as_list=1,
-			)[0][0]
-			count = cint(count) + 1
-			return f"{name} - {cstr(count)}"
+			duplicates = frappe.get_all("Patient", filters={"name": ["like", f"%{name} - %"]}, pluck="name")
+			count = max((cint(duplicate.rsplit(" ", 1)[-1]) for duplicate in duplicates), default=0)
+			return f"{name} - {cstr(count + 1)}"
 
 		return name
 
