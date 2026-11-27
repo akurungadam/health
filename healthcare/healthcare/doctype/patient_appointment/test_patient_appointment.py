@@ -3,6 +3,7 @@
 
 
 import datetime
+import json
 
 import frappe
 from frappe.utils import add_days, flt, get_time, getdate, now_datetime, nowdate, nowtime
@@ -44,6 +45,29 @@ class TestPatientAppointment(HealthcareTestSuite):
 		start = datetime.datetime.combine(getdate(), datetime.time(10, 30))
 		self.assertEqual(events[appointment.name].start, start)
 		self.assertEqual(events[appointment.name].end, start + datetime.timedelta(minutes=15))
+
+	def test_calendar_event_takes_the_appointment_type_color(self):
+		appointment = create_appointment(
+			self.patient, self.practitioner, appointment_type="_Test Colored Appointment Type"
+		)
+		events = {event.name: event for event in get_events(nowdate(), nowdate())}
+		self.assertEqual(events[appointment.name].color, "#ff0000")
+
+	def test_calendar_applies_list_and_dict_filters(self):
+		appointment = create_appointment(self.patient, self.practitioner)
+		other_practitioner = [["Patient Appointment", "practitioner", "!=", self.practitioner]]
+
+		def event_names(filters):
+			return [event.name for event in get_events(nowdate(), nowdate(), json.dumps(filters))]
+
+		self.assertIn(appointment.name, event_names({"practitioner": self.practitioner}))
+		self.assertIn(appointment.name, event_names({"practitioner": ["=", self.practitioner]}))
+		self.assertNotIn(appointment.name, event_names(other_practitioner))
+
+	def test_calendar_refuses_users_who_cannot_read_appointments(self):
+		with self.set_user("test_user@marleyhealth.io"):
+			with self.assertRaises(frappe.PermissionError):
+				get_events(nowdate(), nowdate())
 
 	def test_prescribed_procedures_skip_booked_ones(self):
 		procedure = "_Test Procedure - Knee Surgery and Rehab"

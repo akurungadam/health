@@ -561,6 +561,14 @@ class BootStrapTestData:
 			},
 			{
 				"doctype": "Appointment Type",
+				"appointment_type": "_Test Colored Appointment Type",
+				"allow_booking_for": "Practitioner",
+				"medical_department": "_Test Medical Department",
+				"default_duration": 20,
+				"color": "#ff0000",
+			},
+			{
+				"doctype": "Appointment Type",
 				"appointment_type": "_Test Appointment Type for Department",
 				"allow_booking_for": "Department",
 				"medical_department": "_Test Medical Department",
