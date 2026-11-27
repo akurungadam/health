@@ -3,7 +3,7 @@ from datetime import datetime
 
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Count
+from frappe.query_builder.functions import Avg, Count, Date, Max
 from frappe.utils import add_years, get_timespan_date_range, get_timestamp, getdate
 
 
@@ -143,32 +143,27 @@ def get_patient_assessment_data(patient: str, assessment_template: str, time_spa
 @frappe.whitelist()
 def get_therapy_assessment_correlation_data(patient: str, assessment_template: str, time_span: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	date_range = get_date_range(time_span)
-	query_values = {
-		"from_date": date_range[0],
-		"to_date": date_range[1],
-		"assessment": assessment_template,
-		"patient": patient,
-	}
-	result = frappe.db.sql(
-		"""
-		SELECT
-			therapy.therapy_type, count(*), avg(assessment.total_score_obtained),
-			max(assessment.total_score)
-		FROM
-			`tabPatient Assessment` assessment INNER JOIN `tabTherapy Session` therapy
-		ON
-			assessment.therapy_session = therapy.name
-		WHERE
-			DATE(assessment.assessment_datetime) BETWEEN %(from_date)s AND %(to_date)s and
-			assessment.docstatus = 1 and
-			assessment.patient = %(patient)s and
-			assessment.assessment_template = %(assessment)s
-		GROUP BY therapy.therapy_type
-	""",
-		query_values,
-		as_list=1,
-	)
+	from_date, to_date = get_date_range(time_span)
+	assessment = frappe.qb.DocType("Patient Assessment")
+	therapy = frappe.qb.DocType("Therapy Session")
+	result = (
+		frappe.qb.from_(assessment)
+		.inner_join(therapy)
+		.on(assessment.therapy_session == therapy.name)
+		.select(
+			therapy.therapy_type,
+			Count("*"),
+			Avg(assessment.total_score_obtained),
+			Max(assessment.total_score),
+		)
+		.where(
+			Date(assessment.assessment_datetime).between(from_date, to_date)
+			& (assessment.docstatus == 1)
+			& (assessment.patient == patient)
+			& (assessment.assessment_template == assessment_template)
+		)
+		.groupby(therapy.therapy_type)
+	).run()
 
 	return {
 		"labels": [r[0] for r in result if r[0] is not None],
