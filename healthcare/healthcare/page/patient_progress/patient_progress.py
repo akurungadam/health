@@ -75,28 +75,19 @@ def get_therapy_sessions_distribution_data(patient: str, field: str) -> dict:
 @frappe.whitelist()
 def get_therapy_progress_data(patient: str, therapy_type: str, time_span: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	date_range = get_date_range(time_span)
-	query_values = {
-		"from_date": date_range[0],
-		"to_date": date_range[1],
-		"therapy_type": therapy_type,
-		"patient": patient,
-	}
-	result = frappe.db.sql(
-		"""
-		SELECT
-			start_date, total_counts_targeted, total_counts_completed
-		FROM
-			`tabTherapy Session`
-		WHERE
-			start_date BETWEEN %(from_date)s AND %(to_date)s and
-			docstatus = 1 and
-			therapy_type = %(therapy_type)s and
-			patient = %(patient)s
-		ORDER BY start_date""",
-		query_values,
-		as_list=1,
-	)
+	from_date, to_date = get_date_range(time_span)
+	session = frappe.qb.DocType("Therapy Session")
+	result = (
+		frappe.qb.from_(session)
+		.select(session.start_date, session.total_counts_targeted, session.total_counts_completed)
+		.where(
+			session.start_date.between(from_date, to_date)
+			& (session.docstatus == 1)
+			& (session.therapy_type == therapy_type)
+			& (session.patient == patient)
+		)
+		.orderby(session.start_date)
+	).run()
 
 	return {
 		"labels": [r[0] for r in result if r[0] is not None],
@@ -110,28 +101,19 @@ def get_therapy_progress_data(patient: str, therapy_type: str, time_span: str) -
 @frappe.whitelist()
 def get_patient_assessment_data(patient: str, assessment_template: str, time_span: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	date_range = get_date_range(time_span)
-	query_values = {
-		"from_date": date_range[0],
-		"to_date": date_range[1],
-		"assessment_template": assessment_template,
-		"patient": patient,
-	}
-	result = frappe.db.sql(
-		"""
-		SELECT
-			assessment_datetime, total_score, total_score_obtained
-		FROM
-			`tabPatient Assessment`
-		WHERE
-			DATE(assessment_datetime) BETWEEN %(from_date)s AND %(to_date)s and
-			docstatus = 1 and
-			assessment_template = %(assessment_template)s and
-			patient = %(patient)s
-		ORDER BY assessment_datetime""",
-		query_values,
-		as_list=1,
-	)
+	from_date, to_date = get_date_range(time_span)
+	assessment = frappe.qb.DocType("Patient Assessment")
+	result = (
+		frappe.qb.from_(assessment)
+		.select(assessment.assessment_datetime, assessment.total_score, assessment.total_score_obtained)
+		.where(
+			Date(assessment.assessment_datetime).between(from_date, to_date)
+			& (assessment.docstatus == 1)
+			& (assessment.assessment_template == assessment_template)
+			& (assessment.patient == patient)
+		)
+		.orderby(assessment.assessment_datetime)
+	).run()
 
 	return {
 		"labels": [getdate(r[0]) for r in result if r[0] is not None],
@@ -182,36 +164,25 @@ def get_therapy_assessment_correlation_data(patient: str, assessment_template: s
 @frappe.whitelist()
 def get_assessment_parameter_data(patient: str, parameter: str, time_span: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	date_range = get_date_range(time_span)
-	query_values = {
-		"from_date": date_range[0],
-		"to_date": date_range[1],
-		"parameter": parameter,
-		"patient": patient,
-	}
-	results = frappe.db.sql(
-		"""
-		SELECT
-			assessment.assessment_datetime,
-			sheet.score,
-			template.scale_max
-		FROM
-			`tabPatient Assessment Sheet` sheet
-		INNER JOIN `tabPatient Assessment` assessment
-			ON sheet.parent = assessment.name
-		INNER JOIN `tabPatient Assessment Template` template
-			ON template.name = assessment.assessment_template
-		WHERE
-			DATE(assessment.assessment_datetime) BETWEEN %(from_date)s AND %(to_date)s and
-			assessment.docstatus = 1 and
-			sheet.parameter = %(parameter)s and
-			assessment.patient = %(patient)s
-		ORDER BY
-			assessment.assessment_datetime asc
-	""",
-		query_values,
-		as_list=1,
-	)
+	from_date, to_date = get_date_range(time_span)
+	sheet = frappe.qb.DocType("Patient Assessment Sheet")
+	assessment = frappe.qb.DocType("Patient Assessment")
+	template = frappe.qb.DocType("Patient Assessment Template")
+	results = (
+		frappe.qb.from_(sheet)
+		.inner_join(assessment)
+		.on(sheet.parent == assessment.name)
+		.inner_join(template)
+		.on(template.name == assessment.assessment_template)
+		.select(assessment.assessment_datetime, sheet.score, template.scale_max)
+		.where(
+			Date(assessment.assessment_datetime).between(from_date, to_date)
+			& (assessment.docstatus == 1)
+			& (sheet.parameter == parameter)
+			& (assessment.patient == patient)
+		)
+		.orderby(assessment.assessment_datetime)
+	).run()
 
 	score_percentages = []
 	for r in results:

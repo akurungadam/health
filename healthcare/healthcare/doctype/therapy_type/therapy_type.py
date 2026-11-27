@@ -82,21 +82,19 @@ class TherapyType(Document):
 
 	def get_exercises_for_body_parts(self):
 		body_parts = [entry.body_part for entry in self.therapy_for]
+		if not body_parts:
+			return []
 
-		exercises = frappe.db.sql(
-			"""
-				SELECT DISTINCT
-					b.parent, e.name, e.difficulty_level
-				FROM
-				 	`tabExercise Type` e, `tabBody Part Link` b
-				WHERE
-					b.body_part IN %(body_parts)s AND b.parent=e.name
-			""",
-			{"body_parts": body_parts},
-			as_dict=1,
-		)
-
-		return exercises
+		exercise = frappe.qb.DocType("Exercise Type")
+		body_part = frappe.qb.DocType("Body Part Link")
+		return (
+			frappe.qb.from_(exercise)
+			.inner_join(body_part)
+			.on(body_part.parent == exercise.name)
+			.select(body_part.parent, exercise.name, exercise.difficulty_level)
+			.distinct()
+			.where(body_part.body_part.isin(body_parts))
+		).run(as_dict=True)
 
 
 def create_item_from_therapy(doc):

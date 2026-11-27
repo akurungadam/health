@@ -1232,39 +1232,48 @@ def get_events(start: str, end: str, filters: str | None = None) -> list[dict]:
 @frappe.whitelist()
 def get_procedure_prescribed(patient: str) -> list[tuple]:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	return frappe.db.sql(
-		"""
-			SELECT
-				pp.name, pp.procedure, pp.parent, ct.practitioner,
-				ct.encounter_date, pp.practitioner, pp.date, pp.department
-			FROM
-				`tabPatient Encounter` ct, `tabProcedure Prescription` pp
-			WHERE
-				ct.patient=%(patient)s and pp.parent=ct.name and pp.appointment_booked=0
-			ORDER BY
-				ct.creation desc
-		""",
-		{"patient": patient},
-	)
+	encounter = frappe.qb.DocType("Patient Encounter")
+	prescription = frappe.qb.DocType("Procedure Prescription")
+	return (
+		frappe.qb.from_(encounter)
+		.inner_join(prescription)
+		.on(prescription.parent == encounter.name)
+		.select(
+			prescription.name,
+			prescription.procedure,
+			prescription.parent,
+			encounter.practitioner,
+			encounter.encounter_date,
+			prescription.practitioner,
+			prescription.date,
+			prescription.department,
+		)
+		.where((encounter.patient == patient) & (prescription.appointment_booked == 0))
+		.orderby(encounter.creation, order=frappe.qb.desc)
+	).run()
 
 
 @frappe.whitelist()
 def get_prescribed_therapies(patient: str) -> list[tuple]:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	return frappe.db.sql(
-		"""
-			SELECT
-				t.therapy_type, t.name, t.parent, e.practitioner,
-				e.encounter_date, e.therapy_plan, e.medical_department
-			FROM
-				`tabPatient Encounter` e, `tabTherapy Plan Detail` t
-			WHERE
-				e.patient=%(patient)s and t.parent=e.name
-			ORDER BY
-				e.creation desc
-		""",
-		{"patient": patient},
-	)
+	encounter = frappe.qb.DocType("Patient Encounter")
+	therapy = frappe.qb.DocType("Therapy Plan Detail")
+	return (
+		frappe.qb.from_(encounter)
+		.inner_join(therapy)
+		.on(therapy.parent == encounter.name)
+		.select(
+			therapy.therapy_type,
+			therapy.name,
+			therapy.parent,
+			encounter.practitioner,
+			encounter.encounter_date,
+			encounter.therapy_plan,
+			encounter.medical_department,
+		)
+		.where(encounter.patient == patient)
+		.orderby(encounter.creation, order=frappe.qb.desc)
+	).run()
 
 
 def update_appointment_status():
