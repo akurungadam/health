@@ -14,6 +14,7 @@ from healthcare.healthcare.doctype.patient_appointment.patient_appointment impor
 	check_is_new_patient,
 	check_payment_reqd,
 	get_availability_data,
+	get_events,
 	invoice_appointment,
 	make_encounter,
 	update_status,
@@ -34,6 +35,14 @@ class TestPatientAppointment(HealthcareTestSuite):
 
 		self.patient = "_Test Patient"
 		self.practitioner = "_Test Healthcare Practitioner 2"
+
+	def test_calendar_event_spans_the_appointment(self):
+		appointment = create_appointment(self.patient, self.practitioner, appointment_time="10:30:00")
+		events = {event.name: event for event in get_events(nowdate(), nowdate())}
+
+		start = datetime.datetime.combine(getdate(), datetime.time(10, 30))
+		self.assertEqual(events[appointment.name].start, start)
+		self.assertEqual(events[appointment.name].end, start + datetime.timedelta(minutes=15))
 
 	def test_weekday_availability_has_no_slots_on_a_day_it_skips(self):
 		from healthcare.healthcare.doctype.patient_appointment.patient_appointment import (

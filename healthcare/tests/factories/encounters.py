@@ -222,7 +222,7 @@ def create_encounter_with_therapy(patient, medical_department, practitioner, sub
 	return encounter
 
 
-def create_therapy_session(patient, therapy_type, therapy_plan, duration=0, start_date=None):
+def create_therapy_session(patient, therapy_type, therapy_plan, duration=0, start_date=None, start_time=None):
 	if not start_date:
 		start_date = nowdate()
 	therapy_session = frappe.new_doc("Therapy Session")
@@ -231,6 +231,8 @@ def create_therapy_session(patient, therapy_type, therapy_plan, duration=0, star
 	therapy_session.therapy_plan = therapy_plan
 	therapy_session.duration = duration
 	therapy_session.start_date = start_date
+	if start_time:
+		therapy_session.start_time = start_time
 	therapy_session.company = "_Test Company"
 	therapy_session.save()
 
