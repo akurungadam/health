@@ -45,7 +45,7 @@ class LabTest(Document):
 	def after_insert(self):
 		billing_status = frappe.db.get_value("Service Request", self.service_request, "billing_status")
 		if billing_status == "Invoiced":
-			self.db_set("invoiced", True)
+			self.db_set("invoiced", 1)
 
 		if self.template:
 			self.load_test_from_template()
