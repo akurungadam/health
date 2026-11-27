@@ -3,7 +3,8 @@ from datetime import datetime
 
 import frappe
 from frappe import _
-from frappe.utils import get_timespan_date_range, getdate
+from frappe.query_builder.functions import Count
+from frappe.utils import add_years, get_timespan_date_range, get_timestamp, getdate
 
 
 @frappe.whitelist()
@@ -22,22 +23,19 @@ def get_therapy_sessions_count(patient: str) -> dict:
 @frappe.whitelist()
 def get_patient_heatmap_data(patient: str, date: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	return dict(
-		frappe.db.sql(
-			"""
-		SELECT
-			unix_timestamp(communication_date), count(*)
-		FROM
-			`tabPatient Medical Record`
-		WHERE
-			communication_date > subdate(%(date)s, interval 1 year) and
-			communication_date < subdate(%(date)s, interval -1 year) and
-			patient = %(patient)s
-		GROUP BY communication_date
-		ORDER BY communication_date asc""",
-			{"date": date, "patient": patient},
+	record = frappe.qb.DocType("Patient Medical Record")
+	rows = (
+		frappe.qb.from_(record)
+		.select(record.communication_date, Count("*"))
+		.where(
+			(record.communication_date > add_years(date, -1))
+			& (record.communication_date < add_years(date, 1))
+			& (record.patient == patient)
 		)
-	)
+		.groupby(record.communication_date)
+		.orderby(record.communication_date)
+	).run()
+	return {int(get_timestamp(day)): count for day, count in rows}
 
 
 @frappe.whitelist()

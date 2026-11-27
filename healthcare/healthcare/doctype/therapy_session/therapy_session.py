@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
+from frappe.query_builder import Criterion
 from frappe.utils import flt, get_link_to_form, get_time, getdate
 
 from healthcare.healthcare.doctype.healthcare_settings.healthcare_settings import (
@@ -43,41 +44,41 @@ class TherapySession(Document):
 		self.update_sessions_count_in_therapy_plan(on_cancel=True)
 
 	def validate_duplicate(self):
-		end_time = datetime.datetime.combine(
-			getdate(self.start_date), get_time(self.start_time)
-		) + datetime.timedelta(minutes=flt(self.duration))
-
-		overlaps = frappe.db.sql(
-			"""
-		select
-			name
-		from
-			`tabTherapy Session`
-		where
-			start_date=%s and name!=%s and docstatus!=2
-			and (practitioner=%s or patient=%s) and
-			((start_time<%s and start_time + INTERVAL duration MINUTE>%s) or
-			(start_time>%s and start_time<%s) or
-			(start_time=%s))
-		""",
-			(
-				self.start_date,
-				self.name,
-				self.practitioner,
-				self.patient,
-				self.start_time,
-				end_time.time(),
-				self.start_time,
-				end_time.time(),
-				self.start_time,
-			),
-		)
-
-		if overlaps:
+		overlap = next((other.name for other in self.get_same_day_sessions() if self.overlaps(other)), None)
+		if overlap:
 			overlapping_details = _("Therapy Session overlaps with {0}").format(
-				get_link_to_form("Therapy Session", overlaps[0][0])
+				get_link_to_form("Therapy Session", overlap)
 			)
 			frappe.throw(overlapping_details, title=_("Therapy Sessions Overlapping"))
+
+	def get_same_day_sessions(self):
+		session = frappe.qb.DocType("Therapy Session")
+		people = [
+			session[field] == self.get(field) for field in ("practitioner", "patient") if self.get(field)
+		]
+		if not people:
+			return []
+		return (
+			frappe.qb.from_(session)
+			.select(session.name, session.start_time, session.duration)
+			.where(
+				(session.start_date == self.start_date)
+				& (session.name != self.name)
+				& (session.docstatus != 2)
+				& session.start_time.isnotnull()
+				& Criterion.any(people)
+			)
+		).run(as_dict=True)
+
+	def overlaps(self, other):
+		start, end = self.get_window(self.start_time, self.duration)
+		other_start, other_end = self.get_window(other.start_time, other.duration)
+		contains = other_start < start and other_end > end
+		return contains or start < other_start < end or other_start == start
+
+	def get_window(self, start_time, duration):
+		start = datetime.datetime.combine(getdate(self.start_date), get_time(start_time))
+		return start, start + datetime.timedelta(minutes=flt(duration))
 
 	def on_submit(self):
 		validate_nursing_tasks(self)

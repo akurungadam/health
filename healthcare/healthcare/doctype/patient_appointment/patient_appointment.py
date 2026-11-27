@@ -1196,10 +1196,8 @@ def get_events(start: str, end: str, filters: str | None = None) -> list[dict]:
 			`tabPatient Appointment`.practitioner,
 			`tabPatient Appointment`.status,
 			`tabPatient Appointment`.duration,
-			timestamp(
-				`tabPatient Appointment`.appointment_date,
-				`tabPatient Appointment`.appointment_time
-			) as 'start',
+			`tabPatient Appointment`.appointment_date,
+			`tabPatient Appointment`.appointment_time,
 			`tabAppointment Type`.color
 		from
 			`tabPatient Appointment`
@@ -1223,6 +1221,9 @@ def get_events(start: str, end: str, filters: str | None = None) -> list[dict]:
 	)
 
 	for item in data:
+		item.start = datetime.datetime.combine(
+			getdate(item.pop("appointment_date")), get_time(item.pop("appointment_time"))
+		)
 		item.end = item.start + datetime.timedelta(minutes=item.duration)
 
 	return data
