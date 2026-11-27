@@ -37,6 +37,7 @@ class BootStrapTestData:
 		self.make_exercise_types()
 		self.make_therapy_types()
 		self.make_therapy_plan_templates()
+		self.make_assessment_templates()
 		self.make_medication_classes()
 		self.make_medications()
 		self.make_treatment_plan_templates()
@@ -241,6 +242,18 @@ class BootStrapTestData:
 			},
 		]
 		self.make_records(["plan_name"], records)
+
+	def make_assessment_templates(self):
+		parameter = {"doctype": "Patient Assessment Parameter", "assessment_parameter": "_Test Mobility"}
+		self.make_records(["assessment_parameter"], [parameter])
+		template = {
+			"doctype": "Patient Assessment Template",
+			"assessment_name": "_Test Assessment Template",
+			"scale_min": 0,
+			"scale_max": 5,
+			"parameters": [{"assessment_parameter": "_Test Mobility"}],
+		}
+		self.make_records(["assessment_name"], [template])
 
 	def make_therapy_types(self):
 		records = [
