@@ -451,21 +451,3 @@ def get_lab_test_prescribed(patient: str) -> list[tuple]:
 		.where(sr.template_dt == "Lab Test Template")
 		.orderby(sr.creation, order=frappe.qb.desc)
 	).run()
-	# return frappe.db.sql(
-	# 	"""
-	# 		select
-	# 			sr.template_dn as lab_test_code,
-	# 			sr.order_group,
-	# 			sr.invoiced,
-	# 			sr.practitioner as practitioner,
-	# 			sr.order_date as encounter_date,
-	# 			sr.name,
-	# 			sr.insurance_policy,
-	# 			sr.insurance_payor
-	# 		from
-	# 			`tabService Request` sr
-	# 		where
-	# 			sr.patient=%s
-	# 			and sr.status!=%s
-	# 			and sr.template_dt=%s
-	# 	""", (patient, "Completed", "Lab Test Template"))
