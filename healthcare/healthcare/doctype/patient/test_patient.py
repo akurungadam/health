@@ -18,6 +18,11 @@ class TestPatient(HealthcareTestSuite):
 		patient = "_Test Patient"
 		self.assertTrue(frappe.db.get_value("Patient", patient, "customer"))
 
+	def test_patients_with_the_same_name_get_a_running_number(self):
+		frappe.db.set_single_value("Healthcare Settings", "patient_name_by", "Patient Name")
+		names = [create_patient(patient_name="_Test Namesake") for _ in range(3)]
+		self.assertEqual(names, ["_Test Namesake", "_Test Namesake - 1", "_Test Namesake - 2"])
+
 	def test_patient_registration(self):
 		registration_item = "_Test Registration"
 		settings = frappe.get_single("Healthcare Settings")
