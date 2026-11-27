@@ -153,7 +153,8 @@ def get_therapy_assessment_correlation_data(patient: str, assessment_template: s
 	result = frappe.db.sql(
 		"""
 		SELECT
-			therapy.therapy_type, count(*), avg(assessment.total_score_obtained), total_score
+			therapy.therapy_type, count(*), avg(assessment.total_score_obtained),
+			max(assessment.total_score)
 		FROM
 			`tabPatient Assessment` assessment INNER JOIN `tabTherapy Session` therapy
 		ON
