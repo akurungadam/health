@@ -15,12 +15,13 @@ from healthcare.healthcare.doctype.patient_appointment.patient_appointment impor
 	check_payment_reqd,
 	get_availability_data,
 	get_events,
+	get_procedure_prescribed,
 	invoice_appointment,
 	make_encounter,
 	update_status,
 )
 from healthcare.healthcare.doctype.service_request.service_request import make_clinical_procedure
-from healthcare.tests.factories.encounters import create_encounter_from_appointment
+from healthcare.tests.factories.encounters import create_encounter, create_encounter_from_appointment
 from healthcare.tests.utils import HealthcareTestSuite
 
 
@@ -43,6 +44,19 @@ class TestPatientAppointment(HealthcareTestSuite):
 		start = datetime.datetime.combine(getdate(), datetime.time(10, 30))
 		self.assertEqual(events[appointment.name].start, start)
 		self.assertEqual(events[appointment.name].end, start + datetime.timedelta(minutes=15))
+
+	def test_prescribed_procedures_skip_booked_ones(self):
+		procedure = "_Test Procedure - Knee Surgery and Rehab"
+		encounter = create_encounter(
+			self.patient,
+			self.practitioner,
+			procedure_prescription=[
+				{"procedure": procedure},
+				{"procedure": procedure, "appointment_booked": 1},
+			],
+		)
+		rows = [row for row in get_procedure_prescribed(self.patient) if row[2] == encounter.name]
+		self.assertEqual([(row[1], row[3]) for row in rows], [(procedure, self.practitioner)])
 
 	def test_weekday_availability_has_no_slots_on_a_day_it_skips(self):
 		from healthcare.healthcare.doctype.patient_appointment.patient_appointment import (

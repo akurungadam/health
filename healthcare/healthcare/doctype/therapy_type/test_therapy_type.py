@@ -16,6 +16,19 @@ class TestTherapyType(HealthcareTestSuite):
 		therapy_type.save()
 		self.assertEqual(frappe.db.get_value("Item", therapy_type.item, "disabled"), 1)
 
+	def test_exercises_are_added_for_the_chosen_body_parts(self):
+		therapy_type = frappe.new_doc("Therapy Type")
+		therapy_type.append("therapy_for", {"body_part": "_Test Knee"})
+		therapy_type.add_exercises()
+
+		knee_bend = frappe.db.get_value("Exercise Type", {"exercise_name": "_Test Knee Bend"})
+		self.assertEqual([row.exercise_type for row in therapy_type.exercises], [knee_bend])
+
+	def test_no_exercises_are_added_without_body_parts(self):
+		therapy_type = frappe.new_doc("Therapy Type")
+		therapy_type.add_exercises()
+		self.assertEqual(therapy_type.exercises, [])
+
 
 def create_therapy_type():
 	exercise = create_exercise_type()

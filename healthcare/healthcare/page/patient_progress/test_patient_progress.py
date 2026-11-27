@@ -4,8 +4,11 @@ import frappe
 from frappe.utils import add_years, get_timestamp, getdate, now_datetime
 
 from healthcare.healthcare.page.patient_progress.patient_progress import (
+	get_assessment_parameter_data,
+	get_patient_assessment_data,
 	get_patient_heatmap_data,
 	get_therapy_assessment_correlation_data,
+	get_therapy_progress_data,
 )
 from healthcare.tests.factories.encounters import create_therapy_plan, create_therapy_session
 from healthcare.tests.utils import HealthcareTestSuite
@@ -36,6 +39,42 @@ class TestPatientProgress(HealthcareTestSuite):
 		self.assertEqual(data["labels"], ["Basic Rehab"])
 		self.assertEqual(data["datasets"][0]["values"], [2])
 		self.assertEqual(data["datasets"][1]["values"], [3])
+
+	def test_therapy_progress_lists_submitted_sessions(self):
+		plan = create_therapy_plan()
+		session = create_therapy_session(plan.patient, "Basic Rehab", plan.name, 30, start_time="09:00:00")
+		session.submit()
+		create_therapy_session(plan.patient, "Basic Rehab", plan.name, 30, start_time="11:00:00")
+
+		data = get_therapy_progress_data(PATIENT, "Basic Rehab", self.today_span())
+
+		self.assertEqual(data["labels"], [getdate()])
+		self.assertEqual(data["datasets"][0]["values"], [session.total_counts_targeted])
+
+	def test_assessment_scores_are_listed_in_time_order(self):
+		session = self.create_session()
+		for score in ("2", "4"):
+			self.create_assessment(session.name, score)
+
+		data = get_patient_assessment_data(PATIENT, "_Test Assessment Template", self.today_span())
+
+		self.assertEqual(data["datasets"][0]["values"], [2, 4])
+		self.assertEqual(data["max_score"], 5)
+
+	def test_parameter_scores_are_percentages_of_the_scale(self):
+		self.create_assessment(self.create_session().name, "4")
+
+		data = get_assessment_parameter_data(PATIENT, "_Test Mobility", self.today_span())
+
+		self.assertEqual(data["labels"], [getdate()])
+		self.assertEqual(data["datasets"][0]["values"], [80.0])
+
+	def create_session(self):
+		plan = create_therapy_plan()
+		return create_therapy_session(plan.patient, "Basic Rehab", plan.name, 30, start_time="09:00:00")
+
+	def today_span(self):
+		return json.dumps([str(getdate()), str(getdate())])
 
 	def create_medical_record(self, day):
 		record = {"patient": PATIENT, "communication_date": day, "subject": "_Test Record"}

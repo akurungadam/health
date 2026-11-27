@@ -278,6 +278,7 @@ class BootStrapTestData:
 		self.make_records(["therapy_type"], records)
 
 	def make_exercise_types(self):
+		self.make_records(["body_part"], [{"doctype": "Body Part", "body_part": "_Test Knee"}])
 		records = [
 			{
 				"doctype": "Exercise Type",
@@ -288,7 +289,12 @@ class BootStrapTestData:
 						"description": "Squat and Rise",
 					},
 				],
-			}
+			},
+			{
+				"doctype": "Exercise Type",
+				"exercise_name": "_Test Knee Bend",
+				"body_parts": [{"body_part": "_Test Knee"}],
+			},
 		]
 		self.make_records(["exercise_name"], records)
 
