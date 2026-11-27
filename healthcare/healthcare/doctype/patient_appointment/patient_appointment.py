@@ -818,15 +818,14 @@ def check_employee_wise_availability(date, practitioner_doc):
 
 		# check leave status
 		if "hrms" in frappe.get_installed_apps():
-			leave_record = frappe.db.sql(
-				"""select half_day from `tabLeave Application`
-				where employee = %s and %s between from_date and to_date
-				and docstatus = 1""",
-				(employee, date),
+			leave_record = frappe.db.get_value(
+				"Leave Application",
+				{"employee": employee, "from_date": ["<=", date], "to_date": [">=", date], "docstatus": 1},
+				["name", "half_day"],
 				as_dict=True,
 			)
 			if leave_record:
-				if leave_record[0].half_day:
+				if leave_record.half_day:
 					frappe.throw(
 						_("{0} is on a Half day Leave on {1}").format(practitioner_doc.name, date),
 						title=_("Not Available"),

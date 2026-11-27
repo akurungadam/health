@@ -12,13 +12,14 @@ def get_list_context(context):
 
 def get_appointment_list(doctype, txt, filters, limit_start, limit_page_length=20, order_by="modified desc"):
 	patient = get_patient()
-	lab_tests = frappe.db.sql(
-		"""select * from `tabPatient Appointment`
-		where patient = %s and (status = 'Open' or status = 'Scheduled') order by appointment_date""",
-		patient,
-		as_dict=True,
+	if not patient:
+		return []
+	return frappe.get_all(
+		"Patient Appointment",
+		filters={"patient": patient, "status": ["in", ["Open", "Scheduled"]]},
+		fields=["*"],
+		order_by="appointment_date",
 	)
-	return lab_tests
 
 
 def get_patient():

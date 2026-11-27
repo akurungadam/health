@@ -12,13 +12,9 @@ def get_list_context(context):
 
 def get_lab_test_list(doctype, txt, filters, limit_start, limit_page_length=20, order_by="modified desc"):
 	patient = get_patient()
-	lab_tests = frappe.db.sql(
-		"""select * from `tabLab Test`
-		where patient = %s order by result_date""",
-		patient,
-		as_dict=True,
-	)
-	return lab_tests
+	if not patient:
+		return []
+	return frappe.get_all("Lab Test", filters={"patient": patient}, fields=["*"], order_by="result_date")
 
 
 def get_patient():

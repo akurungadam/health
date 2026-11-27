@@ -381,18 +381,14 @@ def make_invoice(patient, company):
 @frappe.whitelist()
 def get_patient_detail(patient: str) -> dict:
 	frappe.has_permission("Patient", "read", patient, throw=True)
-	patient_dict = frappe.db.sql("""select * from tabPatient where name=%s""", (patient), as_dict=1)
-	if not patient_dict:
+	details = frappe.db.get_value("Patient", patient, "*", as_dict=True)
+	if not details:
 		frappe.throw(_("Patient not found"))
-	vital_sign = frappe.db.sql(
-		"""select * from `tabVital Signs` where patient=%s
-		order by signs_date desc limit 1""",
-		(patient),
-		as_dict=1,
+	vital_sign = frappe.db.get_value(
+		"Vital Signs", {"patient": patient}, "*", order_by="signs_date desc", as_dict=True
 	)
 
-	details = patient_dict[0]
 	if vital_sign:
-		vital_sign[0].pop("inpatient_record")
-		details.update(vital_sign[0])
+		vital_sign.pop("inpatient_record")
+		details.update(vital_sign)
 	return details

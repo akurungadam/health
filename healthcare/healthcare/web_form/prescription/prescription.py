@@ -12,13 +12,11 @@ def get_list_context(context):
 
 def get_encounter_list(doctype, txt, filters, limit_start, limit_page_length=20, order_by="modified desc"):
 	patient = get_patient()
-	encounters = frappe.db.sql(
-		"""select * from `tabPatient Encounter`
-		where patient = %s order by creation desc""",
-		patient,
-		as_dict=True,
+	if not patient:
+		return []
+	return frappe.get_all(
+		"Patient Encounter", filters={"patient": patient}, fields=["*"], order_by="creation desc"
 	)
-	return encounters
 
 
 def get_patient():
