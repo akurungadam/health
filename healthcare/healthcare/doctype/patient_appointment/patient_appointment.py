@@ -1179,53 +1179,57 @@ def get_events(start: str, end: str, filters: str | None = None) -> list[dict]:
 	:param end: End date-time.
 	:param filters: Filters (JSON).
 	"""
-	from frappe.desk.calendar import get_event_conditions
-	from frappe.desk.reportview import build_match_conditions
-
-	conditions = get_event_conditions("Patient Appointment", filters)
-	match_conditions = build_match_conditions("Patient Appointment")
-
-	if match_conditions:
-		conditions += " and " + match_conditions
-
-	query = """
-		select
-			`tabPatient Appointment`.name,
-			`tabPatient Appointment`.patient,
-			`tabPatient Appointment`.practitioner,
-			`tabPatient Appointment`.status,
-			`tabPatient Appointment`.duration,
-			`tabPatient Appointment`.appointment_date,
-			`tabPatient Appointment`.appointment_time,
-			`tabAppointment Type`.color
-		from
-			`tabPatient Appointment`
-		left join
-			`tabAppointment Type`
-		on
-			`tabPatient Appointment`.appointment_type = `tabAppointment Type`.name
-		where
-			(`tabPatient Appointment`.appointment_date between %(start)s and %(end)s)
-			and `tabPatient Appointment`.status != 'Cancelled'
-			and `tabPatient Appointment`.docstatus < 2
-	"""
-
-	query += conditions
-
-	data = frappe.db.sql(
-		query,
-		{"start": start, "end": end},
-		as_dict=True,
-		update={"allDay": 0},
+	data = frappe.get_list(
+		"Patient Appointment",
+		fields=EVENT_FIELDS,
+		filters=get_event_filters(filters, start, end),
 	)
+	colors = get_appointment_type_colors({item.appointment_type for item in data})
 
 	for item in data:
+		item.color = colors.get(item.pop("appointment_type"))
 		item.start = datetime.datetime.combine(
 			getdate(item.pop("appointment_date")), get_time(item.pop("appointment_time"))
 		)
 		item.end = item.start + datetime.timedelta(minutes=item.duration)
+		item.allDay = 0
 
 	return data
+
+
+EVENT_FIELDS = [
+	"name",
+	"patient",
+	"practitioner",
+	"status",
+	"duration",
+	"appointment_date",
+	"appointment_time",
+	"appointment_type",
+]
+
+
+def get_event_filters(filters, start, end):
+	client_filters = frappe.parse_json(filters) or []
+	if isinstance(client_filters, dict):
+		client_filters = [
+			[field, *value] if isinstance(value, list | tuple) else [field, "=", value]
+			for field, value in client_filters.items()
+		]
+	return [
+		*client_filters,
+		["appointment_date", "between", [start, end]],
+		["status", "!=", "Cancelled"],
+		["docstatus", "<", 2],
+	]
+
+
+def get_appointment_type_colors(appointment_types):
+	names = [name for name in appointment_types if name]
+	if not names:
+		return {}
+	rows = frappe.get_all("Appointment Type", filters={"name": ["in", names]}, fields=["name", "color"])
+	return {row.name: row.color for row in rows}
 
 
 @frappe.whitelist()
