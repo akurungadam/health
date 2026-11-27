@@ -722,6 +722,12 @@ class BootStrapTestData:
 			},
 			{
 				"doctype": "User",
+				"email": "web_form_patient@marleyhealth.io",
+				"first_name": "web_form_patient",
+				"password": "password",
+			},
+			{
+				"doctype": "User",
 				"email": "gp@marleyhealth.io",
 				"first_name": "gp",
 				"password": "password",
@@ -825,6 +831,15 @@ class BootStrapTestData:
 				"first_name": "_Test Patient 1",
 				"sex": "Male",
 				"customer_group": "Individual",
+			},
+			{
+				"doctype": "Patient",
+				"name": "_Test Web Form Patient",
+				"first_name": "_Test Web Form Patient",
+				"sex": "Female",
+				"customer_group": "Individual",
+				"email": "web_form_patient@marleyhealth.io",
+				"invite_user": 0,
 			},
 			{
 				"doctype": "Patient",

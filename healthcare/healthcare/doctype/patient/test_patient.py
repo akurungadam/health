@@ -8,6 +8,7 @@ import frappe
 from frappe.tests.classes.context_managers import freeze_time
 from frappe.utils import add_days, getdate, nowdate
 
+from healthcare.healthcare.doctype.patient.patient import get_patient_detail
 from healthcare.tests.factories.encounters import create_patient
 from healthcare.tests.utils import HealthcareTestSuite
 
@@ -22,6 +23,27 @@ class TestPatient(HealthcareTestSuite):
 		frappe.db.set_single_value("Healthcare Settings", "patient_name_by", "Patient Name")
 		names = [create_patient(patient_name="_Test Namesake") for _ in range(3)]
 		self.assertEqual(names, ["_Test Namesake", "_Test Namesake - 1", "_Test Namesake - 2"])
+
+	def test_patient_detail_includes_the_latest_vital_signs(self):
+		for days_ago, temperature in ((2, "37.5"), (0, "38.2")):
+			self.create_vital_signs(add_days(nowdate(), -days_ago), temperature)
+
+		details = get_patient_detail("_Test Patient")
+
+		self.assertEqual(details["patient_name"], "_Test Patient")
+		self.assertEqual(details["temperature"], "38.2")
+
+	def create_vital_signs(self, signs_date, temperature):
+		vital_signs = frappe.new_doc("Vital Signs")
+		vital_signs.update(
+			{
+				"patient": "_Test Patient",
+				"signs_date": signs_date,
+				"signs_time": "09:00:00",
+				"temperature": temperature,
+			}
+		)
+		vital_signs.insert()
 
 	def test_patient_registration(self):
 		registration_item = "_Test Registration"
