@@ -1,0 +1,81 @@
+name: Server (Postgres)
+
+on:
+  pull_request:
+    # 'labeled' so adding the 'postgres' label to an open PR starts a run.
+    types: [opened, reopened, synchronize, labeled]
+    paths-ignore:
+      - "**.css"
+      - "**.js"
+      - "**.md"
+      - "**.html"
+      - "**.csv"
+  schedule:
+    # Every day at 21:30 UTC / 03:00 IST
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: postgres-develop-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Server Tests (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # On pull requests, run only when the PR has the 'postgres' label.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'postgres')
+    env:
+      NODE_ENV: "production"
+
+    services:
+      postgres:
+        image: postgres:18.0
+        env:
+          POSTGRES_PASSWORD: travis
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          check-latest: true
+
+      - name: Add to Hosts
+        run: echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+
+      - name: Cache pip
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install
+        run: bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
+        env:
+          DB: postgres
+
+      - name: Run Tests
+        run: cd ~/frappe-bench/ && bench --site test_site run-parallel-tests --lightmode --app healthcare
+        env:
+          TYPE: server
+          FRAPPE_PRELOAD_DATABASE_DRIVERS: postgres
