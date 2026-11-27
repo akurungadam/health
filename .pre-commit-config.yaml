@@ -42,6 +42,16 @@ repos:
       - id: ruff-format
         name: "Format Python code"
 
+  - repo: local
+    hooks:
+      - id: postgres-compat
+        name: "PostgreSQL compatibility (static check)"
+        entry: .github/helper/postgres_compat.py
+        language: script
+        files: ^healthcare/.*\.py$
+        # Patches are version-gated migrations that a fresh Postgres install skips.
+        exclude: ^healthcare/patches/
+
 ci:
     autoupdate_schedule: weekly
     skip: []
